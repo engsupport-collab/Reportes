@@ -122,16 +122,16 @@ export function ReportForm({
             htmlFor="purchaseOrderNo"
             className="block text-sm font-medium text-text"
           >
-            No. orden de compra
+            No. orden de compra{" "}
+            <span className="font-normal text-muted">(opcional)</span>
           </label>
           <input
             id="purchaseOrderNo"
             name="purchaseOrderNo"
-            required
             maxLength={60}
             defaultValue={valores?.purchaseOrderNo}
             className={CAMPO}
-            placeholder="OC-2026-0148"
+            placeholder="OC-2026-0148 — se puede completar después"
           />
         </div>
 
@@ -228,12 +228,12 @@ export function ReportForm({
             htmlFor="details"
             className="block text-sm font-medium text-text"
           >
-            Detalles del trabajo
+            Detalles del trabajo{" "}
+            <span className="font-normal text-muted">(opcional)</span>
           </label>
           <textarea
             id="details"
             name="details"
-            required
             rows={6}
             maxLength={5000}
             defaultValue={valores?.details}

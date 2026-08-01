@@ -44,12 +44,14 @@ export default async function EditarReportePage({ params }: Params) {
             cancelarHref={`/reportes/${reporte.id}`}
             valores={{
               projectName: reporte.projectName,
-              purchaseOrderNo: reporte.purchaseOrderNo,
+              // null se convierte en "" para el input: un campo vacío es como
+              // se representa "sin valor todavía" en un formulario.
+              purchaseOrderNo: reporte.purchaseOrderNo ?? "",
               clientName: reporte.clientName,
               workDate: aValorInput(reporte.workDate),
               serviceType: reporte.serviceType ?? "",
               etiquetas: reporte.etiquetas,
-              details: reporte.details,
+              details: reporte.details ?? "",
             }}
           />
         </div>

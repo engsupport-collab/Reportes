@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { AppShell } from "@/components/app-shell";
+import { FilterChip, FilterGroupLabel } from "@/components/filter-chip";
 import { FiltrosClasificacion } from "@/components/reports/filtros";
 import { Paginacion, ReportList } from "@/components/reports/report-list";
 import { requireAccesoReportes } from "@/lib/auth-guard";
@@ -13,6 +14,7 @@ import {
 import {
   contarIncompletos,
   contarSinFirma,
+  contarSinOrden,
   listarReportesDeEmpleado,
 } from "@/lib/queries/reports";
 
@@ -21,6 +23,7 @@ type Params = {
     q?: string;
     pagina?: string;
     faltantes?: string;
+    sinorden?: string;
     servicio?: string;
     etiqueta?: string;
   }>;
@@ -44,6 +47,7 @@ export default async function ReportesPage({ searchParams }: Params) {
   const params = await searchParams;
 
   const soloIncompletos = params.faltantes === "1";
+  const soloSinOrden = params.sinorden === "1";
   const companyId = user.empresaActiva.id;
 
   // Los valores que llegan por URL se validan contra el catálogo antes de usarse.
@@ -55,17 +59,19 @@ export default async function ReportesPage({ searchParams }: Params) {
       ? params.etiqueta
       : undefined;
 
-  const [resultado, incompletos, sinFirma] = await Promise.all([
+  const [resultado, incompletos, sinFirma, sinOrden] = await Promise.all([
     listarReportesDeEmpleado(companyId, {
       authorId: user.id,
       buscar: params.q,
       soloIncompletos,
+      soloSinOrden,
       serviceType: servicio,
       etiqueta,
       pagina: Number(params.pagina) || 1,
     }),
     contarIncompletos(companyId, user.id),
     contarSinFirma(companyId, user.id),
+    contarSinOrden(companyId, user.id),
   ]);
 
   /** Construye una URL conservando los filtros vigentes. */
@@ -73,6 +79,7 @@ export default async function ReportesPage({ searchParams }: Params) {
     q?: string | null;
     pagina?: number | null;
     faltantes?: boolean;
+    sinorden?: boolean;
     serviceType?: string | null;
     etiqueta?: string | null;
   }) {
@@ -83,6 +90,9 @@ export default async function ReportesPage({ searchParams }: Params) {
 
     const faltantesNuevo = cambios.faltantes ?? soloIncompletos;
     if (faltantesNuevo) sp.set("faltantes", "1");
+
+    const sinOrdenNuevo = cambios.sinorden ?? soloSinOrden;
+    if (sinOrdenNuevo) sp.set("sinorden", "1");
 
     const servicioNuevo =
       cambios.serviceType === undefined
@@ -105,7 +115,7 @@ export default async function ReportesPage({ searchParams }: Params) {
   }
 
   const hayFiltros = Boolean(
-    params.q || soloIncompletos || servicio || etiqueta,
+    params.q || soloIncompletos || soloSinOrden || servicio || etiqueta,
   );
 
   return (
@@ -151,6 +161,9 @@ export default async function ReportesPage({ searchParams }: Params) {
             {soloIncompletos ? (
               <input type="hidden" name="faltantes" value="1" />
             ) : null}
+            {soloSinOrden ? (
+              <input type="hidden" name="sinorden" value="1" />
+            ) : null}
             {servicio ? (
               <input type="hidden" name="servicio" value={servicio} />
             ) : null}
@@ -178,6 +191,16 @@ export default async function ReportesPage({ searchParams }: Params) {
           >
             Nuevo reporte
           </Link>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <FilterGroupLabel>Orden de compra</FilterGroupLabel>
+          <FilterChip
+            href={construirHref({ sinorden: !soloSinOrden })}
+            activo={soloSinOrden}
+          >
+            Sin orden{sinOrden > 0 ? ` (${sinOrden})` : ""}
+          </FilterChip>
         </div>
 
         <FiltrosClasificacion

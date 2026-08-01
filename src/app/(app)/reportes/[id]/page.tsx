@@ -97,13 +97,14 @@ export default async function DetalleReportePage({ params }: Params) {
               status={reporte.status}
               attachmentCount={adjuntos.length}
               tieneFirma={reporte.signatureUrl !== null}
+              purchaseOrderNo={reporte.purchaseOrderNo}
             />
           </div>
 
           <dl className="mt-6 grid gap-5 sm:grid-cols-2">
             <Dato
               etiqueta="No. orden de compra"
-              valor={reporte.purchaseOrderNo}
+              valor={reporte.purchaseOrderNo ?? "Sin asignar"}
             />
             <Dato
               etiqueta="Fecha del trabajo"
@@ -120,11 +121,17 @@ export default async function DetalleReportePage({ params }: Params) {
             <h3 className="text-xs font-medium uppercase tracking-wide text-muted">
               Detalles del trabajo
             </h3>
-            {/* whitespace-pre-line conserva los saltos de línea que escribió el
-                empleado, sin permitir HTML: React escapa el contenido. */}
-            <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-text">
-              {reporte.details}
-            </p>
+            {reporte.details ? (
+              // whitespace-pre-line conserva los saltos de línea que escribió
+              // el empleado, sin permitir HTML: React escapa el contenido.
+              <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-text">
+                {reporte.details}
+              </p>
+            ) : (
+              // Sin alerta ni badge — el detalle es opcional a propósito, y su
+              // ausencia no es un pendiente, solo la falta de una nota.
+              <p className="mt-2 text-sm italic text-muted">Sin detalles.</p>
+            )}
           </div>
 
           {editado ? (

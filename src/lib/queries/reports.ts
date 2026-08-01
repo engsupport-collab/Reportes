@@ -77,12 +77,19 @@ const faltaFirma = sql`(
   ${reports.status} = 'terminado' AND ${reports.signatureUrl} IS NULL
 )`;
 
+/**
+ * Sin orden de compra. A diferencia de las dos anteriores, no depende del
+ * estado: es un dato administrativo que puede faltar en cualquier momento, no
+ * una señal de avance del trabajo.
+ */
+const sinOrden = sql`${reports.purchaseOrderNo} IS NULL`;
+
 export type ReporteEnLista = {
   id: string;
   companyId: string;
   companyName: string;
   projectName: string;
-  purchaseOrderNo: string;
+  purchaseOrderNo: string | null;
   clientName: string;
   workDate: Date;
   status: ReportStatus;
@@ -111,6 +118,7 @@ export type FiltrosReportes = {
   etiqueta?: string;
   soloIncompletos?: boolean;
   soloSinFirma?: boolean;
+  soloSinOrden?: boolean;
   buscar?: string;
   pagina?: number;
   porPagina?: number;
@@ -149,6 +157,9 @@ function construirWhere(filtros: FiltrosReportes) {
   }
   if (filtros.soloSinFirma) {
     condiciones.push(faltaFirma);
+  }
+  if (filtros.soloSinOrden) {
+    condiciones.push(sinOrden);
   }
 
   const buscar = filtros.buscar?.trim();
@@ -299,6 +310,29 @@ export async function contarSinFirma(
         companyId ? eq(reports.companyId, companyId) : undefined,
         authorId ? eq(reports.authorId, authorId) : undefined,
         faltaFirma,
+      ),
+    );
+
+  return Number(fila?.total ?? 0);
+}
+
+/**
+ * Cuántos reportes no tienen orden de compra. Sin condición de estado —a
+ * diferencia de las dos anteriores, es válido preguntarlo tanto de reportes en
+ * proceso como terminados.
+ */
+export async function contarSinOrden(
+  companyId?: string,
+  authorId?: string,
+): Promise<number> {
+  const [fila] = await db
+    .select({ total: sql<number>`COUNT(*)` })
+    .from(reports)
+    .where(
+      and(
+        companyId ? eq(reports.companyId, companyId) : undefined,
+        authorId ? eq(reports.authorId, authorId) : undefined,
+        sinOrden,
       ),
     );
 

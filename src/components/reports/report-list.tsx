@@ -55,7 +55,10 @@ export function ReportList({
 
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted">
               <span>
-                OC <span className="font-medium text-text">{r.purchaseOrderNo}</span>
+                OC{" "}
+                <span className="font-medium text-text">
+                  {r.purchaseOrderNo ?? "sin asignar"}
+                </span>
               </span>
               <span>{formatFechaCorta(r.workDate)}</span>
               <span>
@@ -76,6 +79,7 @@ export function ReportList({
                 status={r.status}
                 attachmentCount={r.attachmentCount}
                 tieneFirma={r.tieneFirma}
+                purchaseOrderNo={r.purchaseOrderNo}
               />
             </div>
           </Link>

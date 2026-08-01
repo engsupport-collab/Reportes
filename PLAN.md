@@ -19,6 +19,7 @@ Esta sección describe la versión final, tras un cambio de rumbo del cliente a 
 **Admin** — no elige empresa nunca. Ve reportes de las dos mezclados por defecto, en el panel y en la lista global, con un filtro para acotar a una si lo necesita. Al crear un reporte, un interruptor le pide explícitamente para cuál empresa es — es la única acción donde el admin sí tiene que decidir una empresa, porque crear un reporte exige guardarlo en una de las dos.
 
 - **Los mismos campos en ambas**, pero conjuntos de datos completamente separados. Un empleado puede tener 2 reportes en Corp y 5 en SaaS.
+- **Los nombres `Corp` y `SaaS` son provisionales**, confirmado con el cliente al desplegar producción — de momento se quedan así. El nombre visible vive en `companies.name`, una columna de texto sin relación con el identificador interno (`corp`/`saas`, usado en URLs, filtros y la clave foránea de cada reporte). Cambiarlo el día que definan los nombres comerciales reales es un `UPDATE companies SET name = 'Nombre real' WHERE id = 'corp'` — una sola sentencia, sin migración, sin tocar código ni afectar ningún reporte ya guardado.
 
 Cómo se garantiza que los datos no se mezclen sin querer, y que el admin sí pueda tocar todo a propósito:
 
@@ -460,6 +461,39 @@ Se sembraron 2.000 reportes (`npm run seed:demo -- 2000`, quedaron 2.011 en tota
 8. **Repaso de seguridad** — bloqueo por intentos, cabeceras, revisión manual de que cada Server Action llama a su guard.
 9. **Repaso de rendimiento** — sembrar 2.000 reportes de prueba, medir, ajustar índices y paginación, confirmar Fluid Compute y regiones.
 10. **Despliegue** — variables de entorno en Vercel, migración en producción, seed del admin, prueba end-to-end.
+
+### Fase 10, hecho: desplegado en producción
+
+**URL:** `https://reportes-eight.vercel.app`
+**Repositorio:** `github.com/engsupport-collab/Reportes` (privado), conectado a Vercel para despliegue automático en cada push a `main`.
+**Base de datos:** Turso `reportes-engsupport`, región `aws-us-east-1`, limpia — sin los 2.000 reportes de prueba de la fase 9.
+**Blob Store:** `reportes-archivos`, acceso público (igual que en desarrollo), región `iad1`.
+**Cuenta dueña de todo:** Gmail nuevo, propiedad de la empresa — GitHub, Vercel y Turso vinculados a esa identidad, no a la del desarrollador.
+
+Verificado en el sitio real, no solo localmente:
+
+- Login como admin contra la base de producción → funciona, sin errores de consola.
+- Las cinco cabeceras de seguridad llegan en la respuesta real.
+- **La región de las funciones quedó en `iad1` sin configurar nada** — es el default de Vercel para proyectos nuevos, y coincide exactamente con `aws-us-east-1` de Turso. No hizo falta tocar `vercel.json`.
+- El middleware y las páginas estáticas responden en ~400 ms desde donde se probó — ese número es la latencia de red hasta el borde de Vercel, no algo que la app controle.
+
+**Un hallazgo real, sin resolver todavía:** las páginas que sí consultan Turso (login, `/admin/reportes`) responden de forma estable en ~1.9–2.3 segundos, **incluso repitiendo la misma petición varias veces seguidas** — eso descarta que sea un arranque en frío puntual, porque un arranque en frío se nota una vez y después baja. Con la región ya coincidiendo, esta cifra es más alta de lo que la sección 7.1 hacía esperar.
+
+**Fluid Compute: confirmado activo** en el dashboard (`Settings → Functions`) — descarta la primera causa. Queda en pie la segunda:
+
+**Tráfico real bajo.** Un proyecto recién desplegado, sin visitas reales todavía, es exactamente el escenario donde Vercel mantiene menos instancias calientes incluso con Fluid Compute activo. Es posible que este número baje solo, una vez que la empresa empiece a usar el sistema con regularidad durante el día.
+
+**Pendiente:** volver a medir después de unos días de uso real antes de decidir si hace falta investigar más.
+
+### Fase 10.1: orden de compra y detalles opcionales
+
+Pedido del cliente después del lanzamiento: algunos trabajos se registran antes de que exista número de orden de compra, y no todos los reportes necesitan un detalle escrito.
+
+- `purchase_order_no` y `details` dejaron de ser `NOT NULL` en el esquema (`drizzle/0005_many_kingpin.sql`). Migración aplicada con `ALTER COLUMN` nativo de libSQL, sin recrear tablas — sin pérdida de datos, verificado primero en desarrollo.
+- El formulario ya no exige ninguno de los dos campos; ambos muestran "(opcional)" en su etiqueta.
+- **Falta de orden es una alerta, falta de detalle no.** El cliente fue explícito: la orden de compra es un dato administrativo que puede faltar el primer día y completarse después al editar, así que un reporte sin orden muestra el tag "Sin orden" **sin importar su estado** (a diferencia de "Falta documento"/"Falta firma", que solo aplican a reportes terminados). Los detalles, en cambio, no disparan ninguna alerta si faltan — el reporte simplemente muestra "Sin detalles." en su vista.
+- "Sin orden" es también un filtro, replicado en la Vista General del empleado y en la Vista Master del admin, con conteo (`contarSinOrden`) igual que los filtros de faltantes existentes.
+- Para completar la orden más tarde: el mismo flujo de edición que ya existía (admin o el autor del reporte).
 
 ## Problema abierto: firmar con el dedo en celular
 

@@ -48,11 +48,13 @@ export const reporteSchema = z.object({
     .trim()
     .min(1, "Ingresa el nombre del proyecto")
     .max(200, "El nombre del proyecto es demasiado largo"),
+  // Opcional: se guarda `null` si viene vacío, nunca una cadena vacía — así
+  // "sin orden" es una sola condición (`IS NULL`) en vez de dos.
   purchaseOrderNo: z
     .string()
     .trim()
-    .min(1, "Ingresa el número de orden de compra")
-    .max(60, "El número de orden es demasiado largo"),
+    .max(60, "El número de orden es demasiado largo")
+    .transform((v) => (v.length > 0 ? v : null)),
   clientName: z
     .string()
     .trim()
@@ -73,11 +75,14 @@ export const reporteSchema = z.object({
   serviceType: z.enum(TIPOS_SERVICIO_IDS, {
     message: "Indica si el trabajo fue eléctrico o mecánico",
   }),
+  // Opcional, y a propósito sin ningún `min(1)`: el cliente pidió
+  // explícitamente que la ausencia de detalles no dispare ninguna alerta, a
+  // diferencia de la orden de compra.
   details: z
     .string()
     .trim()
-    .min(1, "Describe el trabajo realizado")
-    .max(5000, "Los detalles no pueden superar los 5000 caracteres"),
+    .max(5000, "Los detalles no pueden superar los 5000 caracteres")
+    .transform((v) => (v.length > 0 ? v : null)),
 });
 
 export type ReporteInput = z.infer<typeof reporteSchema>;

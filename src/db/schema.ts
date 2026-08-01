@@ -114,10 +114,18 @@ export const reports = sqliteTable(
       .references(() => users.id, { onDelete: "restrict" }),
 
     projectName: text("project_name").notNull(),
-    purchaseOrderNo: text("purchase_order_no").notNull(),
+    // Opcional: algunos trabajos no tienen orden de compra todavía cuando se
+    // registra el reporte. A diferencia de "sin documento" o "sin firma", esto
+    // no depende del estado — se marca "Sin orden" apenas falta, esté en
+    // proceso o terminado, porque es un dato administrativo, no de avance del
+    // trabajo.
+    purchaseOrderNo: text("purchase_order_no"),
     clientName: text("client_name").notNull(),
     workDate: integer("work_date", { mode: "timestamp_ms" }).notNull(),
-    details: text("details").notNull(),
+    // Opcional a propósito: el detalle es una ayuda para quien lee el reporte
+    // después, no un requisito. A diferencia de la orden de compra, su
+    // ausencia no se marca con ninguna alerta.
+    details: text("details"),
 
     /**
      * Eléctrico o mecánico. Excluyente: un reporte es de uno o del otro.

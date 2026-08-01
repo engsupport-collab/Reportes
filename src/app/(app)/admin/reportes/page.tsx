@@ -19,6 +19,7 @@ type Params = {
     pagina?: string;
     faltantes?: string;
     sinfirma?: string;
+    sinorden?: string;
     servicio?: string;
     etiqueta?: string;
     empleado?: string;
@@ -44,6 +45,7 @@ export default async function AdminReportesPage({ searchParams }: Params) {
 
   const soloIncompletos = params.faltantes === "1";
   const soloSinFirma = params.sinfirma === "1";
+  const soloSinOrden = params.sinorden === "1";
 
   const servicio = TIPOS_SERVICIO_IDS.includes(params.servicio as TipoServicio)
     ? (params.servicio as TipoServicio)
@@ -66,6 +68,7 @@ export default async function AdminReportesPage({ searchParams }: Params) {
     buscar: params.q,
     soloIncompletos,
     soloSinFirma,
+    soloSinOrden,
     serviceType: servicio,
     etiqueta,
     pagina: Number(params.pagina) || 1,
@@ -76,6 +79,7 @@ export default async function AdminReportesPage({ searchParams }: Params) {
     pagina?: number | null;
     faltantes?: boolean | null;
     sinfirma?: boolean | null;
+    sinorden?: boolean | null;
     serviceType?: string | null;
     etiqueta?: string | null;
     empleado?: string | null;
@@ -93,6 +97,10 @@ export default async function AdminReportesPage({ searchParams }: Params) {
     const sinFirmaNuevo =
       cambios.sinfirma === undefined ? soloSinFirma : cambios.sinfirma;
     if (sinFirmaNuevo) sp.set("sinfirma", "1");
+
+    const sinOrdenNuevo =
+      cambios.sinorden === undefined ? soloSinOrden : cambios.sinorden;
+    if (sinOrdenNuevo) sp.set("sinorden", "1");
 
     const servicioNuevo =
       cambios.serviceType === undefined
@@ -130,6 +138,7 @@ export default async function AdminReportesPage({ searchParams }: Params) {
     params.q ||
       soloIncompletos ||
       soloSinFirma ||
+      soloSinOrden ||
       servicio ||
       etiqueta ||
       empleadoId ||
@@ -152,6 +161,9 @@ export default async function AdminReportesPage({ searchParams }: Params) {
             ) : null}
             {soloSinFirma ? (
               <input type="hidden" name="sinfirma" value="1" />
+            ) : null}
+            {soloSinOrden ? (
+              <input type="hidden" name="sinorden" value="1" />
             ) : null}
             {servicio ? (
               <input type="hidden" name="servicio" value={servicio} />
@@ -211,6 +223,12 @@ export default async function AdminReportesPage({ searchParams }: Params) {
               activo={soloSinFirma}
             >
               Sin firmar
+            </FilterChip>
+            <FilterChip
+              href={construirHref({ sinorden: !soloSinOrden })}
+              activo={soloSinOrden}
+            >
+              Sin orden
             </FilterChip>
           </div>
         </div>

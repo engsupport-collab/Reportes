@@ -88,26 +88,34 @@ export function AlertaBadge({ children }: { children: React.ReactNode }) {
 }
 
 /**
- * Qué le falta a un reporte terminado. No muestra nada si está en proceso:
- * mientras el trabajo sigue abierto, que falte el documento es normal.
+ * Qué le falta a un reporte.
+ *
+ * "Sin orden" es distinto a los otros dos: se muestra sin importar el estado,
+ * porque es un dato administrativo (puede faltar desde el primer día y
+ * completarse después, al editar), no una señal de qué tan avanzado va el
+ * trabajo. "Falta documento" y "Falta firma" sí dependen del estado: mientras
+ * el trabajo sigue en proceso, que falten es normal y no amerita alerta.
  */
 export function Faltantes({
   status,
   attachmentCount,
   tieneFirma,
+  purchaseOrderNo,
 }: {
   status: ReportStatus;
   attachmentCount: number;
   tieneFirma: boolean;
+  purchaseOrderNo: string | null;
 }) {
-  if (status !== "terminado") return null;
+  const terminado = status === "terminado";
 
   return (
     <>
-      {attachmentCount === 0 ? (
+      {!purchaseOrderNo ? <AlertaBadge>Sin orden</AlertaBadge> : null}
+      {terminado && attachmentCount === 0 ? (
         <AlertaBadge>Falta documento</AlertaBadge>
       ) : null}
-      {!tieneFirma ? <AlertaBadge>Falta firma</AlertaBadge> : null}
+      {terminado && !tieneFirma ? <AlertaBadge>Falta firma</AlertaBadge> : null}
     </>
   );
 }
