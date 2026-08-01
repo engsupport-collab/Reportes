@@ -1,0 +1,41 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1785598107254,
+      "tag": "0000_ancient_kate_bishop",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1785599645201,
+      "tag": "0001_clammy_infant_terrible",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1785602086047,
+      "tag": "0002_ancient_randall",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1785602804659,
+      "tag": "0003_real_shiver_man",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1785602900338,
+      "tag": "0004_redundant_liz_osborn",
+      "breakpoints": true
+    }
+  ]
+}

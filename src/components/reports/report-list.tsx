@@ -1,0 +1,132 @@
+import Link from "next/link";
+
+import { formatFechaCorta } from "@/lib/fechas";
+import type { ReporteEnLista } from "@/lib/queries/reports";
+import { Clasificacion, EstadoBadge, Faltantes } from "./badges";
+
+/**
+ * Lista de reportes.
+ *
+ * En vez de una tabla se usan tarjetas apiladas: el sistema se abre igual desde
+ * el celular, y una tabla de seis columnas ahí obliga a hacer scroll horizontal
+ * o encoge el texto hasta hacerlo ilegible. En pantalla ancha las tarjetas se
+ * distribuyen en columnas.
+ */
+export function ReportList({
+  items,
+  mostrarAutor = false,
+  mostrarEmpresa = false,
+  baseHref = "/reportes",
+}: {
+  items: ReporteEnLista[];
+  mostrarAutor?: boolean;
+  /** El admin ve reportes de las dos empresas mezclados; esto aclara de cuál es cada uno. */
+  mostrarEmpresa?: boolean;
+  baseHref?: string;
+}) {
+  if (items.length === 0) {
+    return (
+      <div className="rounded-2xl border border-dashed border-border bg-surface p-10 text-center">
+        <p className="text-sm font-medium text-text">No hay reportes todavía</p>
+        <p className="mx-auto mt-1 max-w-sm text-sm text-muted">
+          Cuando termines un trabajo, crea un reporte para dejarlo registrado.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <ul className="grid gap-3 lg:grid-cols-2">
+      {items.map((r) => (
+        <li key={r.id}>
+          <Link
+            href={`${baseHref}/${r.id}`}
+            className="flex h-full flex-col gap-3 rounded-2xl border border-border bg-surface p-4 transition hover:border-brand hover:shadow-sm"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold text-text">
+                  {r.projectName}
+                </p>
+                <p className="truncate text-sm text-muted">{r.clientName}</p>
+              </div>
+              <EstadoBadge status={r.status} />
+            </div>
+
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted">
+              <span>
+                OC <span className="font-medium text-text">{r.purchaseOrderNo}</span>
+              </span>
+              <span>{formatFechaCorta(r.workDate)}</span>
+              <span>
+                {r.attachmentCount === 0
+                  ? "Sin adjuntos"
+                  : `${r.attachmentCount} adjunto${r.attachmentCount === 1 ? "" : "s"}`}
+              </span>
+              {mostrarAutor ? <span>{r.authorName}</span> : null}
+              {mostrarEmpresa ? <span>{r.companyName}</span> : null}
+            </div>
+
+            <div className="mt-auto flex flex-wrap gap-2 empty:hidden">
+              <Clasificacion
+                serviceType={r.serviceType}
+                etiquetas={r.etiquetas}
+              />
+              <Faltantes
+                status={r.status}
+                attachmentCount={r.attachmentCount}
+                tieneFirma={r.tieneFirma}
+              />
+            </div>
+          </Link>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/** Paginación en el servidor: los enlaces cambian la URL, no filtran en memoria. */
+export function Paginacion({
+  pagina,
+  totalPaginas,
+  hrefPara,
+}: {
+  pagina: number;
+  totalPaginas: number;
+  hrefPara: (pagina: number) => string;
+}) {
+  if (totalPaginas <= 1) return null;
+
+  return (
+    <nav
+      aria-label="Paginación"
+      className="flex items-center justify-between gap-3"
+    >
+      {pagina > 1 ? (
+        <Link
+          href={hrefPara(pagina - 1)}
+          className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-muted transition hover:bg-surface-muted hover:text-text"
+        >
+          Anterior
+        </Link>
+      ) : (
+        <span />
+      )}
+
+      <span className="text-sm text-muted">
+        Página {pagina} de {totalPaginas}
+      </span>
+
+      {pagina < totalPaginas ? (
+        <Link
+          href={hrefPara(pagina + 1)}
+          className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-muted transition hover:bg-surface-muted hover:text-text"
+        >
+          Siguiente
+        </Link>
+      ) : (
+        <span />
+      )}
+    </nav>
+  );
+}
