@@ -64,6 +64,42 @@ function ultimosDoceMeses(): PuntoMes[] {
   return puntos;
 }
 
+/**
+ * Serie de reportes por mes, sola.
+ *
+ * Aquí `companyId` sí es opcional —`undefined` suma las dos empresas— porque
+ * el panel del admin muestra justamente eso. Es la única parte de estas
+ * analíticas donde mezclar tiene sentido: "cuánto trabajo entra al mes" es una
+ * pregunta del negocio entero, no de una empresa concreta.
+ */
+export async function serieMensual(
+  companyId?: string,
+): Promise<PuntoMes[]> {
+  const hoy = new Date();
+  const desde = new Date(hoy.getFullYear(), hoy.getMonth() - 11, 1);
+
+  const filas = await db
+    .select({
+      mes: sql<string>`strftime('%Y-%m', ${reports.createdAt} / 1000, 'unixepoch')`,
+      n: sql<number>`COUNT(*)`,
+    })
+    .from(reports)
+    .where(
+      companyId
+        ? and(eq(reports.companyId, companyId), gte(reports.createdAt, desde))
+        : gte(reports.createdAt, desde),
+    )
+    .groupBy(sql`1`);
+
+  const puntos = ultimosDoceMeses();
+  const indice = new Map(puntos.map((p, i) => [p.mes, i]));
+  for (const fila of filas) {
+    const i = indice.get(fila.mes);
+    if (i !== undefined) puntos[i]!.total = Number(fila.n);
+  }
+  return puntos;
+}
+
 export async function obtenerAnaliticas(
   companyId: string,
 ): Promise<Analiticas> {
