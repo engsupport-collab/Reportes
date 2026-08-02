@@ -16,6 +16,12 @@
  */
 import { config } from "dotenv";
 
+// Se anota ANTES de cargar .env.local, para poder decir después de dónde
+// salió la conexión. Sin este aviso, abrir una terminal nueva —donde ya no
+// están las variables exportadas— haría que el script escribiera en
+// desarrollo mientras uno cree que está tocando producción.
+const urlVeniaDelEntorno = Boolean(process.env.TURSO_DATABASE_URL);
+
 // No sobrescribe lo que ya esté en el entorno: si se exportó
 // TURSO_DATABASE_URL apuntando a producción, eso manda sobre .env.local.
 config({ path: ".env.local" });
@@ -235,7 +241,14 @@ async function main() {
 
   // Se dice en voz alta contra qué base se va a escribir: este script puede
   // correr contra producción, y equivocarse de base no debería ser silencioso.
-  console.log(`Base de datos: ${new URL(url).host}`);
+  console.log("");
+  console.log(`  BASE DE DATOS: ${new URL(url).host}`);
+  console.log(
+    urlVeniaDelEntorno
+      ? "  (de las variables de entorno)"
+      : "  (de .env.local — si esperabas producción, CANCELA y exporta TURSO_DATABASE_URL)",
+  );
+  console.log("");
 
   const client = createClient({ url, authToken });
   const db = drizzle(client);
