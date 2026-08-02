@@ -2,9 +2,156 @@
 
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useState } from "react";
 
 import { IconBuscar, IconMenu } from "@/components/nav-icons";
+import type { NavItem } from "@/components/side-nav";
 import type { CurrentUser } from "@/lib/auth-guard";
+
+/**
+ * Para comparar lo escrito con el nombre de una sección sin que estorben las
+ * mayúsculas ni las tildes: quien escribe "nue" o "electrico" con prisa espera
+ * encontrar "Nuevo reporte" y "Eléctrico" igual.
+ */
+function normalizar(texto: string): string {
+  return texto
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "");
+}
+
+type Destino = { href: string; label: string };
+
+/**
+ * Buscador de la barra superior.
+ *
+ * Hace dos cosas con el mismo campo: sugiere secciones a las que ir (escribir
+ * "pan" ofrece "Panel") y, al confirmar, busca reportes. Las secciones son
+ * cuatro o cinco y se sabe su nombre; los reportes son miles y no. Por eso la
+ * sugerencia hay que elegirla — con Enter a secas se busca, que es lo que se
+ * hace la mayoría de las veces.
+ */
+function Buscador({
+  valorInicial,
+  destinos,
+  onBuscar,
+}: {
+  valorInicial: string;
+  destinos: Destino[];
+  onBuscar: (q: string) => void;
+}) {
+  const router = useRouter();
+  const [texto, setTexto] = useState(valorInicial);
+  const [abierto, setAbierto] = useState(false);
+  // -1 = ninguna sugerencia elegida, así Enter busca en vez de navegar.
+  const [indice, setIndice] = useState(-1);
+
+  const consulta = normalizar(texto.trim());
+  const sugerencias = consulta
+    ? destinos.filter((d) => normalizar(d.label).includes(consulta))
+    : [];
+  const visibles = abierto && sugerencias.length > 0;
+
+  function irA(destino: Destino) {
+    setAbierto(false);
+    setTexto("");
+    router.push(destino.href);
+  }
+
+  function alTeclear(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (!visibles) return;
+
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setIndice((i) => (i + 1) % sugerencias.length);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setIndice((i) => (i <= 0 ? sugerencias.length - 1 : i - 1));
+    } else if (e.key === "Escape") {
+      setAbierto(false);
+      setIndice(-1);
+    }
+  }
+
+  function enviar(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const elegida = sugerencias[indice];
+    if (visibles && elegida) {
+      irA(elegida);
+      return;
+    }
+    setAbierto(false);
+    onBuscar(texto.trim());
+  }
+
+  return (
+    <div className="relative min-w-0 flex-1 sm:max-w-md">
+      <form onSubmit={enviar} role="search">
+        <IconBuscar className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
+        <input
+          type="text"
+          name="q"
+          value={texto}
+          onChange={(e) => {
+            setTexto(e.target.value);
+            setAbierto(true);
+            setIndice(-1);
+          }}
+          onFocus={() => setAbierto(true)}
+          onKeyDown={alTeclear}
+          placeholder="Buscar reportes o ir a una sección…"
+          aria-label="Buscar reportes o ir a una sección"
+          role="combobox"
+          aria-expanded={visibles}
+          aria-controls="sugerencias-busqueda"
+          aria-autocomplete="list"
+          autoComplete="off"
+          className="w-full rounded-lg border border-border bg-surface-muted py-2 pl-9 pr-3 text-sm text-text placeholder:text-muted focus:border-brand focus:outline-none"
+        />
+      </form>
+
+      {visibles ? (
+        <>
+          {/* Capa invisible: un clic fuera cierra la lista sin escuchar
+              eventos en todo el documento. No se usa onBlur porque se dispara
+              antes del clic en una sugerencia y se la lleva por delante. */}
+          <button
+            type="button"
+            aria-label="Cerrar sugerencias"
+            className="fixed inset-0 z-10 cursor-default"
+            onClick={() => setAbierto(false)}
+          />
+
+          <ul
+            id="sugerencias-busqueda"
+            role="listbox"
+            className="absolute left-0 right-0 z-20 mt-2 overflow-hidden rounded-xl border border-border bg-surface py-1 shadow-lg"
+          >
+            <li className="px-3 py-1.5 text-xs font-medium uppercase tracking-wide text-muted">
+              Ir a
+            </li>
+            {sugerencias.map((d, i) => (
+              <li key={d.href} role="option" aria-selected={i === indice}>
+                <button
+                  type="button"
+                  onClick={() => irA(d)}
+                  onMouseEnter={() => setIndice(i)}
+                  className={`flex w-full items-center px-3 py-2 text-left text-sm transition ${
+                    i === indice
+                      ? "bg-brand-soft text-brand"
+                      : "text-text hover:bg-surface-muted"
+                  }`}
+                >
+                  {d.label}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </>
+      ) : null}
+    </div>
+  );
+}
 
 /**
  * Barra superior: buscador a la izquierda, cuenta a la derecha.
@@ -15,9 +162,11 @@ import type { CurrentUser } from "@/lib/auth-guard";
  */
 export function TopBar({
   user,
+  nav,
   onAbrirMenu,
 }: {
   user: CurrentUser;
+  nav: NavItem[];
   onAbrirMenu: () => void;
 }) {
   const router = useRouter();
@@ -26,11 +175,14 @@ export function TopBar({
 
   const destino = user.role === "admin" ? "/admin/reportes" : "/reportes";
   const inicial = user.fullName.trim().charAt(0).toUpperCase();
+  const qActual = pathname === destino ? (searchParams.get("q") ?? "") : "";
 
-  function buscar(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    const q = String(new FormData(e.currentTarget).get("q") ?? "").trim();
+  const destinos: Destino[] = [
+    ...nav.map((n) => ({ href: n.href, label: n.label })),
+    { href: "/perfil", label: "Mi perfil" },
+  ];
 
+  function buscar(q: string) {
     const sp = new URLSearchParams();
 
     // Si ya se está en la lista, buscar no debe tirar los filtros puestos: se
@@ -60,22 +212,14 @@ export function TopBar({
           <IconMenu className="h-5 w-5" />
         </button>
 
-        <form onSubmit={buscar} className="relative min-w-0 flex-1 sm:max-w-md">
-          <IconBuscar className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
-          <input
-            type="search"
-            name="q"
-            // key: al navegar a otra búsqueda el campo tiene que reflejar la
-            // vigente, no conservar en el DOM lo que se tecleó antes.
-            key={searchParams.get("q") ?? ""}
-            defaultValue={
-              pathname === destino ? (searchParams.get("q") ?? "") : ""
-            }
-            placeholder="Buscar por proyecto, cliente u orden…"
-            aria-label="Buscar reportes"
-            className="w-full rounded-lg border border-border bg-surface-muted py-2 pl-9 pr-3 text-sm text-text placeholder:text-muted focus:border-brand focus:outline-none"
-          />
-        </form>
+        {/* key: al navegar a otra búsqueda el campo tiene que reflejar la
+            vigente, no conservar lo que se tecleó antes. */}
+        <Buscador
+          key={qActual}
+          valorInicial={qActual}
+          destinos={destinos}
+          onBuscar={buscar}
+        />
 
         <Link
           href="/perfil"

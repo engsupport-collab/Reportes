@@ -44,7 +44,11 @@ export function ShellChrome({
       </SideNav>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <TopBar user={user} onAbrirMenu={() => setMenuAbierto(true)} />
+        <TopBar
+          user={user}
+          nav={nav}
+          onAbrirMenu={() => setMenuAbierto(true)}
+        />
 
         <main className="flex-1 px-4 py-6 sm:px-6 sm:py-8">
           <div className="mx-auto max-w-6xl">{children}</div>

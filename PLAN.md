@@ -535,6 +535,8 @@ Pedido del cliente sobre la navegación, a partir de un dashboard de referencia:
 - El estado del cajón móvil se movió a `shell-chrome.tsx` porque ahora el botón que lo abre (barra superior) y el cajón (rail) son componentes distintos.
 - **No se agregaron** correo, teléfono, ubicación ni foto: esos campos no existen en la base y mostrarlos vacíos no aporta. Requerirían una migración.
 - Corregido de paso un desbordamiento horizontal preexistente: las tarjetas de `report-list` se salían 28px de la pantalla a 390px porque las celdas del grid no llevaban `min-w-0` y no encogían por debajo de su contenido mínimo.
+- **Sugerencias de navegación en el buscador**: escribir "pan" ofrece "Panel", "nue" ofrece "Nuevo reporte". La comparación ignora mayúsculas y tildes. El mismo campo hace dos cosas porque las secciones son cinco y se sabe su nombre, mientras que los reportes son miles y no: por eso la sugerencia hay que elegirla (clic, o flechas y Enter) y **Enter a secas sigue buscando reportes**, que es lo que se hace la mayoría de las veces. Se cierra con un clic fuera, no con `onBlur` — ese se dispara antes del clic en la sugerencia y se la lleva por delante.
+- En `/perfil`, el avatar se posiciona en absoluto a caballo sobre el borde del banner. Antes el nombre iba alineado al fondo del avatar dentro del mismo flex y, como el avatar sube 40px, terminaba escrito encima del color.
 
 ## Problema abierto: firmar con el dedo en celular
 

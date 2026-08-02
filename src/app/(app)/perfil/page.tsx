@@ -38,29 +38,32 @@ export default async function PerfilPage() {
   return (
     <AppShell user={user} saludo={false}>
       <div className="space-y-5">
-        <div className="overflow-hidden rounded-2xl border border-border bg-surface">
+        <div className="relative overflow-hidden rounded-2xl border border-border bg-surface">
           <div className="h-24 bg-gradient-to-r from-brand to-brand-strong" />
 
-          <div className="px-5 pb-5 sm:px-6 sm:pb-6">
-            <div className="-mt-10 flex flex-wrap items-end gap-4">
-              <span
-                aria-hidden
-                className="flex h-20 w-20 shrink-0 items-center justify-center rounded-full border-4 border-surface bg-brand-soft text-2xl font-bold text-brand"
-              >
-                {cuenta.fullName.trim().charAt(0).toUpperCase()}
-              </span>
+          {/* El avatar se posiciona en absoluto, montado a caballo sobre el
+              borde del banner. Antes el nombre iba alineado al fondo del
+              avatar dentro del mismo flex, y como el avatar sube 40px el
+              nombre terminaba escrito encima del color. Así el texto queda
+              siempre debajo de la línea, sin depender de cuánto mida. */}
+          <span
+            aria-hidden
+            className="absolute left-5 top-24 flex h-20 w-20 -translate-y-1/2 items-center justify-center rounded-full border-4 border-surface bg-brand-soft text-2xl font-bold text-brand sm:left-6"
+          >
+            {cuenta.fullName.trim().charAt(0).toUpperCase()}
+          </span>
 
-              <div className="min-w-0 flex-1 pb-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <h2 className="text-xl font-semibold text-text">
-                    {cuenta.fullName}
-                  </h2>
-                  <span className="rounded-full bg-surface-muted px-2 py-0.5 text-xs font-medium text-muted">
-                    {esAdmin ? "Administrador" : "Empleado"}
-                  </span>
-                </div>
-                <p className="mt-0.5 text-sm text-muted">@{cuenta.username}</p>
+          <div className="px-5 pb-5 sm:px-6 sm:pb-6">
+            <div className="ml-24 min-h-11 pt-3 sm:ml-[6.5rem]">
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="text-xl font-semibold text-text">
+                  {cuenta.fullName}
+                </h2>
+                <span className="rounded-full bg-surface-muted px-2 py-0.5 text-xs font-medium text-muted">
+                  {esAdmin ? "Administrador" : "Empleado"}
+                </span>
               </div>
+              <p className="mt-0.5 text-sm text-muted">@{cuenta.username}</p>
             </div>
 
             <dl className="mt-6 grid gap-5 border-t border-border pt-5 sm:grid-cols-3">
