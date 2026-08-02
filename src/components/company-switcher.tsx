@@ -29,7 +29,7 @@ export function CompanySwitcher({
 
   if (empresas.length <= 1) {
     return (
-      <span className="flex items-center gap-2 rounded-lg bg-brand-soft px-3 py-1.5 text-sm font-semibold text-brand">
+      <span className="flex w-full items-center rounded-lg bg-brand-soft px-3 py-2 text-sm font-semibold text-brand">
         {activa.name}
       </span>
     );
@@ -43,13 +43,15 @@ export function CompanySwitcher({
         disabled={pendiente}
         aria-haspopup="listbox"
         aria-expanded={abierto}
-        className="flex items-center gap-2 rounded-lg bg-brand-soft px-3 py-1.5 text-sm font-semibold text-brand transition hover:brightness-95 disabled:opacity-60"
+        className="flex w-full items-center justify-between gap-2 rounded-lg bg-brand-soft px-3 py-2 text-left text-sm font-semibold text-brand transition hover:brightness-95 disabled:opacity-60"
       >
-        {pendiente ? "Cambiando…" : activa.name}
+        <span className="truncate">
+          {pendiente ? "Cambiando…" : activa.name}
+        </span>
         <svg
           aria-hidden
           viewBox="0 0 12 12"
-          className={`h-3 w-3 transition ${abierto ? "rotate-180" : ""}`}
+          className={`h-3 w-3 shrink-0 transition ${abierto ? "rotate-180" : ""}`}
           fill="currentColor"
         >
           <path d="M6 8.5 1.5 4h9L6 8.5Z" />
@@ -69,7 +71,7 @@ export function CompanySwitcher({
 
           <ul
             role="listbox"
-            className="absolute right-0 z-20 mt-2 w-48 overflow-hidden rounded-xl border border-border bg-surface py-1 shadow-lg"
+            className="absolute left-0 right-0 z-20 mt-2 overflow-hidden rounded-xl border border-border bg-surface py-1 shadow-lg"
           >
             {empresas.map((empresa) => {
               const esActiva = empresa.id === activa.id;

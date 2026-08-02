@@ -1,7 +1,6 @@
-import Link from "next/link";
-
 import { logoutAction } from "@/actions/auth";
 import { elegirEmpresaAction } from "@/actions/companies";
+import { SideNav, type NavItem } from "@/components/side-nav";
 import type { CurrentUser } from "@/lib/auth-guard";
 import { formatFechaEncabezado, horaLocal } from "@/lib/fechas";
 import { CompanySwitcher } from "./company-switcher";
@@ -16,25 +15,24 @@ function saludo(): string {
   return "Buenas noches";
 }
 
-type NavItem = { href: string; label: string };
-
 function navPara(role: CurrentUser["role"]): NavItem[] {
   if (role === "admin") {
     return [
-      { href: "/admin", label: "Panel" },
-      { href: "/admin/reportes", label: "Reportes" },
-      { href: "/reportes/nuevo", label: "Nuevo reporte" },
-      { href: "/admin/usuarios", label: "Usuarios" },
+      { href: "/admin", label: "Panel", icono: "panel" },
+      { href: "/admin/reportes", label: "Reportes", icono: "reportes" },
+      { href: "/reportes/nuevo", label: "Nuevo reporte", icono: "nuevo" },
+      { href: "/admin/usuarios", label: "Usuarios", icono: "usuarios" },
     ];
   }
   return [
-    { href: "/reportes", label: "Mis reportes" },
-    { href: "/reportes/nuevo", label: "Nuevo reporte" },
+    { href: "/reportes", label: "Mis reportes", icono: "reportes" },
+    { href: "/reportes/nuevo", label: "Nuevo reporte", icono: "nuevo" },
   ];
 }
 
 /**
- * Marco común de las dos vistas.
+ * Marco común de las dos vistas: rail de navegación a la izquierda y el
+ * contenido de la página a la derecha.
  *
  * Recibe el usuario ya resuelto en vez de consultarlo por su cuenta: la página
  * que lo usa tiene que haber llamado antes a requireUser() o requireAdmin(),
@@ -47,72 +45,37 @@ export function AppShell({
   user: CurrentUser;
   children: React.ReactNode;
 }) {
-  const nav = navPara(user.role);
-
   return (
-    <div className="min-h-screen">
-      <header className="sticky top-0 z-10 border-b border-border bg-surface/95 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl items-center gap-4 px-4 py-3 sm:px-6">
-          <Link href={user.role === "admin" ? "/admin" : "/reportes"}>
-            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand text-sm font-bold text-white">
-              GR
-            </span>
-          </Link>
+    <div className="min-h-screen md:flex">
+      <SideNav
+        user={user}
+        nav={navPara(user.role)}
+        onCerrarSesion={logoutAction}
+      >
+        {/* El admin no elige empresa a nivel de sesión — ve las dos siempre y
+            filtra dentro de cada página. El cambiador solo aplica al empleado,
+            que sí trabaja "dentro de" una empresa a la vez. */}
+        {user.empresaActiva ? (
+          <CompanySwitcher
+            empresas={user.empresas}
+            activa={user.empresaActiva}
+            onCambiar={elegirEmpresaAction}
+          />
+        ) : null}
+      </SideNav>
 
-          {/* El admin no elige empresa a nivel de sesión — ve las dos siempre
-              y filtra dentro de cada página. El cambiador solo aplica al
-              empleado, que sí trabaja "dentro de" una empresa a la vez. */}
-          {user.empresaActiva ? (
-            <CompanySwitcher
-              empresas={user.empresas}
-              activa={user.empresaActiva}
-              onCambiar={elegirEmpresaAction}
-            />
-          ) : null}
-
-          <nav className="flex flex-1 items-center gap-1 overflow-x-auto">
-            {nav.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className="whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium text-muted transition hover:bg-surface-muted hover:text-text"
-              >
-                {item.label}
-              </Link>
-            ))}
-          </nav>
-
-          <div className="flex items-center gap-3">
-            <div className="hidden text-right sm:block">
-              <p className="text-sm font-medium leading-tight text-text">
-                {user.fullName}
-              </p>
-              <p className="text-xs leading-tight text-muted">
-                {user.role === "admin" ? "Administrador" : "Empleado"}
-              </p>
-            </div>
-            <form action={logoutAction}>
-              <button
-                type="submit"
-                className="rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-muted transition hover:bg-surface-muted hover:text-text"
-              >
-                Salir
-              </button>
-            </form>
+      <main className="min-w-0 flex-1 px-4 py-6 sm:px-6 sm:py-8">
+        <div className="mx-auto max-w-6xl">
+          <div className="mb-6">
+            <h1 className="text-2xl font-semibold tracking-tight text-text">
+              {saludo()}, {user.fullName.split(" ")[0]}
+            </h1>
+            <p className="mt-1 text-sm capitalize text-muted">
+              {formatFechaEncabezado()}
+            </p>
           </div>
+          {children}
         </div>
-      </header>
-
-      <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8">
-        <div className="mb-6">
-          <h1 className="text-2xl font-semibold tracking-tight text-text">
-            {saludo()}, {user.fullName.split(" ")[0]}
-          </h1>
-          <p className="mt-1 text-sm capitalize text-muted">
-            {formatFechaEncabezado()}
-          </p>
-        </div>
-        {children}
       </main>
     </div>
   );

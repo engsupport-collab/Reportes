@@ -1,12 +1,16 @@
 import Link from "next/link";
 
-import { FilterChip, FilterGroupLabel } from "@/components/filter-chip";
 import { AppShell } from "@/components/app-shell";
-import { FiltroEmpresa, FiltrosClasificacion } from "@/components/reports/filtros";
+import {
+  FilterPanel,
+  type CampoFiltro,
+} from "@/components/reports/filter-panel";
 import { Paginacion, ReportList } from "@/components/reports/report-list";
 import { requireAdmin } from "@/lib/auth-guard";
 import { empleadosDeEmpresa } from "@/lib/queries/dashboard";
 import {
+  ETIQUETAS_TRABAJO,
+  TIPOS_SERVICIO,
   TIPOS_SERVICIO_IDS,
   type TipoServicio,
   esEtiquetaValida,
@@ -145,15 +149,65 @@ export default async function AdminReportesPage({ searchParams }: Params) {
       empresaFiltro,
   );
 
+  const campos: CampoFiltro[] = [
+    {
+      tipo: "select",
+      name: "empresa",
+      label: "Empresa",
+      valor: empresaFiltro ?? "",
+      vacio: "Todas",
+      opciones: user.empresas.map((e) => ({ value: e.id, label: e.name })),
+    },
+    {
+      tipo: "select",
+      name: "empleado",
+      label: "Empleado",
+      valor: empleadoId ?? "",
+      vacio: "Todos",
+      opciones: empleados.map((e) => ({ value: e.id, label: e.fullName })),
+    },
+    {
+      tipo: "select",
+      name: "servicio",
+      label: "Tipo de servicio",
+      valor: servicio ?? "",
+      vacio: "Todos",
+      opciones: TIPOS_SERVICIO.map((t) => ({ value: t.id, label: t.label })),
+    },
+    {
+      tipo: "select",
+      name: "etiqueta",
+      label: "Etiqueta",
+      valor: etiqueta ?? "",
+      vacio: "Todas",
+      opciones: ETIQUETAS_TRABAJO.map((e) => ({
+        value: e.id,
+        label: e.label,
+      })),
+    },
+    {
+      tipo: "checkbox",
+      name: "faltantes",
+      label: "Sin documento",
+      activo: soloIncompletos,
+    },
+    {
+      tipo: "checkbox",
+      name: "sinfirma",
+      label: "Sin firmar",
+      activo: soloSinFirma,
+    },
+    {
+      tipo: "checkbox",
+      name: "sinorden",
+      label: "Sin orden",
+      activo: soloSinOrden,
+    },
+  ];
+
   return (
     <AppShell user={user}>
       <div className="space-y-5">
-        <FiltroEmpresa
-          empresas={user.empresas}
-          empresaId={empresaFiltro}
-          hrefPara={construirHref}
-        />
-
         <div className="flex flex-wrap items-center gap-3">
           <form action="/admin/reportes" className="flex flex-1 gap-2">
             {soloIncompletos ? (
@@ -193,51 +247,7 @@ export default async function AdminReportesPage({ searchParams }: Params) {
           </form>
         </div>
 
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-          <div className="flex flex-wrap items-center gap-2">
-            <FilterGroupLabel>Empleado</FilterGroupLabel>
-            <FilterChip href={construirHref({ empleado: null })} activo={!empleadoId}>
-              Todos
-            </FilterChip>
-            {empleados.map((e) => (
-              <FilterChip
-                key={e.id}
-                href={construirHref({ empleado: empleadoId === e.id ? null : e.id })}
-                activo={empleadoId === e.id}
-              >
-                {e.fullName}
-              </FilterChip>
-            ))}
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            <FilterGroupLabel>Faltantes</FilterGroupLabel>
-            <FilterChip
-              href={construirHref({ faltantes: !soloIncompletos })}
-              activo={soloIncompletos}
-            >
-              Sin documento
-            </FilterChip>
-            <FilterChip
-              href={construirHref({ sinfirma: !soloSinFirma })}
-              activo={soloSinFirma}
-            >
-              Sin firmar
-            </FilterChip>
-            <FilterChip
-              href={construirHref({ sinorden: !soloSinOrden })}
-              activo={soloSinOrden}
-            >
-              Sin orden
-            </FilterChip>
-          </div>
-        </div>
-
-        <FiltrosClasificacion
-          serviceType={servicio}
-          etiqueta={etiqueta}
-          hrefPara={construirHref}
-        />
+        <FilterPanel basePath="/admin/reportes" q={params.q} campos={campos} />
 
         <div className="flex items-center justify-between gap-3">
           <p className="text-sm text-muted">

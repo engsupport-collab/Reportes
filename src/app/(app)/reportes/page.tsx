@@ -2,11 +2,15 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { AppShell } from "@/components/app-shell";
-import { FilterChip, FilterGroupLabel } from "@/components/filter-chip";
-import { FiltrosClasificacion } from "@/components/reports/filtros";
+import {
+  FilterPanel,
+  type CampoFiltro,
+} from "@/components/reports/filter-panel";
 import { Paginacion, ReportList } from "@/components/reports/report-list";
 import { requireAccesoReportes } from "@/lib/auth-guard";
 import {
+  ETIQUETAS_TRABAJO,
+  TIPOS_SERVICIO,
   TIPOS_SERVICIO_IDS,
   type TipoServicio,
   esEtiquetaValida,
@@ -118,6 +122,43 @@ export default async function ReportesPage({ searchParams }: Params) {
     params.q || soloIncompletos || soloSinOrden || servicio || etiqueta,
   );
 
+  const campos: CampoFiltro[] = [
+    {
+      tipo: "select",
+      name: "servicio",
+      label: "Tipo de servicio",
+      valor: servicio ?? "",
+      vacio: "Todos",
+      opciones: TIPOS_SERVICIO.map((t) => ({ value: t.id, label: t.label })),
+    },
+    {
+      tipo: "select",
+      name: "etiqueta",
+      label: "Etiqueta",
+      valor: etiqueta ?? "",
+      vacio: "Todas",
+      opciones: ETIQUETAS_TRABAJO.map((e) => ({
+        value: e.id,
+        label: e.label,
+      })),
+    },
+    {
+      tipo: "checkbox",
+      name: "faltantes",
+      label: "Sin documento",
+      activo: soloIncompletos,
+    },
+    {
+      // El conteo va en la etiqueta porque es el pendiente que el empleado
+      // resuelve él mismo: saber que son tres y no treinta cambia si lo hace
+      // ahora o lo deja.
+      tipo: "checkbox",
+      name: "sinorden",
+      label: `Sin orden${sinOrden > 0 ? ` (${sinOrden})` : ""}`,
+      activo: soloSinOrden,
+    },
+  ];
+
   return (
     <AppShell user={user}>
       <div className="space-y-5">
@@ -193,21 +234,7 @@ export default async function ReportesPage({ searchParams }: Params) {
           </Link>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <FilterGroupLabel>Orden de compra</FilterGroupLabel>
-          <FilterChip
-            href={construirHref({ sinorden: !soloSinOrden })}
-            activo={soloSinOrden}
-          >
-            Sin orden{sinOrden > 0 ? ` (${sinOrden})` : ""}
-          </FilterChip>
-        </div>
-
-        <FiltrosClasificacion
-          serviceType={servicio}
-          etiqueta={etiqueta}
-          hrefPara={construirHref}
-        />
+        <FilterPanel basePath="/reportes" q={params.q} campos={campos} />
 
         <div className="flex items-center justify-between gap-3">
           <p className="text-sm text-muted">

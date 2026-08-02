@@ -516,6 +516,17 @@ Contenido, en este orden: ficha del reporte (a dos columnas) → firma con su fi
 - `serverExternalPackages: ["sharp"]` en `next.config.ts` es **obligatorio**: sin eso el empaquetador intenta analizar su binario nativo y tumba el worker de compilación ("Jest worker encountered N child process exceptions").
 - Verificado en navegador: PDF de 6 páginas con portada, firma, viático con monto y adjuntos fusionados, incluido un PDF externo que conserva su tamaño Carta.
 
+### Fase 10.4: rail lateral y filtros detrás de un botón
+
+Pedido del cliente sobre la navegación, a partir de un dashboard de referencia:
+
+- **Rail lateral** (`side-nav.tsx`) en lugar de la barra horizontal. En escritorio queda pegado arriba con `sticky` y alto de pantalla — con `static` la navegación se iba desplazando y desaparecía al bajar en una lista larga. En el celular esa columna no cabe, así que se convierte en un cajón que se abre desde una barra superior; se cierra al elegir un enlace, porque si no tapa la página recién abierta.
+- **Menú de cuenta abajo a la izquierda**: avatar con la inicial, nombre y rol; al pulsarlo se despliega hacia arriba (pegado al borde inferior, hacia abajo quedaría fuera de pantalla) con "Cerrar sesión". Salir dejó de ser un botón suelto en la barra: es la acción que más molesta pulsar por error.
+- **Filtros detrás de un botón** (`filter-panel.tsx`), con contador de filtros activos. Antes todas las opciones estaban desplegadas y la lista de empleados empujaba los reportes fuera de la primera pantalla. El filtro de empleado es ahora una lista desplegable, no una fila de nombres.
+- Se mantiene el filtrado por URL: aplicar navega a `?empresa=…&empleado=…`, así la dirección se puede compartir, el botón "atrás" funciona y el filtrado real sigue ocurriendo en SQL. Debajo del botón quedan fichas de lo aplicado, con "×" para quitar cada una — sin eso habría que abrir el panel para saber por qué la lista muestra tres reportes y no cuarenta.
+- El panel de `/admin` conserva sus chips de empresa: son tres opciones y es el selector de contexto de esa pantalla, esconderlo tras un botón sería peor.
+- Verificado en navegador (escritorio y 390px): rail fijo al desplazar, cajón móvil, panel de filtros aplicando y quitando filtros, menú de cuenta con cierre de sesión. Sin errores de consola.
+
 ## Problema abierto: firmar con el dedo en celular
 
 **Estado: sin resolver.** Con mouse en PC funciona correctamente; con el dedo en celular no se dibuja.
