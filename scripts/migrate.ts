@@ -29,6 +29,19 @@ async function main() {
   const client = createClient({ url, authToken });
   const db = drizzle(client);
 
+  // drizzle-orm@0.45.2 trae un bug real en su migrador de libsql: la tabla de
+  // control usa "id SERIAL PRIMARY KEY", sintaxis de Postgres que algunos
+  // servidores de Turso rechazan. Se crea antes, con sintaxis de SQLite, para
+  // que el CREATE TABLE IF NOT EXISTS del migrador la encuentre ya creada y
+  // nunca llegue a ejecutar la sentencia con el error.
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS "__drizzle_migrations" (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      hash text NOT NULL,
+      created_at numeric
+    )
+  `);
+
   console.log("Aplicando migraciones...");
   await migrate(db, { migrationsFolder: "./drizzle" });
   console.log("Migraciones aplicadas correctamente.");
