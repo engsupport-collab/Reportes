@@ -30,28 +30,51 @@
   --warning: #b45309;
   --warning-soft: #fef3c7;
 
+  /* Acento secundario, para lo que no es marca ni estado. */
+  --accent: #6d5ce0;
+  --accent-soft: #eeebfd;
+
   --ring: #0d9aaa;
 }
 
+/**
+ * Modo oscuro: negro real, no azul marino.
+ *
+ * Los grises son neutros (mismo valor en los tres canales, apenas un punto de
+ * azul) para que el fondo se lea como negro y no como "azul oscuro". Sobre esa
+ * base, cada color hace un trabajo distinto y se distingue de los demás:
+ * turquesa la marca, ámbar los pendientes, rojo lo que se borra o falla, verde
+ * lo terminado, violeta el acento secundario.
+ *
+ * Todos los valores están comprobados contra este fondo (#0c0c0e) con el
+ * validador de la guía de color: contraste mínimo 3:1 y, en el caso de los tres
+ * acentos (turquesa, naranja, violeta), separación suficiente para distinguirse
+ * también con daltonismo. Ámbar/rojo/verde no se separan entre sí bajo deuteranopía
+ * —es la confusión clásica—, pero aquí nunca cargan el significado solos: cada
+ * etiqueta de estado lleva además su ícono y su texto.
+ */
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #0b1016;
-    --surface: #131a23;
-    --surface-muted: #171f2a;
-    --border: #26313f;
-    --text: #e8edf3;
-    --text-muted: #94a3b8;
+    --bg: #0c0c0e;
+    --surface: #151518;
+    --surface-muted: #1c1c20;
+    --border: #2b2b31;
+    --text: #f0f0f2;
+    --text-muted: #a3a3ad;
 
-    --brand: #2bb8c9;
-    --brand-strong: #4fd1e0;
-    --brand-soft: #10303a;
+    --brand: #17a2b8;
+    --brand-strong: #22bcd4;
+    --brand-soft: #0e2f36;
 
-    --success: #4ade80;
-    --danger: #f87171;
-    --warning: #fbbf24;
-    --warning-soft: #3a2c0c;
+    --success: #3fb968;
+    --danger: #e0484f;
+    --warning: #d9a520;
+    --warning-soft: #33280a;
 
-    --ring: #2bb8c9;
+    --accent: #8b7cf0;
+    --accent-soft: #1e1a3a;
+
+    --ring: #17a2b8;
   }
 }
 
@@ -71,6 +94,8 @@
   --color-danger: var(--danger);
   --color-warning: var(--warning);
   --color-warning-soft: var(--warning-soft);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
 
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
