@@ -12,6 +12,7 @@ import {
   IconSalir,
   IconUsuarios,
 } from "@/components/nav-icons";
+import { Logotipo } from "@/components/logotipo";
 import type { CurrentUser } from "@/lib/auth-guard";
 
 export type NavItem = {
@@ -103,13 +104,9 @@ function NavDesplegable({
   );
 }
 
-function Logo() {
-  return (
-    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand text-sm font-bold text-white">
-      GR
-    </span>
-  );
-}
+// El dibujo vive en components/logotipo.tsx, para poder sustituirlo por el
+// logotipo del cliente en un solo sitio.
+const Logo = Logotipo;
 
 /**
  * Menú de la cuenta, abajo del todo.
