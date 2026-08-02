@@ -505,6 +505,17 @@ Pedido del cliente: cada reporte necesita una sección de viáticos (gastos del 
 - Descarga autenticada por `/api/viaticos/[id]`, mismo esquema de permisos que `/api/archivos/[id]`.
 - Verificado en navegador con Playwright: agregar con monto, agregar sin monto (muestra "Sin monto", sin alerta), eliminar, y confirmar que la descarga rechaza peticiones sin sesión (401).
 
+### Fase 10.3: descargar el reporte en PDF
+
+Resuelve el "Pendiente A" de más abajo, por la vía recomendada ahí: **generar al descargar**, no congelar al firmar. El PDF se arma en el momento con los datos actuales, así que siempre coincide con lo que muestra el sistema y no hay dos versiones de la verdad.
+
+Contenido, en este orden: ficha del reporte (a dos columnas) → firma con su firmante y fecha → cada viático con su monto → cada adjunto. Las fotos se insertan como página propia y los PDF se fusionan página a página conservando su tamaño original.
+
+- **Word y Excel no se fusionan**: requeriría convertirlos primero, una dependencia mucho más pesada para un caso que casi no ocurre — el cliente confirmó que los documentos "normalmente son foto o PDF". Esos archivos se listan por nombre en una página final, aclarando que hay que descargarlos aparte. Lo mismo con cualquier archivo que no se pueda leer o fusionar: se degrada a un listado en vez de romper la descarga completa.
+- `sharp` se usa **solo aquí**, para convertir a PNG las fotos guardadas en WebP (PDF no admite WebP). Es un costo que paga únicamente quien pide el PDF, no cada petición — por eso aquí sí se justifica, a diferencia de la subida (ver `imagen-cliente.ts`, donde se evitó a propósito).
+- `serverExternalPackages: ["sharp"]` en `next.config.ts` es **obligatorio**: sin eso el empaquetador intenta analizar su binario nativo y tumba el worker de compilación ("Jest worker encountered N child process exceptions").
+- Verificado en navegador: PDF de 6 páginas con portada, firma, viático con monto y adjuntos fusionados, incluido un PDF externo que conserva su tamaño Carta.
+
 ## Problema abierto: firmar con el dedo en celular
 
 **Estado: sin resolver.** Con mouse en PC funciona correctamente; con el dedo en celular no se dibuja.
@@ -524,7 +535,7 @@ Causas ya descartadas (las correcciones se dejaron aplicadas, porque todas eran 
 
 Dos temas planteados por el cliente que se dejan aparcados a propósito, para no interrumpir el orden de construcción. Ninguno bloquea lo que falta.
 
-### A. PDF del reporte firmado
+### A. PDF del reporte firmado — RESUELTO (ver Fase 10.3)
 
 El cliente quiere poder extraer el reporte firmado como PDF. Hay dos formas y la elección depende del uso real:
 

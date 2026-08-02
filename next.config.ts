@@ -1,6 +1,14 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  /**
+   * `sharp` trae un binario nativo. Si el empaquetador intenta analizarlo
+   * como código normal, el worker de compilación de Next se cae (visto en
+   * dev como "Jest worker encountered N child process exceptions"). Esto le
+   * dice que lo deje tal cual y lo cargue en tiempo de ejecución.
+   */
+  serverExternalPackages: ["sharp"],
+
   experimental: {
     /**
      * Las subidas viajan dentro de una Server Action. El límite por defecto es

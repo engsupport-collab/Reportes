@@ -69,6 +69,21 @@ export async function obtenerViaticoConDueno(id: string) {
   return fila ?? null;
 }
 
+/** Viáticos con su `blobUrl` y monto, para armar el PDF de descarga del reporte. */
+export async function listarViaticosParaPdf(reportId: string) {
+  return db
+    .select({
+      id: reportViaticos.id,
+      blobUrl: reportViaticos.blobUrl,
+      fileName: reportViaticos.fileName,
+      mimeType: reportViaticos.mimeType,
+      amount: reportViaticos.amount,
+    })
+    .from(reportViaticos)
+    .where(eq(reportViaticos.reportId, reportId))
+    .orderBy(asc(reportViaticos.uploadedAt));
+}
+
 export async function contarViaticos(reportId: string): Promise<number> {
   const filas = await db
     .select({ id: reportViaticos.id })

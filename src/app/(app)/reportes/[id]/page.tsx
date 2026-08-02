@@ -69,12 +69,21 @@ export default async function DetalleReportePage({ params }: Params) {
       <div className="mx-auto max-w-3xl space-y-5">
         {/* El detalle es la misma página para los dos roles; solo cambia a
             dónde vuelve, para no dejar al admin en una lista que no es la suya. */}
-        <Link
-          href={esAdmin ? "/admin/reportes" : "/reportes"}
-          className="inline-block text-sm font-medium text-muted transition hover:text-text"
-        >
-          ← Volver a {esAdmin ? "todos los reportes" : "mis reportes"}
-        </Link>
+        <div className="flex items-center justify-between gap-3">
+          <Link
+            href={esAdmin ? "/admin/reportes" : "/reportes"}
+            className="inline-block text-sm font-medium text-muted transition hover:text-text"
+          >
+            ← Volver a {esAdmin ? "todos los reportes" : "mis reportes"}
+          </Link>
+
+          <a
+            href={`/api/reportes/${reporte.id}/pdf`}
+            className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-text transition hover:bg-surface-muted"
+          >
+            Descargar reporte
+          </a>
+        </div>
 
         <div className="rounded-2xl border border-border bg-surface p-5 sm:p-6">
           <div className="flex flex-wrap items-start justify-between gap-3">

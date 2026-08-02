@@ -72,6 +72,20 @@ export async function obtenerAdjuntoConDueno(id: string) {
   return fila ?? null;
 }
 
+/** Adjuntos con su `blobUrl`, para armar el PDF de descarga del reporte. */
+export async function listarAdjuntosParaPdf(reportId: string) {
+  return db
+    .select({
+      id: attachments.id,
+      blobUrl: attachments.blobUrl,
+      fileName: attachments.fileName,
+      mimeType: attachments.mimeType,
+    })
+    .from(attachments)
+    .where(eq(attachments.reportId, reportId))
+    .orderBy(asc(attachments.uploadedAt));
+}
+
 export async function contarAdjuntos(reportId: string): Promise<number> {
   const filas = await db
     .select({ id: attachments.id })
