@@ -220,6 +220,37 @@ export const attachments = sqliteTable(
 );
 
 /**
+ * Viáticos de un reporte: gastos del trabajo, cada uno con su foto (recibo o
+ * evidencia) y un monto opcional — opcional porque el monto casi siempre ya se
+ * lee en la propia foto, y no vale la pena obligar a transcribirlo dos veces.
+ *
+ * Es una tabla aparte de `attachments` y no una variante de esa misma tabla
+ * porque tiene un campo propio (`amount`) que no aplica a evidencia genérica, y
+ * porque mezclar los dos ahí complicaría el conteo de "sin documento" del
+ * reporte, que solo debe mirar la evidencia del trabajo, no los recibos.
+ */
+export const reportViaticos = sqliteTable(
+  "report_viaticos",
+  {
+    id: text("id").primaryKey(),
+    reportId: text("report_id")
+      .notNull()
+      .references(() => reports.id, { onDelete: "cascade" }),
+    blobUrl: text("blob_url").notNull(),
+    thumbnailUrl: text("thumbnail_url"),
+    fileName: text("file_name").notNull(),
+    mimeType: text("mime_type").notNull(),
+    sizeBytes: integer("size_bytes").notNull(),
+    // En pesos, sin decimales. Null cuando no se transcribió el monto.
+    amount: integer("amount"),
+    uploadedAt: integer("uploaded_at", { mode: "timestamp_ms" })
+      .notNull()
+      .default(sql`(unixepoch() * 1000)`),
+  },
+  (table) => [index("report_viaticos_report_idx").on(table.reportId)],
+);
+
+/**
  * Intentos de ingreso fallidos por dispositivo (IP).
  *
  * El contador de la tabla `users` bloquea una cuenta concreta, pero no detiene
@@ -256,4 +287,6 @@ export type NewReport = typeof reports.$inferInsert;
 export type ReportTag = typeof reportTags.$inferSelect;
 export type Attachment = typeof attachments.$inferSelect;
 export type NewAttachment = typeof attachments.$inferInsert;
+export type Viatico = typeof reportViaticos.$inferSelect;
+export type NewViatico = typeof reportViaticos.$inferInsert;
 export type LoginAttempt = typeof loginAttempts.$inferSelect;

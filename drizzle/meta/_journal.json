@@ -43,6 +43,13 @@
       "when": 1785624333054,
       "tag": "0005_many_kingpin",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1785628198467,
+      "tag": "0006_normal_sway",
+      "breakpoints": true
     }
   ]
 }

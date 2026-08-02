@@ -495,6 +495,16 @@ Pedido del cliente después del lanzamiento: algunos trabajos se registran antes
 - "Sin orden" es también un filtro, replicado en la Vista General del empleado y en la Vista Master del admin, con conteo (`contarSinOrden`) igual que los filtros de faltantes existentes.
 - Para completar la orden más tarde: el mismo flujo de edición que ya existía (admin o el autor del reporte).
 
+### Fase 10.2: Viáticos
+
+Pedido del cliente: cada reporte necesita una sección de viáticos (gastos del trabajo), donde se suba una foto o archivo por gasto junto con su monto — el monto es opcional a propósito, porque casi siempre ya se lee en la propia foto del recibo.
+
+- Tabla nueva `report_viaticos` (`drizzle/0006_normal_sway.sql`), independiente de `attachments`: mismo patrón (blob privado + miniatura opcional para imágenes), más un campo `amount` (pesos, sin decimales, nullable) que no tiene sentido en la evidencia genérica de un trabajo.
+- Deliberadamente **no** se mezcló con `attachments`: el conteo de "sin documento" del reporte solo debe mirar evidencia del trabajo, no recibos de gastos.
+- Un viático se agrega de a uno (foto + monto opcional), no por lotes como los adjuntos — el monto solo tiene sentido pegado a su propia foto.
+- Descarga autenticada por `/api/viaticos/[id]`, mismo esquema de permisos que `/api/archivos/[id]`.
+- Verificado en navegador con Playwright: agregar con monto, agregar sin monto (muestra "Sin monto", sin alerta), eliminar, y confirmar que la descarga rechaza peticiones sin sesión (401).
+
 ## Problema abierto: firmar con el dedo en celular
 
 **Estado: sin resolver.** Con mouse en PC funciona correctamente; con el dedo en celular no se dibuja.

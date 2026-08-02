@@ -7,6 +7,10 @@ import {
 } from "@/actions/attachments";
 import { cambiarEstadoAction, eliminarReporteAction } from "@/actions/reports";
 import { borrarFirmaAction, firmarReporteAction } from "@/actions/signature";
+import {
+  agregarViaticoAction,
+  eliminarViaticoAction,
+} from "@/actions/viaticos";
 import { AppShell } from "@/components/app-shell";
 import { AttachmentList } from "@/components/reports/attachment-list";
 import { AttachmentUploader } from "@/components/reports/attachment-uploader";
@@ -20,11 +24,14 @@ import {
   EstadoToggle,
 } from "@/components/reports/report-actions";
 import { SignatureBlock } from "@/components/reports/signature-block";
+import { ViaticoList } from "@/components/reports/viatico-list";
+import { ViaticoUploader } from "@/components/reports/viatico-uploader";
 import { MAX_ARCHIVOS_POR_REPORTE } from "@/lib/archivos";
 import { puedeAccederAReporte, requireAccesoReportes } from "@/lib/auth-guard";
 import { formatFechaLarga, formatInstante } from "@/lib/fechas";
 import { listarAdjuntos } from "@/lib/queries/attachments";
 import { obtenerReporte } from "@/lib/queries/reports";
+import { listarViaticos } from "@/lib/queries/viaticos";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -52,6 +59,7 @@ export default async function DetalleReportePage({ params }: Params) {
   }
 
   const adjuntos = await listarAdjuntos(reporte.id);
+  const viaticos = await listarViaticos(reporte.id);
   const sinAdjuntos = adjuntos.length === 0;
   const editado = reporte.updatedBy !== null;
   const esAdmin = user.role === "admin";
@@ -163,6 +171,18 @@ export default async function DetalleReportePage({ params }: Params) {
               action={subirAdjuntosAction.bind(null, reporte.id)}
               restantes={MAX_ARCHIVOS_POR_REPORTE - adjuntos.length}
             />
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-border bg-surface p-5 sm:p-6">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <h3 className="text-sm font-semibold text-text">Viáticos</h3>
+            <span className="text-xs text-muted">{viaticos.length}</span>
+          </div>
+
+          <div className="space-y-4">
+            <ViaticoList viaticos={viaticos} onEliminar={eliminarViaticoAction} />
+            <ViaticoUploader action={agregarViaticoAction.bind(null, reporte.id)} />
           </div>
         </div>
 
