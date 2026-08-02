@@ -3,6 +3,13 @@
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 
 import type { FirmaState } from "@/actions/signature";
+import {
+  ESTILOS_FIRMA,
+  generarFirmaEscrita,
+  type EstiloFirma,
+} from "@/lib/firma-escrita";
+
+type Modo = "escribir" | "dibujar";
 
 /**
  * Pad de firma con mouse o dedo.
@@ -29,6 +36,16 @@ export function SignaturePad({
   const [tieneTrazo, setTieneTrazo] = useState(false);
   const [estado, setEstado] = useState<FirmaState>({});
   const [pendiente, startTransition] = useTransition();
+
+  /**
+   * "Escribir" es lo primero que se ofrece a propósito: dibujar con el dedo no
+   * funciona en algunos celulares (ver PLAN.md), y escribir el nombre sí
+   * funciona en todos. Quien prefiera dibujar tiene la pestaña al lado.
+   */
+  const [modo, setModo] = useState<Modo>("escribir");
+  const [nombre, setNombre] = useState(nombrePorDefecto);
+  const [estilo, setEstilo] = useState<EstiloFirma>(ESTILOS_FIRMA[0]!);
+  const vistaPreviaRef = useRef<HTMLDivElement>(null);
 
 
   /**
@@ -215,7 +232,9 @@ export function SignaturePad({
       window.removeEventListener("pointercancel", terminar);
       window.removeEventListener("mouseup", terminar);
     };
-  }, [preparar]);
+    // `modo` entra aquí porque el canvas solo existe en la pestaña de dibujo:
+    // al volver a ella se monta uno nuevo y hay que engancharle los listeners.
+  }, [preparar, modo]);
 
   function limpiar() {
     const canvas = canvasRef.current;
@@ -228,7 +247,33 @@ export function SignaturePad({
     setEstado({});
   }
 
+  /** Los dos modos mandan el PNG con el mismo nombre: al servidor le da igual
+   *  si se dibujó o se escribió. */
+  function archivoFirma(blob: Blob): File {
+    return new File([blob], "firma.png", { type: "image/png" });
+  }
+
   function guardar(formData: FormData) {
+    if (modo === "escribir") {
+      // La fuente se lee de la vista previa en lugar de nombrarla aquí: es la
+      // misma que el usuario está viendo, así que lo que se guarda no puede
+      // salir distinto de lo que aprobó en pantalla.
+      const pila = vistaPreviaRef.current
+        ? getComputedStyle(vistaPreviaRef.current).fontFamily
+        : "cursive";
+
+      startTransition(async () => {
+        const blob = await generarFirmaEscrita(nombre, pila);
+        if (!blob) {
+          setEstado({ error: "No se pudo generar la firma. Intenta de nuevo." });
+          return;
+        }
+        formData.set("firma", archivoFirma(blob));
+        setEstado(await action({}, formData));
+      });
+      return;
+    }
+
     const canvas = canvasRef.current;
     if (!canvas || !hayTrazo.current) {
       setEstado({ error: "Dibuja la firma antes de guardar." });
@@ -240,8 +285,7 @@ export function SignaturePad({
         setEstado({ error: "No se pudo generar la firma. Intenta de nuevo." });
         return;
       }
-
-      formData.set("firma", new File([blob], "firma.png", { type: "image/png" }));
+      formData.set("firma", archivoFirma(blob));
       startTransition(async () => {
         setEstado(await action({}, formData));
       });
@@ -262,47 +306,121 @@ export function SignaturePad({
           name="signatureName"
           required
           maxLength={120}
-          defaultValue={nombrePorDefecto}
+          value={nombre}
+          onChange={(e) => setNombre(e.target.value)}
           className="w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-sm text-text placeholder:text-muted focus:border-brand focus:outline-none"
           placeholder="Nombre y apellido"
         />
       </div>
 
-      <div>
-        <p className="mb-1.5 text-sm font-medium text-text">Firma</p>
-        <canvas
-          ref={canvasRef}
-          // touchAction en línea además de la clase: es la propiedad que impide
-          // que el navegador convierta el trazo en un desplazamiento de página,
-          // y no debe depender de que una hoja de estilos haya cargado.
-          style={{ touchAction: "none", WebkitUserSelect: "none" }}
-          className="h-44 w-full touch-none select-none rounded-xl border border-dashed border-border bg-white"
-        />
-        <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
-          <p className="text-xs text-muted">
-            Firma con el mouse o con el dedo dentro del recuadro.
-          </p>
+      {/* Dos formas de firmar. Escribir va primero porque funciona en
+          cualquier dispositivo; dibujar con el dedo falla en algunos
+          celulares (ver PLAN.md). */}
+      <div
+        role="tablist"
+        aria-label="Forma de firmar"
+        className="inline-flex rounded-lg border border-border p-0.5"
+      >
+        {(
+          [
+            ["escribir", "Escribir"],
+            ["dibujar", "Dibujar"],
+          ] as const
+        ).map(([id, texto]) => (
           <button
+            key={id}
             type="button"
-            onClick={limpiar}
-            className="text-xs font-medium text-muted transition hover:text-text"
+            role="tab"
+            aria-selected={modo === id}
+            onClick={() => {
+              setModo(id);
+              setEstado({});
+            }}
+            className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${
+              modo === id
+                ? "bg-brand-soft text-brand"
+                : "text-muted hover:text-text"
+            }`}
           >
-            Borrar y volver a empezar
+            {texto}
           </button>
-        </div>
-
-        {/**
-         * PENDIENTE: firmar con el dedo no funciona en celular. En PC con mouse
-         * sí. Ya se descartaron cuatro causas (borrado del canvas por el evento
-         * resize, cancelación del gesto por scroll, listeners pasivos de React,
-         * y el pointerleave que disparaba la captura del puntero). Queda
-         * documentado en PLAN.md. Mientras tanto el flujo alternativo funciona:
-         * firmar en papel y subir el documento como adjunto.
-         *
-         * El contador de diagnóstico se retiró de la interfaz para no mostrarlo
-         * a los usuarios; el estado `diag` sigue disponible para reactivarlo.
-         */}
+        ))}
       </div>
+
+      {modo === "escribir" ? (
+        <div>
+          <p className="mb-1.5 text-sm font-medium text-text">
+            Así se va a ver tu firma
+          </p>
+          <div
+            ref={vistaPreviaRef}
+            style={{ fontFamily: `var(${estilo.variable})` }}
+            className="flex h-44 items-center justify-center overflow-hidden rounded-xl border border-dashed border-border bg-white px-6 text-center text-5xl leading-tight text-[#111827]"
+          >
+            {/* Lo que se ve aquí es exactamente lo que se guarda: la imagen se
+                genera con la fuente que esté aplicada a este recuadro. */}
+            {nombre.trim() || (
+              <span className="font-sans text-base text-neutral-400">
+                Escribe el nombre arriba
+              </span>
+            )}
+          </div>
+
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <span className="text-xs text-muted">Estilo:</span>
+            {ESTILOS_FIRMA.map((e) => (
+              <button
+                key={e.id}
+                type="button"
+                onClick={() => setEstilo(e)}
+                style={{ fontFamily: `var(${e.variable})` }}
+                className={`rounded-lg border px-3 py-1 text-xl transition ${
+                  estilo.id === e.id
+                    ? "border-brand bg-brand-soft text-brand"
+                    : "border-border text-muted hover:text-text"
+                }`}
+              >
+                {e.nombre}
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <div>
+          <p className="mb-1.5 text-sm font-medium text-text">Firma</p>
+          <canvas
+            ref={canvasRef}
+            // touchAction en línea además de la clase: es la propiedad que impide
+            // que el navegador convierta el trazo en un desplazamiento de página,
+            // y no debe depender de que una hoja de estilos haya cargado.
+            style={{ touchAction: "none", WebkitUserSelect: "none" }}
+            className="h-44 w-full touch-none select-none rounded-xl border border-dashed border-border bg-white"
+          />
+          <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
+            <p className="text-xs text-muted">
+              Firma con el mouse o con el dedo dentro del recuadro.
+            </p>
+            <button
+              type="button"
+              onClick={limpiar}
+              className="text-xs font-medium text-muted transition hover:text-text"
+            >
+              Borrar y volver a empezar
+            </button>
+          </div>
+
+          {/**
+           * PENDIENTE: firmar con el dedo no funciona en algunos celulares. En
+           * PC con mouse sí. Ya se descartaron cuatro causas (borrado del canvas
+           * por el evento resize, cancelación del gesto por scroll, listeners
+           * pasivos de React, y el pointerleave que disparaba la captura del
+           * puntero). Queda documentado en PLAN.md.
+           *
+           * Desde que existe la pestaña "Escribir" esto dejó de bloquear a
+           * nadie: quien no pueda dibujar, teclea su nombre y firma igual.
+           */}
+        </div>
+      )}
 
       {estado.error ? (
         <p
@@ -315,7 +433,12 @@ export function SignaturePad({
 
       <button
         type="submit"
-        disabled={pendiente || !tieneTrazo}
+        // Cada modo tiene su propia condición para estar listo: un trazo en el
+        // canvas, o un nombre escrito.
+        disabled={
+          pendiente ||
+          (modo === "dibujar" ? !tieneTrazo : nombre.trim().length === 0)
+        }
         className="rounded-lg bg-brand px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-strong disabled:cursor-not-allowed disabled:opacity-60"
       >
         {pendiente ? "Guardando…" : "Guardar firma"}

@@ -538,6 +538,18 @@ Pedido del cliente sobre la navegación, a partir de un dashboard de referencia:
 - **Sugerencias de navegación en el buscador**: escribir "pan" ofrece "Panel", "nue" ofrece "Nuevo reporte". La comparación ignora mayúsculas y tildes. El mismo campo hace dos cosas porque las secciones son cinco y se sabe su nombre, mientras que los reportes son miles y no: por eso la sugerencia hay que elegirla (clic, o flechas y Enter) y **Enter a secas sigue buscando reportes**, que es lo que se hace la mayoría de las veces. Se cierra con un clic fuera, no con `onBlur` — ese se dispara antes del clic en la sugerencia y se la lleva por delante.
 - En `/perfil`, el avatar se posiciona en absoluto a caballo sobre el borde del banner. Antes el nombre iba alineado al fondo del avatar dentro del mismo flex y, como el avatar sube 40px, terminaba escrito encima del color.
 
+### Fase 10.6: firma escrita y datos de prueba
+
+**Firma escrita.** El bloque de firma pasa a tener dos pestañas: *Escribir* y *Dibujar*. Escribir va primera y es la que se ofrece por defecto, porque funciona en cualquier dispositivo y dibujar con el dedo falla en algunos celulares (ver el problema abierto de abajo).
+
+- Se teclea el nombre, se elige entre tres tipografías (`Dancing Script`, `Caveat`, `Great Vibes`, servidas desde el propio dominio por `next/font`), y lo que se ve en la vista previa es exactamente lo que se guarda: la imagen se genera leyendo la fuente aplicada a ese mismo recuadro, no nombrándola por separado.
+- El resultado es un **PNG idéntico en forma al del pad**, generado en `firma-escrita.ts`. Se guarda una imagen y no "el nombre y la fuente" porque todo lo que hay aguas abajo —la vista del reporte, `/api/firmas`, el PDF— ya trabaja con un PNG; convertirlo ahí deja intacto el resto del sistema.
+- Antes de medir el texto se espera a `document.fonts.load`: sin eso el navegador mide con la fuente suplente y la firma sale con otro tamaño, o directamente con otra letra, que es peor porque no da error.
+- El tamaño baja hasta que el nombre quepa, para que uno largo no se salga por los lados en el PDF.
+- Verificado en navegador: firmado escribiendo (PNG de 26 KB con 6.444 píxeles dibujados — no en blanco), tildes y eñe correctas, el PDF lo incluye, y **el modo dibujar sigue funcionando** tras el refactor (856 píxeles de trazo guardados).
+
+**Datos de prueba (`scripts/seed-prueba.ts`).** 10 reportes en Corp y 8 en SaaS para poder mirar el sistema con contenido dentro. A diferencia de `seed-demo`, este sí puede correrse contra producción: no crea usuarios ni toca nada existente, reutiliza una cuenta admin ya presente y solo inserta reportes. Los casos están escritos a mano —con y sin orden, con y sin detalles, terminados y en proceso, de los dos servicios— porque el objetivo es ver la interfaz, y un bucle daría dieciocho variantes de lo mismo. Cada reporte lleva el id con prefijo `prueba-`: es el único rastro que los distingue, y con él `npm run seed:prueba -- --limpiar` los borra de forma exacta sin depender de reconocerlos por el nombre.
+
 ## Problema abierto: firmar con el dedo en celular
 
 **Estado: sin resolver.** Con mouse en PC funciona correctamente; con el dedo en celular no se dibuja.
