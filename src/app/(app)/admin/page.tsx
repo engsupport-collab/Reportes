@@ -1,13 +1,14 @@
 import Link from "next/link";
 
 import { AppShell } from "@/components/app-shell";
+import { Barras } from "@/components/admin/barras";
 import { GraficaMeses } from "@/components/admin/grafica-meses";
 import { StatTile } from "@/components/admin/stat-tile";
 import { FiltroEmpresa } from "@/components/reports/filtros";
 import { ReportList } from "@/components/reports/report-list";
 import { requireAdmin } from "@/lib/auth-guard";
 import { inicioDeMes, nombreDeMes } from "@/lib/fechas";
-import { serieMensual } from "@/lib/queries/analytics";
+import { estadoDocumental, serieMensual } from "@/lib/queries/analytics";
 import { obtenerResumen } from "@/lib/queries/dashboard";
 import { listarReportes } from "@/lib/queries/reports";
 
@@ -34,13 +35,25 @@ export default async function AdminPage({ searchParams }: Params) {
   // inventado no debe colar como si fuera un filtro válido.
   const empresaFiltro = user.empresas.find((e) => e.id === params.empresa)?.id;
 
-  const [resumen, ultimos, porMes] = await Promise.all([
+  const [resumen, ultimos, porMes, estado] = await Promise.all([
     obtenerResumen(empresaFiltro),
     // Más de los seis de antes: la lista vive en una tarjeta con scroll
     // propio, así que caben sin empujar nada fuera de la pantalla.
     listarReportes({ companyId: empresaFiltro, porPagina: 20 }),
     serieMensual(empresaFiltro),
+    estadoDocumental(empresaFiltro),
   ]);
+
+  const barrasEstado = [
+    { nombre: "Completado", total: estado.completados, tono: "ok" as const },
+    {
+      nombre: "Sin documento",
+      total: estado.sinDocumento,
+      tono: "alerta" as const,
+    },
+    { nombre: "Sin firma", total: estado.sinFirma, tono: "alerta" as const },
+    { nombre: "Sin orden", total: estado.sinOrden, tono: "alerta" as const },
+  ];
 
   const mesAnterior = nombreDeMes(inicioDeMes(1));
   const hayPendientes = resumen.incompletos > 0 || resumen.sinFirma > 0;
@@ -151,16 +164,40 @@ export default async function AdminPage({ searchParams }: Params) {
             estiraran a la misma altura, la de la gráfica quedaría con un
             hueco vacío debajo del dibujo. */}
         <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-          <section className="min-w-0 rounded-2xl border border-border bg-surface p-5">
-            <h2 className="text-sm font-semibold text-text">Reportes por mes</h2>
-            <p className="mt-0.5 text-xs text-muted">
-              Últimos 12 meses de {nombreVista}. El mes actual va empezado, por
-              eso su tramo aparece punteado.
-            </p>
-            <div className="mt-4">
-              <GraficaMeses puntos={porMes} />
-            </div>
-          </section>
+          <div className="min-w-0 space-y-4">
+            <section className="rounded-2xl border border-border bg-surface p-5">
+              <h2 className="text-sm font-semibold text-text">
+                Reportes por mes
+              </h2>
+              <p className="mt-0.5 text-xs text-muted">
+                Últimos 12 meses de {nombreVista}. El mes actual va empezado,
+                por eso su tramo aparece punteado.
+              </p>
+              <div className="mt-4">
+                <GraficaMeses puntos={porMes} />
+              </div>
+            </section>
+
+            <section className="rounded-2xl border border-border bg-surface p-5">
+              <h2 className="text-sm font-semibold text-text">
+                Estado de los reportes terminados
+              </h2>
+              {/* Se dice explícitamente que no suman: un reporte al que le
+                  falten el documento y la firma sale en las dos barras, y sin
+                  la aclaración cualquiera intentaría cuadrar los números
+                  contra el total y creería que hay un error. */}
+              <p className="mt-0.5 text-xs text-muted">
+                Un reporte puede arrastrar varias carencias, así que las barras
+                no suman el total.
+              </p>
+              <div className="mt-4">
+                <Barras
+                  datos={barrasEstado}
+                  vacio="Todavía no hay reportes terminados."
+                />
+              </div>
+            </section>
+          </div>
 
           {/* Tarjeta acotada, no una columna de alto completo: se ven unos tres
               reportes y el resto se alcanza con el scroll de dentro. Así la

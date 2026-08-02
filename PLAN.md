@@ -560,6 +560,13 @@ Pedido del cliente sobre la navegación, a partir de un dashboard de referencia:
 
 "Últimos reportes" es una **tarjeta acotada**, no una columna de alto completo: se ven tres y el resto se alcanza con el scroll de dentro, que no arrastra la página. Antes ocupaba una columna entera y marcaba la altura de todo el panel, que era al revés de su importancia — los totales quedaban apretados en media pantalla mientras la lista se estiraba. Carga 20 en vez de 6, porque ya no empuja nada.
 
+Debajo de la gráfica mensual, en el hueco que dejaba la columna de reportes, va **"Estado de los reportes terminados"**: cuatro barras con Completado, Sin documento, Sin firma y Sin orden.
+
+- Los cuatro números **no suman el total y se dice en pantalla**: un reporte al que le falten el documento y la firma sale en las dos barras. Sin la aclaración, cualquiera intentaría cuadrarlos contra el total y creería que hay un error.
+- "Completado" es el terminado al que no le falta nada: adjunto, firma y número de orden.
+- Aquí sí se usan colores de estado —verde lo que está bien, ámbar lo que falta— porque las categorías tienen valencias distintas, a diferencia de los repartos de la página de analíticas, donde todas las barras miden lo mismo y van de un solo color. Comprobados con el validador contra las dos superficies.
+- El mínimo del 2% de ancho que hace visibles los valores pequeños **se excluye para el cero**: pintaba una astilla de color que se leía como "hay poquito" cuando lo correcto es que no haya nada.
+
 `items-start` en esa rejilla para que cada tarjeta mida lo suyo: estiradas a la misma altura, la de la gráfica quedaba con un hueco vacío debajo del dibujo. `ReportList` gana `unaColumna` porque su rejilla de dos columnas dejaba las tarjetas ilegibles en el hueco lateral.
 
 **Analíticas** (`/admin/analiticas/[empresa]`). Nueva sección con submenú desplegable en el rail. La empresa va en la ruta y no en un parámetro de consulta porque es una pantalla distinta por empresa, no un filtro sobre la misma. Las opciones del submenú salen de las empresas reales, así que una tercera aparecería sola.

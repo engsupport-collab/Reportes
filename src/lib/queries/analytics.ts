@@ -100,6 +100,58 @@ export async function serieMensual(
   return puntos;
 }
 
+export type EstadoDocumental = {
+  completados: number;
+  sinDocumento: number;
+  sinFirma: number;
+  sinOrden: number;
+};
+
+/**
+ * En qué estado documental están los reportes terminados.
+ *
+ * Los cuatro números NO suman el total y no deben leerse como un reparto: un
+ * mismo reporte puede estar a la vez sin documento y sin firma, así que
+ * aparece en las dos barras. La pregunta que responden es "¿cuántos arrastran
+ * cada carencia?", no "¿cómo se divide el total?".
+ *
+ * "Completado" es el terminado al que no le falta nada: tiene adjunto, firma y
+ * número de orden.
+ */
+export async function estadoDocumental(
+  companyId?: string,
+): Promise<EstadoDocumental> {
+  const deLaEmpresa = companyId ? eq(reports.companyId, companyId) : undefined;
+  const terminado = eq(reports.status, "terminado");
+
+  const conAdjunto = sql`EXISTS (SELECT 1 FROM ${attachments} WHERE ${attachments.reportId} = ${reports.id})`;
+
+  const contar = async (condicion: ReturnType<typeof and>): Promise<number> => {
+    const [fila] = await db
+      .select({ n: sql<number>`COUNT(*)` })
+      .from(reports)
+      .where(condicion);
+    return Number(fila?.n ?? 0);
+  };
+
+  const [completados, sinDocumento, sinFirma, sinOrden] = await Promise.all([
+    contar(
+      and(
+        deLaEmpresa,
+        terminado,
+        conAdjunto,
+        sql`${reports.signatureUrl} IS NOT NULL`,
+        sql`${reports.purchaseOrderNo} IS NOT NULL`,
+      ),
+    ),
+    contar(and(deLaEmpresa, terminado, sql`NOT ${conAdjunto}`)),
+    contar(and(deLaEmpresa, terminado, isNull(reports.signatureUrl))),
+    contar(and(deLaEmpresa, terminado, isNull(reports.purchaseOrderNo))),
+  ]);
+
+  return { completados, sinDocumento, sinFirma, sinOrden };
+}
+
 export async function obtenerAnaliticas(
   companyId: string,
 ): Promise<Analiticas> {
