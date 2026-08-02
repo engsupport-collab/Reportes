@@ -27,12 +27,12 @@ export default function LoginPage() {
     <main className="grid min-h-screen lg:grid-cols-2">
       <div className="flex items-center justify-center bg-surface px-6 py-12 sm:px-12">
         <div className="w-full max-w-sm">
+          {/* Aquí sí cabe el lockup completo, que es donde se lee entero el
+              nombre y el subtítulo de la marca. El separador y la bajada
+              dicen qué es esto, no solo de quién es. */}
           <div className="flex items-center gap-4">
-            <Logotipo tamano="grande" />
-            {/* Separador y bajada: dicen qué es esto, no solo de quién es.
-                Cuando entre el logotipo del cliente, el nombre del sistema
-                tiene que seguir leyéndose aparte de la marca. */}
-            <span className="h-9 w-px bg-border" />
+            <Logotipo alto={54} />
+            <span className="h-11 w-px bg-border" />
             <span className="text-xs font-semibold uppercase leading-tight tracking-widest text-muted">
               Reportes
               <br />

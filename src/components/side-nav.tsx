@@ -104,9 +104,6 @@ function NavDesplegable({
   );
 }
 
-// El dibujo vive en components/logotipo.tsx, para poder sustituirlo por el
-// logotipo del cliente en un solo sitio.
-const Logo = Logotipo;
 
 /**
  * Menú de la cuenta, abajo del todo.
@@ -243,7 +240,10 @@ export function SideNav({
       >
         <div className="flex items-center gap-2.5 px-4 py-4">
           <Link href={inicio} className="flex items-center gap-2.5">
-            <Logo />
+            {/* Solo el monograma: el lockup completo a esta altura deja el
+                subtítulo del logotipo ilegible. El nombre del sistema va al
+                lado, en texto, que además es lo que aquí hace falta saber. */}
+            <Logotipo variante="monograma" alto={30} />
             <span className="text-sm font-semibold text-text">Reportes</span>
           </Link>
         </div>
