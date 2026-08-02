@@ -560,12 +560,14 @@ Pedido del cliente sobre la navegación, a partir de un dashboard de referencia:
 
 "Últimos reportes" es una **tarjeta acotada**, no una columna de alto completo: se ven tres y el resto se alcanza con el scroll de dentro, que no arrastra la página. Antes ocupaba una columna entera y marcaba la altura de todo el panel, que era al revés de su importancia — los totales quedaban apretados en media pantalla mientras la lista se estiraba. Carga 20 en vez de 6, porque ya no empuja nada.
 
-Debajo de la gráfica mensual, en el hueco que dejaba la columna de reportes, va **"Estado de los reportes terminados"**: cuatro barras con Completado, Sin documento, Sin firma y Sin orden.
+A todo el ancho, debajo de las dos columnas, va **"Estado de los reportes terminados"**: cuatro barras **verticales** con Completado, Sin documento, Sin firma y Sin orden. Ocupa el ancho completo porque en el tercio de la izquierda las cuatro columnas quedaban estrechas y los nombres se recortaban.
 
 - Los cuatro números **no suman el total y se dice en pantalla**: un reporte al que le falten el documento y la firma sale en las dos barras. Sin la aclaración, cualquiera intentaría cuadrarlos contra el total y creería que hay un error.
 - "Completado" es el terminado al que no le falta nada: adjunto, firma y número de orden.
 - Aquí sí se usan colores de estado —verde lo que está bien, ámbar lo que falta— porque las categorías tienen valencias distintas, a diferencia de los repartos de la página de analíticas, donde todas las barras miden lo mismo y van de un solo color. Comprobados con el validador contra las dos superficies.
 - El mínimo del 2% de ancho que hace visibles los valores pequeños **se excluye para el cero**: pintaba una astilla de color que se leía como "hay poquito" cuando lo correcto es que no haya nada.
+- **El ancho de cada columna está limitado a 80px.** Repartido el espacio entre cuatro, cada barra salía de 256px de ancho por 192 de alto: más ancha que alta, que deja de leerse como una columna y pasa a ser un bloque de color — justo el "thick saturated block" que la guía marca como error.
+- Las barras llegan como mucho al 86% del alto para dejar sitio a la cifra que va encima. Recortar así la escala no induce a error porque el valor va escrito en cada barra: no hay que medirlo contra un eje.
 
 `items-start` en esa rejilla para que cada tarjeta mida lo suyo: estiradas a la misma altura, la de la gráfica quedaba con un hueco vacío debajo del dibujo. `ReportList` gana `unaColumna` porque su rejilla de dos columnas dejaba las tarjetas ilegibles en el hueco lateral.
 

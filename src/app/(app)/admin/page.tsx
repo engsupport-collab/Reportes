@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 import { AppShell } from "@/components/app-shell";
-import { Barras } from "@/components/admin/barras";
+import { BarrasVerticales } from "@/components/admin/barras-verticales";
 import { GraficaMeses } from "@/components/admin/grafica-meses";
 import { StatTile } from "@/components/admin/stat-tile";
 import { FiltroEmpresa } from "@/components/reports/filtros";
@@ -164,40 +164,16 @@ export default async function AdminPage({ searchParams }: Params) {
             estiraran a la misma altura, la de la gráfica quedaría con un
             hueco vacío debajo del dibujo. */}
         <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-          <div className="min-w-0 space-y-4">
-            <section className="rounded-2xl border border-border bg-surface p-5">
-              <h2 className="text-sm font-semibold text-text">
-                Reportes por mes
-              </h2>
-              <p className="mt-0.5 text-xs text-muted">
-                Últimos 12 meses de {nombreVista}. El mes actual va empezado,
-                por eso su tramo aparece punteado.
-              </p>
-              <div className="mt-4">
-                <GraficaMeses puntos={porMes} />
-              </div>
-            </section>
-
-            <section className="rounded-2xl border border-border bg-surface p-5">
-              <h2 className="text-sm font-semibold text-text">
-                Estado de los reportes terminados
-              </h2>
-              {/* Se dice explícitamente que no suman: un reporte al que le
-                  falten el documento y la firma sale en las dos barras, y sin
-                  la aclaración cualquiera intentaría cuadrar los números
-                  contra el total y creería que hay un error. */}
-              <p className="mt-0.5 text-xs text-muted">
-                Un reporte puede arrastrar varias carencias, así que las barras
-                no suman el total.
-              </p>
-              <div className="mt-4">
-                <Barras
-                  datos={barrasEstado}
-                  vacio="Todavía no hay reportes terminados."
-                />
-              </div>
-            </section>
-          </div>
+          <section className="min-w-0 rounded-2xl border border-border bg-surface p-5">
+            <h2 className="text-sm font-semibold text-text">Reportes por mes</h2>
+            <p className="mt-0.5 text-xs text-muted">
+              Últimos 12 meses de {nombreVista}. El mes actual va empezado, por
+              eso su tramo aparece punteado.
+            </p>
+            <div className="mt-4">
+              <GraficaMeses puntos={porMes} />
+            </div>
+          </section>
 
           {/* Tarjeta acotada, no una columna de alto completo: se ven unos tres
               reportes y el resto se alcanza con el scroll de dentro. Así la
@@ -229,6 +205,29 @@ export default async function AdminPage({ searchParams }: Params) {
             </div>
           </section>
         </div>
+
+        {/* A todo el ancho, debajo de las dos columnas: son cuatro barras y en
+            el tercio de la izquierda quedaban estrechas. Aquí respiran y los
+            nombres caben debajo sin recortarse. */}
+        <section className="rounded-2xl border border-border bg-surface p-5">
+          <h2 className="text-sm font-semibold text-text">
+            Estado de los reportes terminados
+          </h2>
+          {/* Se dice explícitamente que no suman: un reporte al que le falten
+              el documento y la firma sale en las dos barras, y sin la
+              aclaración cualquiera intentaría cuadrar los números contra el
+              total y creería que hay un error. */}
+          <p className="mt-0.5 text-xs text-muted">
+            Un reporte puede arrastrar varias carencias, así que las barras no
+            suman el total.
+          </p>
+          <div className="mt-6">
+            <BarrasVerticales
+              datos={barrasEstado}
+              vacio="Todavía no hay reportes terminados."
+            />
+          </div>
+        </section>
       </div>
     </AppShell>
   );
