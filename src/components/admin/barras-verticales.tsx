@@ -41,8 +41,11 @@ export function BarrasVerticales({
   const maximo = Math.max(...datos.map((d) => d.total), 1);
 
   return (
-    <div>
-      <div className="flex h-72 items-end gap-3 border-b border-border sm:gap-6">
+    // Ocupa el alto que le den, con un mínimo para que no se aplaste. Así la
+    // tarjeta puede estirarse hasta igualar la columna de al lado y no queda
+    // un hueco muerto entre una y otra.
+    <div className="flex h-full flex-col">
+      <div className="flex min-h-52 flex-1 items-end gap-3 border-b border-border sm:gap-6">
         {datos.map((d) => {
           // El cero no dibuja nada: una astilla de color se leería como "hay
           // poquito" cuando lo correcto es que no haya nada.
@@ -71,7 +74,7 @@ export function BarrasVerticales({
         })}
       </div>
 
-      <div className="mt-2 flex gap-3 sm:gap-6">
+      <div className="mt-2 flex shrink-0 gap-3 sm:gap-6">
         {datos.map((d) => (
           <span
             key={d.nombre}

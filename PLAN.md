@@ -560,7 +560,11 @@ Pedido del cliente sobre la navegación, a partir de un dashboard de referencia:
 
 "Últimos reportes" es una **tarjeta acotada**, no una columna de alto completo: se ven tres y el resto se alcanza con el scroll de dentro, que no arrastra la página. Antes ocupaba una columna entera y marcaba la altura de todo el panel, que era al revés de su importancia — los totales quedaban apretados en media pantalla mientras la lista se estiraba. Carga 20 en vez de 6, porque ya no empuja nada.
 
-A todo el ancho, debajo de las dos columnas, va **"Estado de los reportes terminados"**: cuatro barras **verticales** con Completado, Sin documento, Sin firma y Sin orden. Ocupa el ancho completo porque en el tercio de la izquierda las cuatro columnas quedaban estrechas y los nombres se recortaban.
+Debajo de la gráfica mensual, en la misma columna, va **"Estado de los reportes terminados"**: cuatro barras **verticales** con Completado, Sin documento, Sin firma y Sin orden.
+
+La disposición final es: las dos gráficas apiladas a la izquierda y los últimos reportes al lado, ocupando el alto de las dos. **Sin `items-start`**, para que las dos columnas midan lo mismo, y la tarjeta de estado se estira (`flex-1`) hasta rellenar lo que le sobre a la izquierda. Puesta a todo el ancho debajo de las dos columnas —como estuvo un momento— arrancaba por debajo de la columna más alta y dejaba un hueco muerto de varios cientos de píxeles junto a la gráfica mensual.
+
+Para que ese estirado funcione, `BarrasVerticales` ocupa el alto que le den (`h-full`, área de dibujo con `flex-1` y un `min-h` para que no se aplaste) en vez de tener una altura fija.
 
 - Los cuatro números **no suman el total y se dice en pantalla**: un reporte al que le falten el documento y la firma sale en las dos barras. Sin la aclaración, cualquiera intentaría cuadrarlos contra el total y creería que hay un error.
 - "Completado" es el terminado al que no le falta nada: adjunto, firma y número de orden.
