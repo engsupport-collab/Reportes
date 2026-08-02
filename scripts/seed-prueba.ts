@@ -21,6 +21,7 @@ import { config } from "dotenv";
 // están las variables exportadas— haría que el script escribiera en
 // desarrollo mientras uno cree que está tocando producción.
 const urlVeniaDelEntorno = Boolean(process.env.TURSO_DATABASE_URL);
+const tokenVeniaDelEntorno = Boolean(process.env.TURSO_AUTH_TOKEN);
 
 // No sobrescribe lo que ya esté en el entorno: si se exportó
 // TURSO_DATABASE_URL apuntando a producción, eso manda sobre .env.local.
@@ -245,10 +246,35 @@ async function main() {
   console.log(`  BASE DE DATOS: ${new URL(url).host}`);
   console.log(
     urlVeniaDelEntorno
-      ? "  (de las variables de entorno)"
-      : "  (de .env.local — si esperabas producción, CANCELA y exporta TURSO_DATABASE_URL)",
+      ? "  URL:   de las variables de entorno"
+      : "  URL:   de .env.local — si esperabas producción, CANCELA y exporta TURSO_DATABASE_URL",
+  );
+  console.log(
+    `  Token: ${tokenVeniaDelEntorno ? "de las variables de entorno" : "de .env.local"}` +
+      ` (${authToken.length} caracteres)`,
   );
   console.log("");
+
+  // Que uno venga del entorno y el otro de .env.local casi siempre es un
+  // olvido al abrir una terminal nueva, y el síntoma es un HTTP 400 opaco al
+  // primer SELECT: el token de una base no sirve para la otra. Mejor pararlo
+  // aquí con el motivo escrito.
+  if (urlVeniaDelEntorno !== tokenVeniaDelEntorno) {
+    throw new Error(
+      "La URL y el token vienen de sitios distintos: uno de las variables de " +
+        "entorno y el otro de .env.local. Son de bases diferentes y la " +
+        "conexión va a fallar. Exporta los dos, o ninguno.",
+    );
+  }
+
+  // Un token de Turso es un JWT largo. Si mide menos, casi seguro se pegó el
+  // texto de ejemplo en vez del token real.
+  if (authToken.length < 100) {
+    throw new Error(
+      `El token tiene solo ${authToken.length} caracteres. Un token real de ` +
+        "Turso pasa de 300 y empieza por 'eyJ'. Revisa que lo hayas pegado completo.",
+    );
+  }
 
   const client = createClient({ url, authToken });
   const db = drizzle(client);
