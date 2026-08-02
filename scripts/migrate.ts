@@ -1,31 +1,25 @@
 /**
  * Aplica las migraciones pendientes a la base de datos configurada.
  *
- *   npm run db:generate   -> genera el SQL en ./drizzle a partir del esquema
- *   npm run db:migrate    -> lo aplica a Turso
+ *   npm run db:generate         -> genera el SQL en ./drizzle a partir del esquema
+ *   npm run db:migrate          -> lo aplica a la base de desarrollo
+ *   npm run db:migrate -- --prod -> lo aplica a producción (lee .env.prod)
  *
  * Se usa un script propio en vez de `drizzle-kit migrate` para que el mismo
- * comando sirva en local y en el despliegue, leyendo las variables de entorno
- * de la misma forma en ambos casos.
+ * comando sirva en local y en el despliegue, leyendo las credenciales de la
+ * misma forma en ambos casos.
  */
-import { config } from "dotenv";
-
-config({ path: ".env.local" });
-
 import { createClient } from "@libsql/client";
 import { drizzle } from "drizzle-orm/libsql";
 import { migrate } from "drizzle-orm/libsql/migrator";
 
+import { anunciar, cargarCredenciales } from "./entorno";
+
 async function main() {
-  const url = process.env.TURSO_DATABASE_URL;
-  const authToken = process.env.TURSO_AUTH_TOKEN;
+  const credenciales = cargarCredenciales(process.argv);
+  anunciar(credenciales);
 
-  if (!url || !authToken) {
-    throw new Error(
-      "Faltan TURSO_DATABASE_URL o TURSO_AUTH_TOKEN. Copia .env.example a .env.local y complétalo.",
-    );
-  }
-
+  const { url, authToken } = credenciales;
   const client = createClient({ url, authToken });
   const db = drizzle(client);
 

@@ -14,25 +14,13 @@
  * a ojo para borrarlos después es justo lo que sale mal. Con el prefijo, la
  * limpieza es exacta y no depende de acordarse de cuáles eran.
  */
-import { config } from "dotenv";
-
-// Se anota ANTES de cargar .env.local, para poder decir después de dónde
-// salió la conexión. Sin este aviso, abrir una terminal nueva —donde ya no
-// están las variables exportadas— haría que el script escribiera en
-// desarrollo mientras uno cree que está tocando producción.
-const urlVeniaDelEntorno = Boolean(process.env.TURSO_DATABASE_URL);
-const tokenVeniaDelEntorno = Boolean(process.env.TURSO_AUTH_TOKEN);
-
-// No sobrescribe lo que ya esté en el entorno: si se exportó
-// TURSO_DATABASE_URL apuntando a producción, eso manda sobre .env.local.
-config({ path: ".env.local" });
-
 import { createClient } from "@libsql/client";
 import { eq, like } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/libsql";
 
 import { reportTags, reports, users } from "../src/db/schema";
 import { parseFechaISO } from "../src/lib/fechas";
+import { anunciar, cargarCredenciales } from "./entorno";
 
 const PREFIJO = "prueba-";
 
@@ -232,50 +220,10 @@ const SAAS: Plantilla[] = [
 async function main() {
   const limpiar = process.argv.includes("--limpiar");
 
-  const url = process.env.TURSO_DATABASE_URL;
-  const authToken = process.env.TURSO_AUTH_TOKEN;
-  if (!url || !authToken) {
-    throw new Error(
-      "Faltan TURSO_DATABASE_URL y TURSO_AUTH_TOKEN en el entorno.",
-    );
-  }
+  const credenciales = cargarCredenciales(process.argv);
+  anunciar(credenciales);
 
-  // Se dice en voz alta contra qué base se va a escribir: este script puede
-  // correr contra producción, y equivocarse de base no debería ser silencioso.
-  console.log("");
-  console.log(`  BASE DE DATOS: ${new URL(url).host}`);
-  console.log(
-    urlVeniaDelEntorno
-      ? "  URL:   de las variables de entorno"
-      : "  URL:   de .env.local — si esperabas producción, CANCELA y exporta TURSO_DATABASE_URL",
-  );
-  console.log(
-    `  Token: ${tokenVeniaDelEntorno ? "de las variables de entorno" : "de .env.local"}` +
-      ` (${authToken.length} caracteres)`,
-  );
-  console.log("");
-
-  // Que uno venga del entorno y el otro de .env.local casi siempre es un
-  // olvido al abrir una terminal nueva, y el síntoma es un HTTP 400 opaco al
-  // primer SELECT: el token de una base no sirve para la otra. Mejor pararlo
-  // aquí con el motivo escrito.
-  if (urlVeniaDelEntorno !== tokenVeniaDelEntorno) {
-    throw new Error(
-      "La URL y el token vienen de sitios distintos: uno de las variables de " +
-        "entorno y el otro de .env.local. Son de bases diferentes y la " +
-        "conexión va a fallar. Exporta los dos, o ninguno.",
-    );
-  }
-
-  // Un token de Turso es un JWT largo. Si mide menos, casi seguro se pegó el
-  // texto de ejemplo en vez del token real.
-  if (authToken.length < 100) {
-    throw new Error(
-      `El token tiene solo ${authToken.length} caracteres. Un token real de ` +
-        "Turso pasa de 300 y empieza por 'eyJ'. Revisa que lo hayas pegado completo.",
-    );
-  }
-
+  const { url, authToken } = credenciales;
   const client = createClient({ url, authToken });
   const db = drizzle(client);
 
