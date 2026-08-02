@@ -527,6 +527,15 @@ Pedido del cliente sobre la navegación, a partir de un dashboard de referencia:
 - El panel de `/admin` conserva sus chips de empresa: son tres opciones y es el selector de contexto de esa pantalla, esconderlo tras un botón sería peor.
 - Verificado en navegador (escritorio y 390px): rail fijo al desplazar, cajón móvil, panel de filtros aplicando y quitando filtros, menú de cuenta con cierre de sesión. Sin errores de consola.
 
+### Fase 10.5: barra superior y perfil
+
+- **Barra superior** (`top-bar.tsx`) con el buscador a la izquierda y la cuenta a la derecha. El buscador es uno solo para todo el sistema y se quitaron los de cada lista: dos cajas de búsqueda en la misma pantalla confunden. Si ya se está en la lista, buscar conserva los filtros puestos y solo reinicia la página.
+- **`/perfil`**: ficha de la propia cuenta (nombre, usuario, empresas, fecha de alta) y **cambio de la propia contraseña**, que hasta ahora no existía — la única forma era que un admin la reseteara, lo que obliga a que la temporal viaje por WhatsApp y quede escrita en algún lado. Pide la actual además de la nueva: sin eso, cualquiera que encuentre una sesión abierta se queda con la cuenta.
+- El perfil es siempre el del usuario de la sesión, nunca un id por URL — un perfil direccionable por parámetro sería una puerta para leer la cuenta de otro. Para cuentas ajenas está `/admin/usuarios`, detrás de `requireAdmin()`.
+- El estado del cajón móvil se movió a `shell-chrome.tsx` porque ahora el botón que lo abre (barra superior) y el cajón (rail) son componentes distintos.
+- **No se agregaron** correo, teléfono, ubicación ni foto: esos campos no existen en la base y mostrarlos vacíos no aporta. Requerirían una migración.
+- Corregido de paso un desbordamiento horizontal preexistente: las tarjetas de `report-list` se salían 28px de la pantalla a 390px porque las celdas del grid no llevaban `min-w-0` y no encogían por debajo de su contenido mínimo.
+
 ## Problema abierto: firmar con el dedo en celular
 
 **Estado: sin resolver.** Con mouse en PC funciona correctamente; con el dedo en celular no se dibuja.

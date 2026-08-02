@@ -37,6 +37,29 @@ export const nuevaContrasenaSchema = z
   .max(200, "Contraseña demasiado larga");
 
 /**
+ * Cambio de contraseña hecho por el propio usuario desde su perfil.
+ *
+ * Pide la actual además de la nueva: sin eso, cualquiera que encuentre una
+ * sesión abierta en un celular prestado se queda con la cuenta. La repetición
+ * es porque el campo va enmascarado — un dedazo sin confirmación deja a la
+ * persona fuera de su propia cuenta hasta que un admin se la resetee.
+ */
+export const cambiarContrasenaSchema = z
+  .object({
+    actual: z.string().min(1, "Ingresa tu contraseña actual"),
+    nueva: nuevaContrasenaSchema,
+    repetir: z.string(),
+  })
+  .refine((d) => d.nueva === d.repetir, {
+    message: "Las contraseñas nuevas no coinciden",
+    path: ["repetir"],
+  })
+  .refine((d) => d.nueva !== d.actual, {
+    message: "La contraseña nueva tiene que ser distinta de la actual",
+    path: ["nueva"],
+  });
+
+/**
  * Reporte de trabajo.
  *
  * Los límites de longitud no son decorativos: sin ellos, alguien puede mandar

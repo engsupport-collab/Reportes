@@ -46,6 +46,27 @@ export async function listarUsuarios(): Promise<UsuarioConAccesos[]> {
   }));
 }
 
+/**
+ * Datos de la cuenta que no viajan en la sesión, para la página de perfil.
+ *
+ * El token solo lleva lo que hace falta en cada petición (id, nombre, rol);
+ * meterle la fecha de alta lo engordaría para mostrarla en una sola pantalla.
+ */
+export async function obtenerCuenta(userId: string) {
+  const [fila] = await db
+    .select({
+      username: users.username,
+      fullName: users.fullName,
+      role: users.role,
+      createdAt: users.createdAt,
+    })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+
+  return fila ?? null;
+}
+
 export async function existeUsername(username: string): Promise<boolean> {
   const [fila] = await db
     .select({ id: users.id })

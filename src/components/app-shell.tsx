@@ -1,6 +1,7 @@
 import { logoutAction } from "@/actions/auth";
 import { elegirEmpresaAction } from "@/actions/companies";
-import { SideNav, type NavItem } from "@/components/side-nav";
+import { ShellChrome } from "@/components/shell-chrome";
+import type { NavItem } from "@/components/side-nav";
 import type { CurrentUser } from "@/lib/auth-guard";
 import { formatFechaEncabezado, horaLocal } from "@/lib/fechas";
 import { CompanySwitcher } from "./company-switcher";
@@ -31,52 +32,54 @@ function navPara(role: CurrentUser["role"]): NavItem[] {
 }
 
 /**
- * Marco común de las dos vistas: rail de navegación a la izquierda y el
- * contenido de la página a la derecha.
+ * Marco común de las dos vistas.
  *
  * Recibe el usuario ya resuelto en vez de consultarlo por su cuenta: la página
  * que lo usa tiene que haber llamado antes a requireUser() o requireAdmin(),
  * así la comprobación de acceso ocurre siempre antes de renderizar nada.
+ *
+ * `saludo` acepta ocultarse porque no toda pantalla lo quiere: en el perfil,
+ * "Buenas noches, Administrador" justo encima de la ficha del propio usuario
+ * dice dos veces lo mismo.
  */
 export function AppShell({
   user,
+  saludo: mostrarSaludo = true,
   children,
 }: {
   user: CurrentUser;
+  saludo?: boolean;
   children: React.ReactNode;
 }) {
   return (
-    <div className="min-h-screen md:flex">
-      <SideNav
-        user={user}
-        nav={navPara(user.role)}
-        onCerrarSesion={logoutAction}
-      >
-        {/* El admin no elige empresa a nivel de sesión — ve las dos siempre y
-            filtra dentro de cada página. El cambiador solo aplica al empleado,
-            que sí trabaja "dentro de" una empresa a la vez. */}
-        {user.empresaActiva ? (
+    <ShellChrome
+      user={user}
+      nav={navPara(user.role)}
+      onCerrarSesion={logoutAction}
+      selectorEmpresa={
+        // El admin no elige empresa a nivel de sesión — ve las dos siempre y
+        // filtra dentro de cada página. El cambiador solo aplica al empleado,
+        // que sí trabaja "dentro de" una empresa a la vez.
+        user.empresaActiva ? (
           <CompanySwitcher
             empresas={user.empresas}
             activa={user.empresaActiva}
             onCambiar={elegirEmpresaAction}
           />
-        ) : null}
-      </SideNav>
-
-      <main className="min-w-0 flex-1 px-4 py-6 sm:px-6 sm:py-8">
-        <div className="mx-auto max-w-6xl">
-          <div className="mb-6">
-            <h1 className="text-2xl font-semibold tracking-tight text-text">
-              {saludo()}, {user.fullName.split(" ")[0]}
-            </h1>
-            <p className="mt-1 text-sm capitalize text-muted">
-              {formatFechaEncabezado()}
-            </p>
-          </div>
-          {children}
+        ) : null
+      }
+    >
+      {mostrarSaludo ? (
+        <div className="mb-6">
+          <h1 className="text-2xl font-semibold tracking-tight text-text">
+            {saludo()}, {user.fullName.split(" ")[0]}
+          </h1>
+          <p className="mt-1 text-sm capitalize text-muted">
+            {formatFechaEncabezado()}
+          </p>
         </div>
-      </main>
-    </div>
+      ) : null}
+      {children}
+    </ShellChrome>
   );
 }

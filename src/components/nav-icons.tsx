@@ -78,6 +78,24 @@ export function IconFiltros(props: IconProps) {
   );
 }
 
+export function IconBuscar(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <circle cx="11" cy="11" r="7" />
+      <path d="m20 20-3.5-3.5" />
+    </Svg>
+  );
+}
+
+export function IconPerfil(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <circle cx="12" cy="8" r="3.5" />
+      <path d="M5 20a7 7 0 0 1 14 0" />
+    </Svg>
+  );
+}
+
 export function IconMenu(props: IconProps) {
   return (
     <Svg {...props}>

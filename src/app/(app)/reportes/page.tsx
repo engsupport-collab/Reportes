@@ -197,34 +197,10 @@ export default async function ReportesPage({ searchParams }: Params) {
           </p>
         ) : null}
 
-        <div className="flex flex-wrap items-center gap-3">
-          <form action="/reportes" className="flex flex-1 gap-2">
-            {soloIncompletos ? (
-              <input type="hidden" name="faltantes" value="1" />
-            ) : null}
-            {soloSinOrden ? (
-              <input type="hidden" name="sinorden" value="1" />
-            ) : null}
-            {servicio ? (
-              <input type="hidden" name="servicio" value={servicio} />
-            ) : null}
-            {etiqueta ? (
-              <input type="hidden" name="etiqueta" value={etiqueta} />
-            ) : null}
-            <input
-              type="search"
-              name="q"
-              defaultValue={params.q ?? ""}
-              placeholder="Buscar por proyecto, cliente u orden de compra"
-              className="min-w-0 flex-1 rounded-lg border border-border bg-surface px-3 py-2.5 text-sm text-text placeholder:text-muted focus:border-brand focus:outline-none"
-            />
-            <button
-              type="submit"
-              className="rounded-lg border border-border px-4 py-2.5 text-sm font-medium text-muted transition hover:bg-surface-muted hover:text-text"
-            >
-              Buscar
-            </button>
-          </form>
+        {/* La búsqueda vive en la barra superior, no aquí: es la misma para
+            todo el sistema y tenerla dos veces en pantalla confunde. */}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <FilterPanel basePath="/reportes" q={params.q} campos={campos} />
 
           <Link
             href="/reportes/nuevo"
@@ -233,8 +209,6 @@ export default async function ReportesPage({ searchParams }: Params) {
             Nuevo reporte
           </Link>
         </div>
-
-        <FilterPanel basePath="/reportes" q={params.q} campos={campos} />
 
         <div className="flex items-center justify-between gap-3">
           <p className="text-sm text-muted">

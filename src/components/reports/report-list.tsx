@@ -36,9 +36,12 @@ export function ReportList({
   }
 
   return (
+    // min-w-0 en cada celda: por defecto una celda de grid no encoge por
+    // debajo del ancho mínimo de su contenido, así que en el celular la
+    // tarjeta se salía de la pantalla en vez de recortar el título.
     <ul className="grid gap-3 lg:grid-cols-2">
       {items.map((r) => (
-        <li key={r.id}>
+        <li key={r.id} className="min-w-0">
           <Link
             href={`${baseHref}/${r.id}`}
             className="flex h-full flex-col gap-3 rounded-2xl border border-border bg-surface p-4 transition hover:border-brand hover:shadow-sm"

@@ -5,7 +5,6 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 
 import {
-  IconMenu,
   IconNuevo,
   IconPanel,
   IconReportes,
@@ -123,46 +122,38 @@ function MenuCuenta({
  *
  * En pantallas anchas es una columna fija a la izquierda. En el celular esa
  * columna no cabe sin comerse el contenido, así que se convierte en un cajón
- * que se abre desde una barra superior — los trabajadores crean reportes desde
- * el teléfono, no es un caso secundario.
+ * que se abre desde el botón de la barra superior — los trabajadores crean
+ * reportes desde el teléfono, no es un caso secundario.
+ *
+ * Abrir y cerrar se controla desde fuera porque el botón que lo abre vive en
+ * la barra superior, que es otro componente: el estado tiene que ser de quien
+ * los contiene a los dos.
  */
 export function SideNav({
   user,
   nav,
   onCerrarSesion,
+  abierto,
+  onCerrar,
   children,
 }: {
   user: CurrentUser;
   nav: NavItem[];
   onCerrarSesion: () => void | Promise<void>;
+  abierto: boolean;
+  onCerrar: () => void;
   children?: React.ReactNode;
 }) {
-  const [abierto, setAbierto] = useState(false);
   const pathname = usePathname();
   const inicio = user.role === "admin" ? "/admin" : "/reportes";
 
   return (
     <>
-      {/* Barra superior, solo en celular: da acceso al cajón. */}
-      <div className="sticky top-0 z-30 flex items-center gap-3 border-b border-border bg-surface/95 px-4 py-2.5 backdrop-blur md:hidden">
-        <button
-          type="button"
-          onClick={() => setAbierto(true)}
-          aria-label="Abrir menú"
-          className="rounded-lg p-1.5 text-muted transition hover:bg-surface-muted hover:text-text"
-        >
-          <IconMenu className="h-5 w-5" />
-        </button>
-        <Link href={inicio}>
-          <Logo />
-        </Link>
-      </div>
-
       {abierto ? (
         <button
           type="button"
           aria-label="Cerrar menú"
-          onClick={() => setAbierto(false)}
+          onClick={onCerrar}
           className="fixed inset-0 z-40 cursor-default bg-black/50 md:hidden"
         />
       ) : null}
@@ -201,7 +192,7 @@ export function SideNav({
                 href={item.href}
                 // En el celular el rail es un cajón encima del contenido: si no
                 // se cierra al elegir, tapa la página que se acaba de abrir.
-                onClick={() => setAbierto(false)}
+                onClick={onCerrar}
                 aria-current={activo ? "page" : undefined}
                 className={`flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium transition ${
                   activo
