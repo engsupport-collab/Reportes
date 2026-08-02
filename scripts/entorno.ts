@@ -55,9 +55,23 @@ export function cargarCredenciales(argv: string[]): Credenciales {
   const url = process.env.TURSO_DATABASE_URL;
   const authToken = process.env.TURSO_AUTH_TOKEN;
 
-  if (!url || !authToken) {
+  // Se distingue "no está" de "está pero vacía": son problemas distintos y el
+  // segundo es el que pasa de verdad —la línea existe en el archivo pero el
+  // valor se quedó sin escribir—, así que decir solo "falta" manda a buscar
+  // en el sitio equivocado.
+  const estado = (v: string | undefined) =>
+    v === undefined ? "no está en el archivo" : v === "" ? "está vacía" : null;
+
+  const problemas = [
+    ["TURSO_DATABASE_URL", estado(url)] as const,
+    ["TURSO_AUTH_TOKEN", estado(authToken)] as const,
+  ].filter(([, malo]) => malo !== null);
+
+  if (problemas.length > 0 || !url || !authToken) {
     throw new Error(
-      `Faltan TURSO_DATABASE_URL y/o TURSO_AUTH_TOKEN (se buscaron en ${archivo}).`,
+      `Problema con las credenciales en ${archivo}:\n` +
+        problemas.map(([n, m]) => `  - ${n} ${m}`).join("\n") +
+        `\n\nRevisa el archivo: cada línea va como NOMBRE=valor, sin comillas.`,
     );
   }
 
