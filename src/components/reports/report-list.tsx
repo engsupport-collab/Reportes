@@ -17,12 +17,19 @@ export function ReportList({
   mostrarAutor = false,
   mostrarEmpresa = false,
   baseHref = "/reportes",
+  unaColumna = false,
 }: {
   items: ReporteEnLista[];
   mostrarAutor?: boolean;
   /** El admin ve reportes de las dos empresas mezclados; esto aclara de cuál es cada uno. */
   mostrarEmpresa?: boolean;
   baseHref?: string;
+  /**
+   * Fuerza una sola columna. Necesario cuando la lista va en la columna
+   * lateral del panel: ahí la pantalla es ancha pero el hueco no, y las dos
+   * columnas de siempre dejarían las tarjetas ilegibles.
+   */
+  unaColumna?: boolean;
 }) {
   if (items.length === 0) {
     return (
@@ -39,7 +46,7 @@ export function ReportList({
     // min-w-0 en cada celda: por defecto una celda de grid no encoge por
     // debajo del ancho mínimo de su contenido, así que en el celular la
     // tarjeta se salía de la pantalla en vez de recortar el título.
-    <ul className="grid gap-3 lg:grid-cols-2">
+    <ul className={`grid gap-3 ${unaColumna ? "" : "lg:grid-cols-2"}`}>
       {items.map((r) => (
         <li key={r.id} className="min-w-0">
           <Link

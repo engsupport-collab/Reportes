@@ -16,11 +16,22 @@ function saludo(): string {
   return "Buenas noches";
 }
 
-function navPara(role: CurrentUser["role"]): NavItem[] {
-  if (role === "admin") {
+function navPara(user: CurrentUser): NavItem[] {
+  if (user.role === "admin") {
     return [
       { href: "/admin", label: "Panel", icono: "panel" },
       { href: "/admin/reportes", label: "Reportes", icono: "reportes" },
+      {
+        // Las opciones salen de las empresas reales del sistema: si mañana hay
+        // una tercera, aparece sola sin tocar este archivo.
+        href: "/admin/analiticas",
+        label: "Analíticas",
+        icono: "analiticas",
+        hijos: user.empresas.map((e) => ({
+          href: `/admin/analiticas/${e.id}`,
+          label: e.name,
+        })),
+      },
       { href: "/reportes/nuevo", label: "Nuevo reporte", icono: "nuevo" },
       { href: "/admin/usuarios", label: "Usuarios", icono: "usuarios" },
     ];
@@ -54,7 +65,7 @@ export function AppShell({
   return (
     <ShellChrome
       user={user}
-      nav={navPara(user.role)}
+      nav={navPara(user)}
       onCerrarSesion={logoutAction}
       selectorEmpresa={
         // El admin no elige empresa a nivel de sesión — ve las dos siempre y

@@ -78,6 +78,16 @@ export function IconFiltros(props: IconProps) {
   );
 }
 
+export function IconAnaliticas(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M4 20V4" />
+      <path d="M4 20h16" />
+      <path d="M8 17v-5M13 17V8M18 17v-7" />
+    </Svg>
+  );
+}
+
 export function IconBuscar(props: IconProps) {
   return (
     <Svg {...props}>

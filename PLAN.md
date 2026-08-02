@@ -550,6 +550,22 @@ Pedido del cliente sobre la navegación, a partir de un dashboard de referencia:
 
 **Datos de prueba (`scripts/seed-prueba.ts`).** 10 reportes en Corp y 8 en SaaS para poder mirar el sistema con contenido dentro. A diferencia de `seed-demo`, este sí puede correrse contra producción: no crea usuarios ni toca nada existente, reutiliza una cuenta admin ya presente y solo inserta reportes. Los casos están escritos a mano —con y sin orden, con y sin detalles, terminados y en proceso, de los dos servicios— porque el objetivo es ver la interfaz, y un bucle daría dieciocho variantes de lo mismo. Cada reporte lleva el id con prefijo `prueba-`: es el único rastro que los distingue, y con él `npm run seed:prueba -- --limpiar` los borra de forma exacta sin depender de reconocerlos por el nombre.
 
+### Fase 10.7: panel a dos columnas y analíticas por empresa
+
+**Panel.** "Últimos reportes" pasa de estar debajo del resumen a una columna propia a la derecha, con su propio scroll (`sticky` + `max-h` contra el alto de la ventana), y muestra 20 en vez de 6. A la izquierda queda lo que hay que mirar: alertas y totales. En pantalla estrecha se apilan con los reportes al final — en el celular lo primero tiene que seguir siendo el pendiente, no la lista. `ReportList` gana `unaColumna` porque su rejilla de dos columnas dejaba las tarjetas ilegibles en el hueco lateral.
+
+**Analíticas** (`/admin/analiticas/[empresa]`). Nueva sección con submenú desplegable en el rail. La empresa va en la ruta y no en un parámetro de consulta porque es una pantalla distinta por empresa, no un filtro sobre la misma. Las opciones del submenú salen de las empresas reales, así que una tercera aparecería sola.
+
+Contenido: cifras (total, terminados, en proceso, sin orden), reportes por mes de los últimos 12, reparto por tipo de servicio y por etiqueta, clientes con más reportes, y pendientes. Todo agregado en SQL — traer las filas para contarlas en memoria funcionaría hoy y dejaría de funcionar sin avisar con miles de reportes.
+
+Decisiones de la gráfica, siguiendo la guía de visualización:
+
+- **Los meses sin reportes se rellenan a cero.** SQL solo devuelve los meses con filas; pintar eso tal cual haría desaparecer del eje un mes sin trabajo en vez de mostrarlo como un valle.
+- **El último tramo va punteado.** El mes en curso siempre vale menos que los cerrados, así que la línea terminaba en una caída que se lee como un derrumbe. El trazo discontinuo es la convención para "esto no está cerrado", y el tooltip lo dice: "(en curso)".
+- **Una sola serie, sin leyenda** — el título ya dice qué se mira.
+- **Las barras van todas del mismo color.** Lo que distingue una de otra es su nombre, escrito al lado; un color por barra añadiría un código que no significa nada. El valor va escrito, así que no hace falta pasar el puntero para leerlo.
+- Colores comprobados con el validador de la guía contra las dos superficies de tarjeta (`#ffffff` y `#151518`).
+
 ## Problema abierto: firmar con el dedo en celular
 
 **Estado: sin resolver.** Con mouse en PC funciona correctamente; con el dedo en celular no se dibuja.

@@ -34,7 +34,9 @@ export default async function AdminPage({ searchParams }: Params) {
 
   const [resumen, ultimos] = await Promise.all([
     obtenerResumen(empresaFiltro),
-    listarReportes({ companyId: empresaFiltro, porPagina: 6 }),
+    // Más de los seis de antes: ahora la lista vive en su propia columna con
+    // scroll, así que caben sin empujar nada fuera de la pantalla.
+    listarReportes({ companyId: empresaFiltro, porPagina: 20 }),
   ]);
 
   const mesAnterior = nombreDeMes(inicioDeMes(1));
@@ -55,14 +57,20 @@ export default async function AdminPage({ searchParams }: Params) {
 
   return (
     <AppShell user={user}>
-      <div className="space-y-8">
-        <FiltroEmpresa
-          empresas={user.empresas}
-          empresaId={empresaFiltro}
-          hrefPara={hrefPara}
-        />
+      <FiltroEmpresa
+        empresas={user.empresas}
+        empresaId={empresaFiltro}
+        hrefPara={hrefPara}
+      />
 
-        <section>
+      {/* Dos columnas en pantalla ancha: a la izquierda lo que hay que mirar
+          (alertas y totales), a la derecha el flujo de últimos reportes. En
+          pantalla estrecha se apilan, con los reportes al final — en el
+          celular lo primero tiene que seguir siendo el pendiente, no la
+          lista. */}
+      <div className="mt-8 grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
+        <div className="min-w-0 space-y-8">
+          <section>
           <h2 className="mb-3 text-sm font-semibold text-text">
             {hayPendientes ? "Requiere atención" : "Todo al día"}
           </h2>
@@ -132,10 +140,15 @@ export default async function AdminPage({ searchParams }: Params) {
               }
               href="/admin/usuarios"
             />
-          </div>
-        </section>
+            </div>
+          </section>
+        </div>
 
-        <section>
+        {/* Columna derecha: el flujo de últimos reportes, con su propio scroll.
+            Se queda pegada arriba al bajar por el panel, y el alto se calcula
+            contra la altura de la ventana para que la lista scrollee por
+            dentro en vez de estirar la página. */}
+        <aside className="min-w-0 xl:sticky xl:top-20 xl:max-h-[calc(100vh-6rem)] xl:overflow-y-auto">
           <div className="mb-3 flex items-center justify-between gap-3">
             <h2 className="text-sm font-semibold text-text">Últimos reportes</h2>
             <Link
@@ -154,8 +167,9 @@ export default async function AdminPage({ searchParams }: Params) {
             items={ultimos.items}
             mostrarAutor
             mostrarEmpresa={!empresaFiltro}
+            unaColumna
           />
-        </section>
+        </aside>
       </div>
     </AppShell>
   );
