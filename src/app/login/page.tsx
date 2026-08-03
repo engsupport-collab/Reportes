@@ -107,12 +107,19 @@ export default function LoginPage() {
               primera frase necesita 609px de ancho para caber en una línea.
               Los escalones de reserva existen para que el titular siempre
               queden dos líneas — sin ellos se partía en cuatro. */}
+          {/* Blanco al 70%, el extremo más legible del rango pedido: sobre
+              este fondo da 3,9:1, y bajarlo al 60% lo dejaría en 3,3:1. */}
+          <p className="mb-5 text-[12px] font-semibold uppercase tracking-[0.2em] text-white/70">
+            Gestión operativa
+          </p>
           <p className="text-[28px] font-bold leading-[1.12] tracking-tight text-white @[450px]:text-[32px] @[610px]:text-[44px]">
             Menos tiempo administrando.
             <br />
             Más tiempo ejecutando.
           </p>
-          <p className="mt-6 text-[18px] font-normal leading-[30px] text-white/80">
+          {/* Del 80% al 60% de opacidad. Al 20% literal daría 1,5:1 sobre este
+              fondo, es decir, invisible. */}
+          <p className="mt-6 text-[18px] font-normal italic leading-[30px] text-white/60">
             Toda la información de campo, organizada de forma simple, segura y
             accesible.
           </p>
