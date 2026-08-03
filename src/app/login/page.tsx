@@ -29,19 +29,27 @@ export default function LoginPage() {
       <div className="flex items-center justify-center bg-surface px-6 py-12 sm:px-14">
         <div className="w-full max-w-md">
           {/* El lockup completo y grande: es la única pantalla donde el
-              logotipo se lee entero, subtítulo incluido. */}
-          <Logotipo alto={72} />
+              logotipo se lee entero, subtítulo incluido. Centrado, aunque el
+              resto de la columna vaya alineado a la izquierda: la marca
+              preside, no forma parte de la lectura del formulario. */}
+          <div className="flex justify-center">
+            <Logotipo alto={108} />
+          </div>
 
-          {/* En el azul de la marca, no en el turquesa de la interfaz: el
-              logotipo está justo encima y el titular en otro color se leería
-              como que no van juntos. */}
-          <p className="mt-14 text-xs font-bold uppercase tracking-[0.2em] text-marca">
+          {/* En violeta y no en el azul de la marca: repetir el azul del
+              logotipo en la palabra de encima del titular los ata visualmente
+              y la página se queda en un solo tono. Este es el acento
+              secundario de la paleta, el que existe justo para lo que no es
+              ni marca ni estado. */}
+          <p className="mt-14 text-xs font-bold uppercase tracking-[0.2em] text-accent">
             Bienvenido
           </p>
-          <h1 className="mt-3 text-5xl font-bold leading-[1.05] tracking-tight text-marca">
+          {/* En el azul de la marca: el logotipo está justo encima y el
+              titular en otro color se leería como que no van juntos. */}
+          <h1 className="mt-3 text-6xl font-bold leading-[1.05] tracking-wide text-marca">
             Ingresa a tu cuenta
           </h1>
-          <p className="mt-4 text-base text-muted">
+          <p className="mt-4 text-base italic text-muted">
             Registra tus trabajos de forma rápida y sencilla.
           </p>
 

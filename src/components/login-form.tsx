@@ -27,7 +27,7 @@ function BotonEntrar() {
     <button
       type="submit"
       disabled={pending}
-      className="w-full rounded-xl bg-brand px-4 py-3.5 text-base font-semibold text-white transition hover:bg-brand-strong disabled:cursor-not-allowed disabled:opacity-60"
+      className="w-full rounded-xl bg-brand px-4 py-3.5 text-lg font-semibold text-white transition hover:bg-brand-strong disabled:cursor-not-allowed disabled:opacity-60"
     >
       {pending ? "Verificando…" : "Ingresar"}
     </button>
@@ -45,7 +45,7 @@ export function LoginForm() {
       <div className="space-y-2">
         <label
           htmlFor="username"
-          className="block text-sm font-semibold text-text"
+          className="block text-base font-semibold text-text"
         >
           Usuario
         </label>
@@ -65,7 +65,7 @@ export function LoginForm() {
       <div className="space-y-2">
         <label
           htmlFor="password"
-          className="block text-sm font-semibold text-text"
+          className="block text-base font-semibold text-text"
         >
           Contraseña
         </label>
