@@ -49,15 +49,18 @@ export default function LoginPage() {
           </p>
           {/* En el azul de la marca: el logotipo está justo encima y el
               titular en otro color se leería como que no van juntos. */}
-          {/* El titular escala para caber siempre en una sola línea.
-              Los cortes se miden contra la columna (`@`), no contra la
-              ventana: cuando aparece el panel de la derecha, la columna pasa a
-              ser la mitad de la pantalla, así que una ventana ancha puede
-              tener una columna estrecha y los cortes por ventana fallaban.
+          {/* En celular va grande y se parte en dos líneas, que es como se
+              quiere: ahí sobra alto y lo que hace falta es presencia.
+
+              El escalado solo entra a partir de `lg`, que es cuando aparece el
+              panel de la derecha y la columna se queda con media pantalla —
+              ahí sí hay que encoger para no partir el titular. Los cortes se
+              miden contra la columna (`@`) y no contra la ventana, porque una
+              ventana ancha puede tener una columna estrecha.
 
               Cada umbral es el ancho que ese tamaño necesita, medido:
-              24px→237, 30px→296, 36px→355, 48px→474, 60px→593. */}
-          <h1 className="mt-3 text-2xl font-bold leading-[1.05] tracking-wide text-marca @[310px]:text-3xl @[370px]:text-4xl @[490px]:text-5xl @[610px]:text-6xl">
+              36px→355, 48px→474, 60px→593. */}
+          <h1 className="mt-3 text-6xl font-bold leading-[1.05] tracking-wide text-marca lg:text-4xl lg:@[490px]:text-5xl lg:@[600px]:text-6xl">
             Ingresa a tu cuenta
           </h1>
           <p className="mt-4 text-base italic text-muted">
