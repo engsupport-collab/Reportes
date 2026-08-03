@@ -1,11 +1,16 @@
 "use server";
 
 import { eq } from "drizzle-orm";
+import { getTranslations } from "next-intl/server";
 import { redirect } from "next/navigation";
 
 import { db } from "@/db";
 import { users } from "@/db/schema";
-import { createSessionCookie, destroySessionCookie } from "@/lib/auth-guard";
+import {
+  createSessionCookie,
+  destroySessionCookie,
+  setIdiomaCookie,
+} from "@/lib/auth-guard";
 import { fakeVerify, verifyPassword } from "@/lib/password";
 import { empresasDelUsuario } from "@/lib/queries/companies";
 import {
@@ -23,23 +28,25 @@ import { loginSchema } from "@/lib/validation";
 
 export type LoginState = { error?: string };
 
-/**
- * Mensaje único para credenciales inválidas.
- *
- * Da igual si el usuario no existe o si la contraseña está mal: la respuesta es
- * la misma. Decir "ese usuario no existe" le confirmaría a un atacante qué
- * nombres son reales, y eso reduce el problema a adivinar solo la contraseña.
- */
-const CREDENCIALES_INVALIDAS = "Usuario o contraseña incorrectos.";
-
-function mensajeBloqueo(hasta: Date): string {
-  return `Demasiados intentos fallidos. Vuelve a intentar en ${minutosRestantes(hasta)} minutos.`;
-}
-
 export async function loginAction(
   _prevState: LoginState,
   formData: FormData,
 ): Promise<LoginState> {
+  const t = await getTranslations("login");
+
+  /**
+   * Mensaje único para credenciales inválidas.
+   *
+   * Da igual si el usuario no existe o si la contraseña está mal: la respuesta
+   * es la misma. Decir "ese usuario no existe" le confirmaría a un atacante qué
+   * nombres son reales, y eso reduce el problema a adivinar solo la contraseña.
+   */
+  const credencialesInvalidas = t("credencialesInvalidas");
+
+  function mensajeBloqueo(hasta: Date): string {
+    return t("bloqueo", { minutos: minutosRestantes(hasta) });
+  }
+
   const ip = await getClientIp();
 
   // Se comprueba el bloqueo del dispositivo antes que nada: si esta IP está
@@ -57,7 +64,9 @@ export async function loginAction(
   });
 
   if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? CREDENCIALES_INVALIDAS };
+    return {
+      error: parsed.error.issues[0]?.message ?? credencialesInvalidas,
+    };
   }
 
   const { username, password } = parsed.data;
@@ -77,7 +86,7 @@ export async function loginAction(
     if (estado.lockedUntil && estaBloqueado(estado.lockedUntil)) {
       return { error: mensajeBloqueo(estado.lockedUntil) };
     }
-    return { error: CREDENCIALES_INVALIDAS };
+    return { error: credencialesInvalidas };
   }
 
   if (estaBloqueado(user.lockedUntil)) {
@@ -105,13 +114,13 @@ export async function loginAction(
     // en el siguiente, desde fuera parecería que el bloqueo no funciona.
     if (bloqueo) return { error: mensajeBloqueo(bloqueo) };
 
-    return { error: CREDENCIALES_INVALIDAS };
+    return { error: credencialesInvalidas };
   }
 
   // Cuenta desactivada: se comprueba después de validar la contraseña para no
   // revelar el estado de la cuenta a quien no conoce las credenciales.
   if (!user.isActive) {
-    return { error: "Tu cuenta está desactivada. Contacta al administrador." };
+    return { error: t("cuentaDesactivada") };
   }
 
   await Promise.all([limpiarIntentos(user.id), limpiarIp(ip)]);
@@ -125,14 +134,16 @@ export async function loginAction(
       name: user.fullName,
       role: user.role,
     });
+    // Al entrar, la cookie de idioma se vuelve a escribir desde la cuenta:
+    // así este navegador queda igual que el resto, aunque antes tuviera
+    // guardada la preferencia de una sesión anterior distinta.
+    await setIdiomaCookie(user.locale);
     redirect(rutaInicio(user.role));
   }
 
   const empresas = await empresasDelUsuario(user.id);
   if (empresas.length === 0) {
-    return {
-      error: "Tu cuenta no tiene ninguna empresa asignada. Contacta al administrador.",
-    };
+    return { error: t("sinEmpresa") };
   }
 
   // Quien pertenece a una sola empresa entra directo: no tiene sentido pedirle
@@ -146,6 +157,7 @@ export async function loginAction(
     role: user.role,
     empresa: empresaUnica,
   });
+  await setIdiomaCookie(user.locale);
 
   // redirect() lanza una excepción de control interna de Next.js: tiene que
   // quedar fuera de cualquier try/catch o quedaría atrapada.

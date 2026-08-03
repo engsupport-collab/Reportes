@@ -1,6 +1,7 @@
 "use server";
 
 import { eq } from "drizzle-orm";
+import { getTranslations } from "next-intl/server";
 import { revalidatePath } from "next/cache";
 
 import { db } from "@/db";
@@ -28,6 +29,7 @@ export async function cambiarMiContrasenaAction(
   formData: FormData,
 ): Promise<PerfilState> {
   const user = await requireUser();
+  const t = await getTranslations("perfil");
 
   const parsed = cambiarContrasenaSchema.safeParse({
     actual: String(formData.get("actual") ?? ""),
@@ -36,7 +38,12 @@ export async function cambiarMiContrasenaAction(
   });
 
   if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
+    // El mensaje detallado (longitud mínima, no coinciden, etc.) viene del
+    // propio esquema Zod y sigue en español: traducirlo exige reconstruir el
+    // esquema por idioma, un trabajo aparte. Este "genérico" es solo la red de
+    // seguridad para cuando el esquema no trae mensaje, algo que en la
+    // práctica no pasa.
+    return { error: parsed.error.issues[0]?.message ?? t("datosInvalidos") };
   }
 
   const [fila] = await db
@@ -45,14 +52,14 @@ export async function cambiarMiContrasenaAction(
     .where(eq(users.id, user.id))
     .limit(1);
 
-  if (!fila) return { error: "No se encontró la cuenta." };
+  if (!fila) return { error: t("cuentaNoEncontrada") };
 
   const actualCorrecta = await verifyPassword(
     parsed.data.actual,
     fila.passwordHash,
   );
   if (!actualCorrecta) {
-    return { error: "La contraseña actual no es correcta." };
+    return { error: t("actualIncorrecta") };
   }
 
   await db
@@ -69,5 +76,5 @@ export async function cambiarMiContrasenaAction(
 
   revalidatePath("/perfil");
 
-  return { ok: "Contraseña actualizada." };
+  return { ok: t("actualizada") };
 }

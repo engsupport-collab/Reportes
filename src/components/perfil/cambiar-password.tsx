@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { useActionState } from "react";
 
 import type { PerfilState } from "@/actions/perfil";
@@ -47,6 +48,7 @@ export function CambiarPassword({
     formData: FormData,
   ) => Promise<PerfilState>;
 }) {
+  const t = useTranslations("perfil");
   const [estado, formAction, pendiente] = useActionState(action, {});
 
   return (
@@ -55,13 +57,13 @@ export function CambiarPassword({
       action={formAction}
       className="max-w-sm space-y-4"
     >
-      <Campo id="actual" label="Contraseña actual" />
+      <Campo id="actual" label={t("contrasenaActual")} />
       <Campo
         id="nueva"
-        label="Contraseña nueva"
-        ayuda={`Al menos ${PASSWORD_MIN_LENGTH} caracteres.`}
+        label={t("contrasenaNueva")}
+        ayuda={t("ayudaMinimo", { min: PASSWORD_MIN_LENGTH })}
       />
-      <Campo id="repetir" label="Repetir la nueva" />
+      <Campo id="repetir" label={t("repetirNueva")} />
 
       {estado.error ? (
         <p
@@ -86,7 +88,7 @@ export function CambiarPassword({
         disabled={pendiente}
         className="rounded-lg bg-brand px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-strong disabled:cursor-not-allowed disabled:opacity-60"
       >
-        {pendiente ? "Guardando…" : "Cambiar contraseña"}
+        {pendiente ? t("guardando") : t("cambiarBoton")}
       </button>
     </form>
   );

@@ -2,9 +2,11 @@
 
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { useState } from "react";
 
 import { IconBuscar, IconMenu } from "@/components/nav-icons";
+import { IdiomaSelector } from "@/components/idioma-selector";
 import type { NavItem } from "@/components/side-nav";
 import type { CurrentUser } from "@/lib/auth-guard";
 
@@ -40,6 +42,7 @@ function Buscador({
   destinos: Destino[];
   onBuscar: (q: string) => void;
 }) {
+  const t = useTranslations("buscador");
   const router = useRouter();
   const [texto, setTexto] = useState(valorInicial);
   const [abierto, setAbierto] = useState(false);
@@ -99,8 +102,8 @@ function Buscador({
           }}
           onFocus={() => setAbierto(true)}
           onKeyDown={alTeclear}
-          placeholder="Buscar reportes o ir a una sección…"
-          aria-label="Buscar reportes o ir a una sección"
+          placeholder={t("placeholder")}
+          aria-label={t("ariaLabel")}
           role="combobox"
           aria-expanded={visibles}
           aria-controls="sugerencias-busqueda"
@@ -117,7 +120,7 @@ function Buscador({
               antes del clic en una sugerencia y se la lleva por delante. */}
           <button
             type="button"
-            aria-label="Cerrar sugerencias"
+            aria-label={t("cerrarSugerencias")}
             className="fixed inset-0 z-10 cursor-default"
             onClick={() => setAbierto(false)}
           />
@@ -128,7 +131,7 @@ function Buscador({
             className="absolute left-0 right-0 z-20 mt-2 overflow-hidden rounded-xl border border-border bg-surface py-1 shadow-lg"
           >
             <li className="px-3 py-1.5 text-xs font-medium uppercase tracking-wide text-muted">
-              Ir a
+              {t("irA")}
             </li>
             {sugerencias.map((d, i) => (
               <li key={d.href} role="option" aria-selected={i === indice}>
@@ -169,6 +172,7 @@ export function TopBar({
   nav: NavItem[];
   onAbrirMenu: () => void;
 }) {
+  const t = useTranslations();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -179,7 +183,7 @@ export function TopBar({
 
   const destinos: Destino[] = [
     ...nav.map((n) => ({ href: n.href, label: n.label })),
-    { href: "/perfil", label: "Mi perfil" },
+    { href: "/perfil", label: t("nav.miPerfil") },
   ];
 
   function buscar(q: string) {
@@ -206,7 +210,7 @@ export function TopBar({
         <button
           type="button"
           onClick={onAbrirMenu}
-          aria-label="Abrir menú"
+          aria-label={t("nav.abrirMenu")}
           className="rounded-lg p-1.5 text-muted transition hover:bg-surface-muted hover:text-text md:hidden"
         >
           <IconMenu className="h-5 w-5" />
@@ -221,26 +225,33 @@ export function TopBar({
           onBuscar={buscar}
         />
 
-        <Link
-          href="/perfil"
-          className="ml-auto flex items-center gap-2.5 rounded-lg px-1.5 py-1 transition hover:bg-surface-muted"
-        >
-          <span className="hidden text-right sm:block">
-            <span className="block text-sm font-medium leading-tight text-text">
-              {user.fullName}
-            </span>
-            <span className="block text-xs leading-tight text-muted">
-              {user.role === "admin" ? "Administrador" : "Empleado"}
-            </span>
-          </span>
-          <span
-            aria-hidden
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-soft text-sm font-semibold text-brand"
+        {/* El selector va junto a la cuenta, no dentro del menú de la cuenta:
+            es una preferencia de dispositivo, no una acción sobre la sesión, y
+            tiene que verse sin necesidad de desplegar nada. */}
+        <div className="ml-auto flex items-center gap-1">
+          <IdiomaSelector />
+
+          <Link
+            href="/perfil"
+            className="flex items-center gap-2.5 rounded-lg px-1.5 py-1 transition hover:bg-surface-muted"
           >
-            {inicial}
-          </span>
-          <span className="sr-only">Ver mi perfil</span>
-        </Link>
+            <span className="hidden text-right sm:block">
+              <span className="block text-sm font-medium leading-tight text-text">
+                {user.fullName}
+              </span>
+              <span className="block text-xs leading-tight text-muted">
+                {user.role === "admin" ? t("nav.administrador") : t("nav.empleado")}
+              </span>
+            </span>
+            <span
+              aria-hidden
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-soft text-sm font-semibold text-brand"
+            >
+              {inicial}
+            </span>
+            <span className="sr-only">{t("buscador.verMiPerfil")}</span>
+          </Link>
+        </div>
       </div>
     </header>
   );

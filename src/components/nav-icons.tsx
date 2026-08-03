@@ -114,6 +114,16 @@ export function IconMenu(props: IconProps) {
   );
 }
 
+export function IconIdioma(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M3 12h18" />
+      <path d="M12 3c2.5 2.5 3.75 5.75 3.75 9S14.5 18.5 12 21c-2.5-2.5-3.75-5.75-3.75-9S9.5 5.5 12 3Z" />
+    </Svg>
+  );
+}
+
 export function IconSalir(props: IconProps) {
   return (
     <Svg {...props}>

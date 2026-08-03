@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 
 import { db } from "@/db";
 import { users } from "@/db/schema";
+import { IDIOMA_COOKIE, type Idioma } from "./idiomas";
 import { type Empresa, empresasDelUsuario, listarEmpresas } from "./queries/companies";
 import type { UserRole } from "./roles";
 import {
@@ -43,6 +44,7 @@ export type CurrentUser = {
   empresas: Empresa[];
   /** Empresa elegida por un empleado. Siempre null para un admin. */
   empresaActiva: Empresa | null;
+  locale: Idioma;
 };
 
 /**
@@ -82,6 +84,23 @@ export async function destroySessionCookie() {
 }
 
 /**
+ * Escribe la cookie de preferencia de idioma.
+ *
+ * Aparte de `createSessionCookie` a propósito: una vive tanto como la sesión
+ * (8 horas) y la otra un año, porque el idioma es una preferencia de
+ * dispositivo/navegador, no algo que deba caducar con el inicio de sesión.
+ */
+export async function setIdiomaCookie(locale: Idioma) {
+  const cookieStore = await cookies();
+  cookieStore.set(IDIOMA_COOKIE, locale, {
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: 60 * 60 * 24 * 365,
+  });
+}
+
+/**
  * Usuario de la sesión actual, o null.
  *
  * Consulta la base en cada llamada, a propósito. El token ya trae el rol y la
@@ -104,6 +123,7 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
       fullName: users.fullName,
       role: users.role,
       isActive: users.isActive,
+      locale: users.locale,
     })
     .from(users)
     .where(eq(users.id, session.sub))
@@ -123,6 +143,7 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
       role: "admin",
       empresas: await listarEmpresas(),
       empresaActiva: null,
+      locale: user.locale,
     };
   }
 
@@ -140,6 +161,7 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
     role: user.role,
     empresas,
     empresaActiva,
+    locale: user.locale,
   };
 }
 

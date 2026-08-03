@@ -8,6 +8,7 @@ import {
 } from "drizzle-orm/sqlite-core";
 
 import { TIPOS_SERVICIO_IDS } from "@/lib/etiquetas";
+import { IDIOMAS } from "@/lib/idiomas";
 import { REPORT_STATUSES, USER_ROLES } from "@/lib/roles";
 
 export { REPORT_STATUSES, USER_ROLES };
@@ -46,6 +47,15 @@ export const users = sqliteTable(
     passwordHash: text("password_hash").notNull(),
     fullName: text("full_name").notNull(),
     role: text("role", { enum: USER_ROLES }).notNull().default("empleado"),
+    /**
+     * Idioma de la interfaz, elegido por la propia persona.
+     *
+     * Va en la cuenta y no en la URL: es una herramienta interna con sesión, y
+     * nadie comparte enlaces por idioma. Metido en la ruta obligaría a mover
+     * todas las páginas bajo `[lang]` y rompería las direcciones existentes,
+     * a cambio de nada.
+     */
+    locale: text("locale", { enum: IDIOMAS }).notNull().default("es"),
     isActive: integer("is_active", { mode: "boolean" }).notNull().default(true),
     failedAttempts: integer("failed_attempts").notNull().default(0),
     lockedUntil: integer("locked_until", { mode: "timestamp_ms" }),

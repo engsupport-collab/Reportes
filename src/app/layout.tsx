@@ -6,6 +6,8 @@ import {
   Geist_Mono,
   Great_Vibes,
 } from "next/font/google";
+import { NextIntlClientProvider } from "next-intl";
+import { getLocale } from "next-intl/server";
 
 import "./globals.css";
 
@@ -54,17 +56,27 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // El único lugar donde se lee el idioma sin pasar por next-intl: el
+  // atributo `lang` del documento no es un mensaje traducible, es metadato
+  // para el lector de pantalla y el corrector ortográfico del navegador.
+  const locale = await getLocale();
+
   return (
     <html
-      lang="es"
+      lang={locale}
       className={`${geistSans.variable} ${geistMono.variable} ${firmaCursiva.variable} ${firmaManuscrita.variable} ${firmaElegante.variable} h-full antialiased`}
     >
-      <body className="min-h-full font-sans">{children}</body>
+      <body className="min-h-full font-sans">
+        {/* El proveedor va aquí, en la raíz, y no más abajo: hace falta tanto
+            en la pantalla de ingreso como en toda la aplicación autenticada, y
+            son subárboles distintos sin un layout común más específico. */}
+        <NextIntlClientProvider>{children}</NextIntlClientProvider>
+      </body>
     </html>
   );
 }

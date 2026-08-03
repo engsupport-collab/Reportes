@@ -56,9 +56,17 @@ export function aValorInput(fecha: Date): string {
   }).format(fecha);
 }
 
-/** Date -> "1 de agosto de 2026". */
-export function formatFechaLarga(fecha: Date): string {
-  return fecha.toLocaleDateString("es-CO", {
+/**
+ * `locale` es opcional y por defecto "es-CO" a propósito: el PDF (`lib/pdf.ts`)
+ * llama a estas funciones sin pasarlo, porque el documento siempre sale en
+ * español sin importar el idioma de quien lo descarga — es una constancia de
+ * trabajo, no parte de la interfaz. Las pantallas sí lo pasan, tomado del
+ * idioma de la sesión.
+ */
+
+/** Date -> "1 de agosto de 2026" / "August 1, 2026" / "1 de agosto de 2026". */
+export function formatFechaLarga(fecha: Date, locale = "es-CO"): string {
+  return fecha.toLocaleDateString(locale, {
     day: "numeric",
     month: "long",
     year: "numeric",
@@ -67,8 +75,8 @@ export function formatFechaLarga(fecha: Date): string {
 }
 
 /** Date -> "01/08/2026", para listas. */
-export function formatFechaCorta(fecha: Date): string {
-  return fecha.toLocaleDateString("es-CO", {
+export function formatFechaCorta(fecha: Date, locale = "es-CO"): string {
+  return fecha.toLocaleDateString(locale, {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
@@ -77,8 +85,8 @@ export function formatFechaCorta(fecha: Date): string {
 }
 
 /** Date -> "01/08/2026, 10:45 a. m." — creado, editado, firmado. */
-export function formatInstante(fecha: Date): string {
-  return fecha.toLocaleString("es-CO", {
+export function formatInstante(fecha: Date, locale = "es-CO"): string {
+  return fecha.toLocaleString(locale, {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
@@ -135,8 +143,8 @@ export function inicioDeMes(mesesAtras = 0): Date {
 }
 
 /** "agosto de 2026" — para nombrar el periodo de una comparación. */
-export function nombreDeMes(fecha: Date): string {
-  return fecha.toLocaleDateString("es-CO", {
+export function nombreDeMes(fecha: Date, locale = "es-CO"): string {
+  return fecha.toLocaleDateString(locale, {
     month: "long",
     year: "numeric",
     timeZone: ZONA_HORARIA,
@@ -144,8 +152,8 @@ export function nombreDeMes(fecha: Date): string {
 }
 
 /** "sábado, 1 de agosto de 2026" — encabezado de las vistas. */
-export function formatFechaEncabezado(fecha = new Date()): string {
-  return fecha.toLocaleDateString("es-CO", {
+export function formatFechaEncabezado(fecha = new Date(), locale = "es-CO"): string {
+  return fecha.toLocaleDateString(locale, {
     weekday: "long",
     day: "numeric",
     month: "long",

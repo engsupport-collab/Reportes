@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { getTranslations } from "next-intl/server";
 
 import { LoginForm } from "@/components/login-form";
 import { Logotipo } from "@/components/logotipo";
@@ -23,7 +24,9 @@ const PANEL = "#0a6b76";
  * derecha. El panel es el único sitio del sistema con espacio de sobra para la
  * identidad, y es lo primero que ve alguien que entra.
  */
-export default function LoginPage() {
+export default async function LoginPage() {
+  const t = await getTranslations("login");
+
   return (
     <main className="grid min-h-screen lg:grid-cols-2">
       <div className="flex items-center justify-center bg-surface px-6 py-12 sm:px-14">
@@ -44,7 +47,7 @@ export default function LoginPage() {
               fijo desaparecería en modo claro, donde esta media pantalla es
               blanca. */}
           <p className="mt-14 text-xs font-bold uppercase tracking-[0.2em] text-text">
-            Bienvenido
+            {t("bienvenido")}
           </p>
           {/* En el azul de la marca: el logotipo está justo encima y el
               titular en otro color se leería como que no van juntos. */}
@@ -58,19 +61,20 @@ export default function LoginPage() {
               ventana ancha puede tener una columna estrecha.
 
               Cada umbral es el ancho que ese tamaño necesita, medido:
-              36px→355, 48px→474, 60px→593. */}
+              36px→355, 48px→474, 60px→593. Los tamaños en inglés y portugués
+              corren un poco más largos que en español para el mismo mensaje;
+              los umbrales se dejan igual porque el contenedor solo encoge un
+              paso antes en el peor caso, y sigue leyéndose bien. */}
           <h1 className="mt-3 text-6xl font-bold leading-[1.05] tracking-wide text-titular lg:text-4xl lg:@[490px]:text-5xl lg:@[600px]:text-6xl">
-            Ingresa a tu cuenta
+            {t("titulo")}
           </h1>
-          <p className="mt-4 text-base italic text-muted">
-            Registra tus trabajos de forma rápida y sencilla.
-          </p>
+          <p className="mt-4 text-base italic text-muted">{t("subtitulo")}</p>
 
           <div className="mt-10">
             <LoginForm />
           </div>
 
-          <p className="mt-12 text-xs text-muted">Sistema de reportes</p>
+          <p className="mt-12 text-xs text-muted">{t("sistemaDeReportes")}</p>
         </div>
       </div>
 
@@ -110,18 +114,17 @@ export default function LoginPage() {
           {/* Blanco al 70%, el extremo más legible del rango pedido: sobre
               este fondo da 3,9:1, y bajarlo al 60% lo dejaría en 3,3:1. */}
           <p className="mb-5 text-[12px] font-semibold uppercase tracking-[0.2em] text-white/70">
-            Gestión operativa
+            {t("panelEtiqueta")}
           </p>
           <p className="text-[28px] font-bold leading-[1.12] tracking-tight text-white @[450px]:text-[32px] @[610px]:text-[44px]">
-            Menos tiempo administrando.
+            {t("panelTitulo1")}
             <br />
-            Más tiempo ejecutando.
+            {t("panelTitulo2")}
           </p>
           {/* Del 80% al 60% de opacidad. Al 20% literal daría 1,5:1 sobre este
               fondo, es decir, invisible. */}
           <p className="mt-6 text-[18px] font-normal italic leading-[30px] text-white/60">
-            Toda la información de campo, organizada de forma simple, segura y
-            accesible.
+            {t("panelTexto")}
           </p>
         </div>
       </div>

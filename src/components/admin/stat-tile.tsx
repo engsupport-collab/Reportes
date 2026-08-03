@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { getTranslations } from "next-intl/server";
 
 import { Sparkline } from "./sparkline";
 
@@ -16,7 +17,7 @@ function compacto(valor: number): string {
   return `${(valor / 1_000_000).toFixed(1).replace(/\.0$/, "")}M`;
 }
 
-function Variacion({
+async function Variacion({
   actual,
   anterior,
   periodo,
@@ -27,8 +28,10 @@ function Variacion({
   periodo: string;
   subirEsBueno: boolean;
 }) {
+  const t = await getTranslations("panel");
+
   if (anterior === 0 && actual === 0) {
-    return <span className="text-xs text-muted">Sin datos previos</span>;
+    return <span className="text-xs text-muted">{t("sinDatosPrevios")}</span>;
   }
 
   // Desde cero no existe el porcentaje de aumento: se dice "nuevo" en lugar de
@@ -36,7 +39,7 @@ function Variacion({
   if (anterior === 0) {
     return (
       <span className="text-xs font-medium text-muted">
-        Nuevo · {periodo} sin registros
+        {t("nuevoSinRegistros", { periodo })}
       </span>
     );
   }
@@ -64,7 +67,7 @@ function Variacion({
   );
 }
 
-export function StatTile({
+export async function StatTile({
   etiqueta,
   valor,
   anterior,
@@ -87,6 +90,7 @@ export function StatTile({
   nota?: string;
 }) {
   const esAlerta = tono === "alerta" && valor > 0;
+  const t = await getTranslations("panel");
 
   const contenido = (
     <>
@@ -124,7 +128,9 @@ export function StatTile({
       ) : null}
 
       {esAlerta && href ? (
-        <p className="mt-3 text-xs font-semibold text-warning">Ver pendientes →</p>
+        <p className="mt-3 text-xs font-semibold text-warning">
+          {t("verPendientes")}
+        </p>
       ) : null}
     </>
   );

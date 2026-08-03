@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { getLocale, getTranslations } from "next-intl/server";
 
 import { AppShell } from "@/components/app-shell";
 import { BarrasVerticales } from "@/components/admin/barras-verticales";
@@ -8,6 +9,7 @@ import { FiltroEmpresa } from "@/components/reports/filtros";
 import { ReportList } from "@/components/reports/report-list";
 import { requireAdmin } from "@/lib/auth-guard";
 import { inicioDeMes, nombreDeMes } from "@/lib/fechas";
+import { type Idioma, REGION } from "@/lib/idiomas";
 import { estadoDocumental, serieMensual } from "@/lib/queries/analytics";
 import { obtenerResumen } from "@/lib/queries/dashboard";
 import { listarReportes } from "@/lib/queries/reports";
@@ -35,27 +37,30 @@ export default async function AdminPage({ searchParams }: Params) {
   // inventado no debe colar como si fuera un filtro válido.
   const empresaFiltro = user.empresas.find((e) => e.id === params.empresa)?.id;
 
-  const [resumen, ultimos, porMes, estado] = await Promise.all([
+  const [resumen, ultimos, porMes, estado, t, locale] = await Promise.all([
     obtenerResumen(empresaFiltro),
     // Más de los seis de antes: la lista vive en una tarjeta con scroll
     // propio, así que caben sin empujar nada fuera de la pantalla.
     listarReportes({ companyId: empresaFiltro, porPagina: 20 }),
     serieMensual(empresaFiltro),
     estadoDocumental(empresaFiltro),
+    getTranslations("panel"),
+    getLocale(),
   ]);
+  const region = REGION[locale as Idioma];
 
   const barrasEstado = [
-    { nombre: "Completado", total: estado.completados, tono: "ok" as const },
+    { nombre: t("completado"), total: estado.completados, tono: "ok" as const },
     {
-      nombre: "Sin documento",
+      nombre: t("sinDocumento"),
       total: estado.sinDocumento,
       tono: "alerta" as const,
     },
-    { nombre: "Sin firma", total: estado.sinFirma, tono: "alerta" as const },
-    { nombre: "Sin orden", total: estado.sinOrden, tono: "alerta" as const },
+    { nombre: t("sinFirma"), total: estado.sinFirma, tono: "alerta" as const },
+    { nombre: t("sinOrden"), total: estado.sinOrden, tono: "alerta" as const },
   ];
 
-  const mesAnterior = nombreDeMes(inicioDeMes(1));
+  const mesAnterior = nombreDeMes(inicioDeMes(1), region);
   const hayPendientes = resumen.incompletos > 0 || resumen.sinFirma > 0;
 
   const hrefPara = (cambios: { empresa?: string | null }) => {
@@ -69,7 +74,7 @@ export default async function AdminPage({ searchParams }: Params) {
 
   const nombreVista = empresaFiltro
     ? user.empresas.find((e) => e.id === empresaFiltro)!.name
-    : "las dos empresas";
+    : t("lasDosEmpresas");
 
   return (
     <AppShell user={user}>
@@ -86,16 +91,16 @@ export default async function AdminPage({ searchParams }: Params) {
       <div className="mt-8 space-y-8">
         <section>
           <h2 className="mb-3 text-sm font-semibold text-text">
-            {hayPendientes ? "Requiere atención" : "Todo al día"}
+            {hayPendientes ? t("requiereAtencion") : t("todoAlDia")}
           </h2>
 
           {hayPendientes ? (
             <div className="grid gap-3 sm:grid-cols-2">
               <StatTile
-                etiqueta="Sin documento adjunto"
+                etiqueta={t("sinDocumentoAdjunto")}
                 valor={resumen.incompletos}
                 tono="alerta"
-                nota="Reportes terminados a los que falta el archivo"
+                nota={t("notaSinDocumento")}
                 href={
                   empresaFiltro
                     ? `/admin/reportes?faltantes=1&empresa=${empresaFiltro}`
@@ -103,10 +108,10 @@ export default async function AdminPage({ searchParams }: Params) {
                 }
               />
               <StatTile
-                etiqueta="Sin firmar"
+                etiqueta={t("sinFirmar")}
                 valor={resumen.sinFirma}
                 tono="alerta"
-                nota="Reportes terminados que nadie ha firmado"
+                nota={t("notaSinFirma")}
                 href={
                   empresaFiltro
                     ? `/admin/reportes?sinfirma=1&empresa=${empresaFiltro}`
@@ -116,41 +121,42 @@ export default async function AdminPage({ searchParams }: Params) {
             </div>
           ) : (
             <p className="rounded-2xl border border-border bg-surface px-4 py-3 text-sm text-muted">
-              No hay reportes terminados a los que les falte el documento o la
-              firma.
+              {t("sinPendientes")}
             </p>
           )}
         </section>
 
         <section>
           <h2 className="mb-3 text-sm font-semibold text-text">
-            Resumen de {nombreVista}
+            {t("resumenDe", { empresa: nombreVista })}
           </h2>
 
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <StatTile
-              etiqueta="Reportes este mes"
+              etiqueta={t("reportesEsteMes")}
               valor={resumen.reportesDelMes}
               anterior={resumen.reportesMesAnterior}
               periodo={mesAnterior}
               tendencia={resumen.tendencia}
             />
             <StatTile
-              etiqueta="Terminados este mes"
+              etiqueta={t("terminadosEsteMes")}
               valor={resumen.terminadosDelMes}
               anterior={resumen.terminadosMesAnterior}
               periodo={mesAnterior}
             />
             <StatTile
-              etiqueta="Total histórico"
+              etiqueta={t("totalHistorico")}
               valor={resumen.totalHistorico}
-              nota="Desde el inicio del sistema"
+              nota={t("desdeInicio")}
             />
             <StatTile
-              etiqueta="Empleados activos"
+              etiqueta={t("empleadosActivos")}
               valor={resumen.empleadosActivos}
               nota={
-                empresaFiltro ? `Con acceso a ${nombreVista}` : "En cualquiera de las dos empresas"
+                empresaFiltro
+                  ? t("conAccesoA", { empresa: nombreVista })
+                  : t("enCualquieraDeLasDos")
               }
               href="/admin/usuarios"
             />
@@ -166,11 +172,10 @@ export default async function AdminPage({ searchParams }: Params) {
           <div className="flex min-w-0 flex-col gap-4">
             <section className="rounded-2xl border border-border bg-surface p-5">
               <h2 className="text-sm font-semibold text-text">
-                Reportes por mes
+                {t("reportesPorMes")}
               </h2>
               <p className="mt-0.5 text-xs text-muted">
-                Últimos 12 meses de {nombreVista}. El mes actual va empezado,
-                por eso su tramo aparece punteado.
+                {t("notaReportesPorMes", { empresa: nombreVista })}
               </p>
               <div className="mt-4">
                 <GraficaMeses puntos={porMes} />
@@ -179,20 +184,17 @@ export default async function AdminPage({ searchParams }: Params) {
 
             <section className="flex flex-1 flex-col rounded-2xl border border-border bg-surface p-5">
               <h2 className="text-sm font-semibold text-text">
-                Estado de los reportes terminados
+                {t("estadoReportesTerminados")}
               </h2>
               {/* Se dice explícitamente que no suman: un reporte al que le
                   falten el documento y la firma sale en las dos barras, y sin
                   la aclaración cualquiera intentaría cuadrar los números
                   contra el total y creería que hay un error. */}
-              <p className="mt-0.5 text-xs text-muted">
-                Un reporte puede arrastrar varias carencias, así que las barras
-                no suman el total.
-              </p>
+              <p className="mt-0.5 text-xs text-muted">{t("notaEstado")}</p>
               <div className="mt-6 min-h-0 flex-1">
                 <BarrasVerticales
                   datos={barrasEstado}
-                  vacio="Todavía no hay reportes terminados."
+                  vacio={t("sinReportesTerminados")}
                 />
               </div>
             </section>
@@ -204,13 +206,13 @@ export default async function AdminPage({ searchParams }: Params) {
           <section className="flex min-w-0 flex-col overflow-hidden rounded-2xl border border-border bg-surface">
             <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
               <h2 className="text-sm font-semibold text-text">
-                Últimos reportes
+                {t("ultimosReportes")}
               </h2>
               <Link
                 href={empresaFiltro ? `/admin/reportes?empresa=${empresaFiltro}` : "/admin/reportes"}
                 className="text-sm font-medium text-brand hover:underline"
               >
-                Ver todos
+                {t("verTodos")}
               </Link>
             </div>
 

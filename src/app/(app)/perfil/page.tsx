@@ -1,10 +1,12 @@
 import { notFound } from "next/navigation";
+import { getLocale, getTranslations } from "next-intl/server";
 
 import { cambiarMiContrasenaAction } from "@/actions/perfil";
 import { AppShell } from "@/components/app-shell";
 import { CambiarPassword } from "@/components/perfil/cambiar-password";
 import { requireUser } from "@/lib/auth-guard";
 import { formatFechaLarga } from "@/lib/fechas";
+import { type Idioma, REGION } from "@/lib/idiomas";
 import { obtenerCuenta } from "@/lib/queries/users";
 
 function Dato({ etiqueta, valor }: { etiqueta: string; valor: string }) {
@@ -27,7 +29,13 @@ function Dato({ etiqueta, valor }: { etiqueta: string; valor: string }) {
  */
 export default async function PerfilPage() {
   const user = await requireUser();
-  const cuenta = await obtenerCuenta(user.id);
+  const [cuenta, t, tNav, locale] = await Promise.all([
+    obtenerCuenta(user.id),
+    getTranslations("perfil"),
+    getTranslations("nav"),
+    getLocale(),
+  ]);
+  const region = REGION[locale as Idioma];
 
   // La sesión sigue siendo válida pero la cuenta ya no está: pasa si un admin
   // la borra mientras la persona la tiene abierta.
@@ -60,21 +68,23 @@ export default async function PerfilPage() {
                   {cuenta.fullName}
                 </h2>
                 <span className="rounded-full bg-surface-muted px-2 py-0.5 text-xs font-medium text-muted">
-                  {esAdmin ? "Administrador" : "Empleado"}
+                  {esAdmin ? tNav("administrador") : tNav("empleado")}
                 </span>
               </div>
               <p className="mt-0.5 text-sm text-muted">@{cuenta.username}</p>
             </div>
 
             <dl className="mt-6 grid gap-5 border-t border-border pt-5 sm:grid-cols-3">
-              <Dato etiqueta="Usuario" valor={cuenta.username} />
+              <Dato etiqueta={t("usuario")} valor={cuenta.username} />
               <Dato
-                etiqueta={esAdmin ? "Empresas del sistema" : "Empresas"}
-                valor={user.empresas.map((e) => e.name).join(", ") || "Ninguna"}
+                etiqueta={esAdmin ? t("empresasDelSistema") : t("empresas")}
+                valor={
+                  user.empresas.map((e) => e.name).join(", ") || t("ninguna")
+                }
               />
               <Dato
-                etiqueta="Cuenta creada"
-                valor={formatFechaLarga(cuenta.createdAt)}
+                etiqueta={t("cuentaCreada")}
+                valor={formatFechaLarga(cuenta.createdAt, region)}
               />
             </dl>
           </div>
@@ -82,11 +92,10 @@ export default async function PerfilPage() {
 
         <div className="rounded-2xl border border-border bg-surface p-5 sm:p-6">
           <h3 className="text-sm font-semibold text-text">
-            Cambiar contraseña
+            {t("cambiarContrasena")}
           </h3>
           <p className="mb-4 mt-1 text-sm text-muted">
-            Al cambiarla, la sesión actual sigue abierta. Nadie más conoce la
-            contraseña nueva, ni siquiera un administrador.
+            {t("cambiarContrasenaDesc")}
           </p>
           <CambiarPassword action={cambiarMiContrasenaAction} />
         </div>

@@ -1,4 +1,6 @@
-import { ordenarEtiquetas, tipoServicioLabel } from "@/lib/etiquetas";
+import { getTranslations } from "next-intl/server";
+
+import { ordenarEtiquetas, TIPOS_SERVICIO_IDS } from "@/lib/etiquetas";
 import type { ReportStatus } from "@/lib/roles";
 
 /**
@@ -7,9 +9,15 @@ import type { ReportStatus } from "@/lib/roles";
  * Ninguna se apoya solo en el color: todas llevan texto. El verde y el ámbar se
  * confunden con daltonismo, y estas etiquetas son justamente las que le dicen a
  * alguien que su reporte está incompleto.
+ *
+ * El tipo de servicio y las etiquetas del trabajo se guardan por id
+ * ("electrico", "urgencia"...) y se traducen aquí al mostrarlos. El catálogo de
+ * `lib/etiquetas.ts` conserva su `label` en español porque lo sigue usando el
+ * PDF, que no pasa por next-intl.
  */
 
-export function EstadoBadge({ status }: { status: ReportStatus }) {
+export async function EstadoBadge({ status }: { status: ReportStatus }) {
+  const t = await getTranslations("badges");
   const esTerminado = status === "terminado";
 
   return (
@@ -24,7 +32,7 @@ export function EstadoBadge({ status }: { status: ReportStatus }) {
         aria-hidden
         className={`h-1.5 w-1.5 rounded-full ${esTerminado ? "bg-success" : "bg-muted"}`}
       />
-      {esTerminado ? "Terminado" : "En proceso"}
+      {esTerminado ? t("terminado") : t("enProceso")}
     </span>
   );
 }
@@ -35,14 +43,19 @@ export function EstadoBadge({ status }: { status: ReportStatus }) {
  * La urgencia se muestra en rojo y las demás en neutro: si todas se vieran
  * igual, marcar "urgencia" no serviría para nada al mirar una lista larga.
  */
-export function Clasificacion({
+export async function Clasificacion({
   serviceType,
   etiquetas,
 }: {
   serviceType: string | null;
   etiquetas: string[];
 }) {
-  const tipo = tipoServicioLabel(serviceType);
+  const t = await getTranslations("etiquetas");
+
+  const tipo =
+    serviceType && (TIPOS_SERVICIO_IDS as readonly string[]).includes(serviceType)
+      ? t(serviceType as (typeof TIPOS_SERVICIO_IDS)[number])
+      : null;
   const marcas = ordenarEtiquetas(etiquetas);
 
   if (!tipo && marcas.length === 0) return null;
@@ -64,7 +77,7 @@ export function Clasificacion({
               : "bg-surface-muted text-muted"
           }`}
         >
-          {marca.label}
+          {t(marca.id as Parameters<typeof t>[0])}
         </span>
       ))}
     </>
@@ -96,7 +109,7 @@ export function AlertaBadge({ children }: { children: React.ReactNode }) {
  * trabajo. "Falta documento" y "Falta firma" sí dependen del estado: mientras
  * el trabajo sigue en proceso, que falten es normal y no amerita alerta.
  */
-export function Faltantes({
+export async function Faltantes({
   status,
   attachmentCount,
   tieneFirma,
@@ -107,15 +120,18 @@ export function Faltantes({
   tieneFirma: boolean;
   purchaseOrderNo: string | null;
 }) {
+  const t = await getTranslations("badges");
   const terminado = status === "terminado";
 
   return (
     <>
-      {!purchaseOrderNo ? <AlertaBadge>Sin orden</AlertaBadge> : null}
+      {!purchaseOrderNo ? <AlertaBadge>{t("sinOrden")}</AlertaBadge> : null}
       {terminado && attachmentCount === 0 ? (
-        <AlertaBadge>Falta documento</AlertaBadge>
+        <AlertaBadge>{t("faltaDocumento")}</AlertaBadge>
       ) : null}
-      {terminado && !tieneFirma ? <AlertaBadge>Falta firma</AlertaBadge> : null}
+      {terminado && !tieneFirma ? (
+        <AlertaBadge>{t("faltaFirma")}</AlertaBadge>
+      ) : null}
     </>
   );
 }

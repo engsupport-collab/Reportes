@@ -604,6 +604,24 @@ En la interfaz se usa la versión clara, por el modo único. La azul se conserva
 - Los campos encienden el borde al pasar el puntero. El campo de texto es el único elemento de la página sin forma de pulsable, y esa respuesta es la que dice que sí lo es.
 - **Autorrelleno del navegador**: Chrome repinta esos campos con su propio fondo y su propia tipografía. En modo oscuro quedaba un recuadro claro en medio de la pantalla negra. El fondo no se puede sobrescribir con `background-color` —el navegador lo aplica por encima—; la sombra interior gigante sí lo tapa.
 
+### Fase 11: idioma de la interfaz (español, inglés, portugués)
+
+Traduce **la aplicación**, no el contenido: los reportes que escriben los operarios (proyecto, cliente, detalles) se guardan y se muestran tal cual, en el idioma en que se escribieron. Traducirlos automáticamente reescribiría un registro de trabajo con valor probatorio. El PDF tampoco se traduce — sale siempre en español, sea cual sea el idioma de quien lo descarga, porque es una constancia, no parte de la interfaz.
+
+**`next-intl`**, elegido porque el sistema tiene bastantes cadenas con conteo ("1 adjunto" / "3 adjuntos") y las reglas de plural cambian entre idiomas — escribirlo a mano son condicionales repartidos por todas partes; next-intl lo resuelve con formato ICU (`{count, plural, =0 {...} one {...} other {...}}`). Sin enrutado por idioma (`/en/reportes`): es una herramienta interna con sesión, nadie comparte enlaces por idioma, y meterlo en la ruta habría obligado a mover todas las páginas bajo `[locale]` para nada.
+
+**El idioma vive en la cuenta** (`users.locale`), no en la sesión JWT. La cuenta es la fuente de verdad — sigue a la persona a cualquier navegador donde inicie sesión —, y una cookie de solo lectura (`IDIOMA_COOKIE`, un año de vida, no atada a la sesión) es la copia rápida que `i18n/request.ts` lee en cada petición sin tocar la base. Se descartó llevarlo en el JWT: `getCurrentUser()` ya consulta la base en cada petición (para poder desactivar una cuenta al instante), así que duplicar el dato en el token solo habría reintroducido el problema de datos obsoletos que ese diseño evita.
+
+Al cambiar de idioma (`actions/idioma.ts`) se escribe en los dos sitios y se llama a `revalidatePath("/", "layout")`: un solo segmento no bastaría porque el idioma se resuelve en el layout raíz, que envuelve tanto `/login` como toda la aplicación autenticada.
+
+**Costo real, no oculto**: `/login` y `/_not-found` pasan de estáticas a dinámicas. Leer la cookie del idioma en `i18n/request.ts` obliga a Next a renderizar esas páginas en cada petición — rompe la optimización que el propio código de `/login` documentaba ("se puede pre-renderizar y servir desde el CDN"). Es el precio de que el login recuerde el último idioma elegido antes de que exista sesión.
+
+Verificado en navegador con Playwright en los tres idiomas: cambio de idioma, persistencia tras recargar, fechas con `Intl` según la región (`es-CO` / `en-US` / `pt-BR`), plural cero ("Sem anexos"), catálogo de etiquetas por id (Eléctrico/Electrical/Elétrico), y que el cambio tarda ~2s en aplicarse del todo porque revalida una página con varias consultas — aceptable para una acción infrecuente.
+
+**Alcance de esta fase — traducido:** rail, barra superior (con el selector de idioma junto a la cuenta), menú de cuenta, ingreso, perfil y cambio de contraseña, panel del administrador completo (alertas, cifras, gráficas, tarjetas de estadística), lista y tarjetas de reportes, insignias de estado y clasificación, paginación.
+
+**Deliberadamente fuera, para una fase siguiente:** el detalle de un reporte, el formulario de crear/editar, el panel de filtros (`filter-panel.tsx`), `/admin/usuarios`, viáticos y adjuntos, el detalle de analíticas por empresa, y los mensajes de validación que vienen incrustados en los esquemas Zod (`lib/validation.ts`) — traducirlos exige reconstruir cada esquema por idioma, un trabajo aparte del de las pantallas. `lib/moneda.ts` tampoco cambia: la cifra de los viáticos sigue en formato `es-CO` en las tres versiones, porque ese componente no se tocó en esta fase.
+
 ## Problema abierto: firmar con el dedo en celular
 
 **Estado: sin resolver.** Con mouse en PC funciona correctamente; con el dedo en celular no se dibuja.

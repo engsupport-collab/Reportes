@@ -1,6 +1,8 @@
 import Link from "next/link";
+import { getLocale, getTranslations } from "next-intl/server";
 
 import { formatFechaCorta } from "@/lib/fechas";
+import { type Idioma, REGION } from "@/lib/idiomas";
 import type { ReporteEnLista } from "@/lib/queries/reports";
 import { Clasificacion, EstadoBadge, Faltantes } from "./badges";
 
@@ -12,7 +14,7 @@ import { Clasificacion, EstadoBadge, Faltantes } from "./badges";
  * o encoge el texto hasta hacerlo ilegible. En pantalla ancha las tarjetas se
  * distribuyen en columnas.
  */
-export function ReportList({
+export async function ReportList({
   items,
   mostrarAutor = false,
   mostrarEmpresa = false,
@@ -31,12 +33,20 @@ export function ReportList({
    */
   unaColumna?: boolean;
 }) {
+  const [t, locale] = await Promise.all([
+    getTranslations("reportList"),
+    getLocale(),
+  ]);
+  const region = REGION[locale as Idioma];
+
   if (items.length === 0) {
     return (
       <div className="rounded-2xl border border-dashed border-border bg-surface p-10 text-center">
-        <p className="text-sm font-medium text-text">No hay reportes todavía</p>
+        <p className="text-sm font-medium text-text">
+          {t("sinReportesTitulo")}
+        </p>
         <p className="mx-auto mt-1 max-w-sm text-sm text-muted">
-          Cuando termines un trabajo, crea un reporte para dejarlo registrado.
+          {t("sinReportesTexto")}
         </p>
       </div>
     );
@@ -65,17 +75,13 @@ export function ReportList({
 
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted">
               <span>
-                OC{" "}
+                {t("oc")}{" "}
                 <span className="font-medium text-text">
-                  {r.purchaseOrderNo ?? "sin asignar"}
+                  {r.purchaseOrderNo ?? t("sinAsignar")}
                 </span>
               </span>
-              <span>{formatFechaCorta(r.workDate)}</span>
-              <span>
-                {r.attachmentCount === 0
-                  ? "Sin adjuntos"
-                  : `${r.attachmentCount} adjunto${r.attachmentCount === 1 ? "" : "s"}`}
-              </span>
+              <span>{formatFechaCorta(r.workDate, region)}</span>
+              <span>{t("adjuntos", { count: r.attachmentCount })}</span>
               {mostrarAutor ? <span>{r.authorName}</span> : null}
               {mostrarEmpresa ? <span>{r.companyName}</span> : null}
             </div>
@@ -100,7 +106,7 @@ export function ReportList({
 }
 
 /** Paginación en el servidor: los enlaces cambian la URL, no filtran en memoria. */
-export function Paginacion({
+export async function Paginacion({
   pagina,
   totalPaginas,
   hrefPara,
@@ -111,9 +117,11 @@ export function Paginacion({
 }) {
   if (totalPaginas <= 1) return null;
 
+  const t = await getTranslations("reportList");
+
   return (
     <nav
-      aria-label="Paginación"
+      aria-label={t("paginacionAriaLabel")}
       className="flex items-center justify-between gap-3"
     >
       {pagina > 1 ? (
@@ -121,14 +129,14 @@ export function Paginacion({
           href={hrefPara(pagina - 1)}
           className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-muted transition hover:bg-surface-muted hover:text-text"
         >
-          Anterior
+          {t("anterior")}
         </Link>
       ) : (
         <span />
       )}
 
       <span className="text-sm text-muted">
-        Página {pagina} de {totalPaginas}
+        {t("pagina", { actual: pagina, total: totalPaginas })}
       </span>
 
       {pagina < totalPaginas ? (
@@ -136,7 +144,7 @@ export function Paginacion({
           href={hrefPara(pagina + 1)}
           className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-muted transition hover:bg-surface-muted hover:text-text"
         >
-          Siguiente
+          {t("siguiente")}
         </Link>
       ) : (
         <span />

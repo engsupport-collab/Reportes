@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { useState } from "react";
 
 import {
@@ -120,9 +121,10 @@ function MenuCuenta({
   user: CurrentUser;
   onCerrarSesion: () => void | Promise<void>;
 }) {
+  const t = useTranslations("nav");
   const [abierto, setAbierto] = useState(false);
   const inicial = user.fullName.trim().charAt(0).toUpperCase();
-  const rol = user.role === "admin" ? "Administrador" : "Empleado";
+  const rol = user.role === "admin" ? t("administrador") : t("empleado");
 
   return (
     <div className="relative">
@@ -130,7 +132,7 @@ function MenuCuenta({
         <>
           <button
             type="button"
-            aria-label="Cerrar menú"
+            aria-label={t("cerrarMenu")}
             className="fixed inset-0 z-10 cursor-default"
             onClick={() => setAbierto(false)}
           />
@@ -149,7 +151,7 @@ function MenuCuenta({
                 className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-sm text-text transition hover:bg-surface-muted"
               >
                 <IconSalir className="h-4 w-4 text-muted" />
-                Cerrar sesión
+                {t("cerrarSesion")}
               </button>
             </form>
           </div>
@@ -215,6 +217,7 @@ export function SideNav({
   onCerrar: () => void;
   children?: React.ReactNode;
 }) {
+  const t = useTranslations("nav");
   const pathname = usePathname();
   const inicio = user.role === "admin" ? "/admin" : "/reportes";
 
@@ -223,7 +226,7 @@ export function SideNav({
       {abierto ? (
         <button
           type="button"
-          aria-label="Cerrar menú"
+          aria-label={t("cerrarMenu")}
           onClick={onCerrar}
           className="fixed inset-0 z-40 cursor-default bg-black/50 md:hidden"
         />

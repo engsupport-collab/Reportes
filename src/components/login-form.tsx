@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
 
@@ -22,6 +23,7 @@ const CAMPO =
 
 function BotonEntrar() {
   const { pending } = useFormStatus();
+  const t = useTranslations("login");
 
   return (
     <button
@@ -29,12 +31,13 @@ function BotonEntrar() {
       disabled={pending}
       className="w-full rounded-xl bg-brand px-4 py-3.5 text-lg font-semibold text-white transition hover:bg-brand-strong disabled:cursor-not-allowed disabled:opacity-60"
     >
-      {pending ? "Verificando…" : "Ingresar"}
+      {pending ? t("botonVerificando") : t("botonIngresar")}
     </button>
   );
 }
 
 export function LoginForm() {
+  const t = useTranslations("login");
   const [state, formAction] = useActionState<LoginState, FormData>(
     loginAction,
     {},
@@ -47,7 +50,7 @@ export function LoginForm() {
           htmlFor="username"
           className="block text-base font-semibold text-text"
         >
-          Usuario
+          {t("usuario")}
         </label>
         <input
           id="username"
@@ -58,7 +61,7 @@ export function LoginForm() {
           spellCheck={false}
           required
           className={CAMPO}
-          placeholder="Escribe tu usuario"
+          placeholder={t("placeholderUsuario")}
         />
       </div>
 
@@ -67,7 +70,7 @@ export function LoginForm() {
           htmlFor="password"
           className="block text-base font-semibold text-text"
         >
-          Contraseña
+          {t("contrasena")}
         </label>
         <input
           id="password"
@@ -76,7 +79,7 @@ export function LoginForm() {
           autoComplete="current-password"
           required
           className={CAMPO}
-          placeholder="Escribe tu contraseña"
+          placeholder={t("placeholderContrasena")}
         />
       </div>
 
