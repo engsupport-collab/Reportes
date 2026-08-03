@@ -5,6 +5,21 @@ import { useFormStatus } from "react-dom";
 
 import { type LoginState, loginAction } from "@/actions/auth";
 
+/**
+ * Campos altos y con aire: es la única pantalla que se usa de pie, con una
+ * mano, y a veces con guantes. Un campo de 40px de alto se falla al tocarlo.
+ *
+ * Al pasar el puntero se enciende el borde en turquesa. No es decoración: el
+ * campo de texto es el único elemento de la página que no parece pulsable,
+ * porque no tiene la forma de un botón, y esa respuesta al pasar por encima
+ * es la que dice que sí lo es.
+ */
+const CAMPO =
+  "w-full rounded-xl border-2 border-border bg-surface px-4 py-3.5 text-base " +
+  "text-text placeholder:text-muted transition " +
+  "hover:border-brand/60 " +
+  "focus:border-brand focus:outline-none focus:ring-4 focus:ring-brand/15";
+
 function BotonEntrar() {
   const { pending } = useFormStatus();
 
@@ -12,9 +27,9 @@ function BotonEntrar() {
     <button
       type="submit"
       disabled={pending}
-      className="w-full rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-strong disabled:cursor-not-allowed disabled:opacity-60"
+      className="w-full rounded-xl bg-brand px-4 py-3.5 text-base font-semibold text-white transition hover:bg-brand-strong disabled:cursor-not-allowed disabled:opacity-60"
     >
-      {pending ? "Verificando…" : "Entrar"}
+      {pending ? "Verificando…" : "Ingresar"}
     </button>
   );
 }
@@ -26,11 +41,11 @@ export function LoginForm() {
   );
 
   return (
-    <form action={formAction} className="space-y-4">
-      <div className="space-y-1.5">
+    <form action={formAction} className="space-y-5">
+      <div className="space-y-2">
         <label
           htmlFor="username"
-          className="block text-sm font-medium text-text"
+          className="block text-sm font-semibold text-text"
         >
           Usuario
         </label>
@@ -42,15 +57,15 @@ export function LoginForm() {
           autoCapitalize="none"
           spellCheck={false}
           required
-          className="w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-sm text-text placeholder:text-muted focus:border-brand focus:outline-none"
-          placeholder="tu.usuario"
+          className={CAMPO}
+          placeholder="Escribe tu usuario"
         />
       </div>
 
-      <div className="space-y-1.5">
+      <div className="space-y-2">
         <label
           htmlFor="password"
-          className="block text-sm font-medium text-text"
+          className="block text-sm font-semibold text-text"
         >
           Contraseña
         </label>
@@ -60,8 +75,8 @@ export function LoginForm() {
           type="password"
           autoComplete="current-password"
           required
-          className="w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-sm text-text placeholder:text-muted focus:border-brand focus:outline-none"
-          placeholder="••••••••"
+          className={CAMPO}
+          placeholder="Escribe tu contraseña"
         />
       </div>
 
@@ -70,13 +85,15 @@ export function LoginForm() {
         // apenas aparece, sin que el usuario tenga que ir a buscarlo.
         <p
           role="alert"
-          className="rounded-lg border border-danger/30 bg-danger/10 px-3 py-2.5 text-sm text-danger"
+          className="rounded-xl border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger"
         >
           {state.error}
         </p>
       ) : null}
 
-      <BotonEntrar />
+      <div className="pt-1">
+        <BotonEntrar />
+      </div>
     </form>
   );
 }

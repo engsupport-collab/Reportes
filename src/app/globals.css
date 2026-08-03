@@ -34,6 +34,16 @@
   --accent: #6d5ce0;
   --accent-soft: #eeebfd;
 
+  /**
+   * Azul de Eng-Support, medido sobre su logotipo.
+   *
+   * Son dos pasos del mismo tono, no dos colores: el azul de la marca está
+   * pensado para papel y fondos claros, y sobre nuestro fondo casi negro se
+   * queda en 2,6:1 — ilegible. El paso claro sube a 4,6:1 sin dejar de ser
+   * reconociblemente su azul.
+   */
+  --marca: #2256aa;
+
   --ring: #0d9aaa;
 }
 
@@ -74,6 +84,9 @@
     --accent: #8b7cf0;
     --accent-soft: #1e1a3a;
 
+    /* Paso claro del azul de marca. Ver la nota en el bloque de arriba. */
+    --marca: #4a80d4;
+
     --ring: #17a2b8;
   }
 }
@@ -96,6 +109,7 @@
   --color-warning-soft: var(--warning-soft);
   --color-accent: var(--accent);
   --color-accent-soft: var(--accent-soft);
+  --color-marca: var(--marca);
 
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);

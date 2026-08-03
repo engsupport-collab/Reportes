@@ -10,6 +10,7 @@ export const metadata: Metadata = {
 /** Fondo del panel de marca. */
 const PANEL = "#0a6b76";
 
+
 /**
  * Pantalla de ingreso.
  *
@@ -25,38 +26,30 @@ const PANEL = "#0a6b76";
 export default function LoginPage() {
   return (
     <main className="grid min-h-screen lg:grid-cols-2">
-      <div className="flex items-center justify-center bg-surface px-6 py-12 sm:px-12">
-        <div className="w-full max-w-sm">
-          {/* Aquí sí cabe el lockup completo, que es donde se lee entero el
-              nombre y el subtítulo de la marca. El separador y la bajada
-              dicen qué es esto, no solo de quién es. */}
-          <div className="flex items-center gap-4">
-            <Logotipo alto={54} />
-            <span className="h-11 w-px bg-border" />
-            <span className="text-xs font-semibold uppercase leading-tight tracking-widest text-muted">
-              Reportes
-              <br />
-              de trabajo
-            </span>
-          </div>
+      <div className="flex items-center justify-center bg-surface px-6 py-12 sm:px-14">
+        <div className="w-full max-w-md">
+          {/* El lockup completo y grande: es la única pantalla donde el
+              logotipo se lee entero, subtítulo incluido. */}
+          <Logotipo alto={72} />
 
-          <p className="mt-12 text-xs font-semibold uppercase tracking-widest text-brand">
+          {/* En el azul de la marca, no en el turquesa de la interfaz: el
+              logotipo está justo encima y el titular en otro color se leería
+              como que no van juntos. */}
+          <p className="mt-14 text-xs font-bold uppercase tracking-[0.2em] text-marca">
             Bienvenido
           </p>
-          <h1 className="mt-2 text-3xl font-semibold tracking-tight text-text">
+          <h1 className="mt-3 text-5xl font-bold leading-[1.05] tracking-tight text-marca">
             Ingresa a tu cuenta
           </h1>
-          <p className="mt-2 text-sm text-muted">
+          <p className="mt-4 text-base text-muted">
             Registra tus trabajos de forma rápida y sencilla.
           </p>
 
-          <div className="mt-8">
+          <div className="mt-10">
             <LoginForm />
           </div>
 
-          <p className="mt-10 text-xs text-muted">
-            Sistema interno. El acceso queda registrado.
-          </p>
+          <p className="mt-12 text-xs text-muted">Sistema de reportes</p>
         </div>
       </div>
 
