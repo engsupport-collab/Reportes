@@ -587,6 +587,23 @@ Decisiones de la gráfica, siguiendo la guía de visualización:
 - **Las barras van todas del mismo color.** Lo que distingue una de otra es su nombre, escrito al lado; un color por barra añadiría un código que no significa nada. El valor va escrito, así que no hace falta pasar el puntero para leerlo.
 - Colores comprobados con el validador de la guía contra las dos superficies de tarjeta (`#ffffff` y `#151518`).
 
+### Fase 10.8: identidad de Eng-Support y modo único
+
+**La aplicación es solo oscura.** No hay modo claro, ni conmutador, ni variante según la preferencia del sistema. Antes convivían los dos y cada color necesitaba su pareja; ahora hay un único juego de variables y lo que se define en `globals.css` es lo que se ve. `color-scheme: dark` en `:root` para que el navegador pinte en oscuro también lo que no controlamos con CSS —barras de desplazamiento, desplegables nativos—; sin eso, quien tenga el sistema en claro vería barras blancas alrededor de una aplicación negra.
+
+**Logotipo.** El cliente entregó la versión blanca sobre transparente. La azul se **genera** desde ella (`scripts/generar-logos.ts`) tiñendo el canal alfa: el dibujo es de un solo color plano —94% blanco puro, el resto grises del antialiasing—, así que la forma vive entera en la transparencia. Las dos salen del mismo archivo y no pueden desincronizarse. El azul de marca, `#2256AA`, se midió contando los píxeles del logotipo original de su web, no a ojo sobre una captura.
+
+El recorte del monograma no usa un porcentaje fijo: busca la primera franja de columnas transparentes, que es el hueco entre la S y la palabra, y sigue siendo correcto si cambian el logotipo por otro de distinta proporción.
+
+En la interfaz se usa la versión clara, por el modo único. La azul se conserva para el membrete del PDF y el favicon, que van sobre blanco.
+
+**Pantalla de ingreso** partida en dos: formulario a la izquierda y panel de marca a la derecha, oculto por debajo de `lg` —en el celular no caben las dos mitades y lo que no puede faltar es el formulario—.
+
+- El titular escala por **consultas de contenedor** y no por ancho de ventana: al aparecer el panel, la columna pasa a ser media pantalla, así que una ventana ancha puede tener una columna estrecha. Cada umbral es el ancho que ese tamaño necesita, medido.
+- En celular el titular se queda grande y parte en dos líneas, a propósito: ahí sobra alto y lo que hace falta es presencia. El encogido solo entra a partir de `lg`.
+- Los campos encienden el borde al pasar el puntero. El campo de texto es el único elemento de la página sin forma de pulsable, y esa respuesta es la que dice que sí lo es.
+- **Autorrelleno del navegador**: Chrome repinta esos campos con su propio fondo y su propia tipografía. En modo oscuro quedaba un recuadro claro en medio de la pantalla negra. El fondo no se puede sobrescribir con `background-color` —el navegador lo aplica por encima—; la sombra interior gigante sí lo tapa.
+
 ## Problema abierto: firmar con el dedo en celular
 
 **Estado: sin resolver.** Con mouse en PC funciona correctamente; con el dedo en celular no se dibuja.

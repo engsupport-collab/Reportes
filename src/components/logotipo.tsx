@@ -5,18 +5,13 @@
 /**
  * Marca del sistema.
  *
- * Vive en un solo componente a propósito: el logotipo aparece en el rail, en
- * el ingreso y (pronto) en el PDF, y repartir el dibujo por las pantallas
- * obligaría a acordarse de todas cuando cambie.
+ * Vive en un solo componente a propósito: el logotipo aparece en el rail y en
+ * el ingreso, y repartir el dibujo por las pantallas obligaría a acordarse de
+ * todas cuando cambie.
  *
- * Hay dos variantes de color porque el logotipo es de un solo tono: la azul
- * desaparecería sobre el fondo casi negro del modo oscuro, y la blanca sobre
- * el papel. Las dos salen del mismo archivo original mediante
- * `scripts/generar-logos.ts`, así que no pueden desincronizarse entre sí.
- *
- * Se muestran las dos y se oculta una con CSS, en vez de elegir en
- * JavaScript: el modo de color se resuelve al pintar, y decidirlo en el
- * cliente haría que el logo parpadeara al cargar.
+ * Se usa la versión clara porque la aplicación es solo oscura. La variante
+ * azul sigue generándose (`scripts/generar-logos.ts`) para el membrete del PDF
+ * y el favicon, que van sobre blanco.
  */
 
 type Props = {
@@ -40,7 +35,6 @@ export function Logotipo({
 }: Props) {
   const base = variante === "completo" ? "logo" : "monograma";
   const ancho = Math.round(alto * RELACION[variante]);
-  const comun = "block w-auto";
 
   return (
     // `maxWidth: 100%` y no un ancho fijo: en una pantalla de 320px el lockup
@@ -51,19 +45,11 @@ export function Logotipo({
       style={{ width: ancho }}
     >
       <img
-        src={`/${base}-azul.png`}
+        src={`/${base}-claro.png`}
         alt="Eng-Support Corp."
         width={ancho}
         height={alto}
-        className={`${comun} h-auto dark:hidden`}
-      />
-      <img
-        src={`/${base}-claro.png`}
-        alt=""
-        aria-hidden
-        width={ancho}
-        height={alto}
-        className={`${comun} hidden h-auto dark:block`}
+        className="block h-auto w-auto"
       />
     </span>
   );

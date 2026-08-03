@@ -59,7 +59,7 @@ export default function LoginPage() {
 
               Cada umbral es el ancho que ese tamaño necesita, medido:
               36px→355, 48px→474, 60px→593. */}
-          <h1 className="mt-3 text-6xl font-bold leading-[1.05] tracking-wide text-marca lg:text-4xl lg:@[490px]:text-5xl lg:@[600px]:text-6xl">
+          <h1 className="mt-3 text-6xl font-bold leading-[1.05] tracking-wide text-titular lg:text-4xl lg:@[490px]:text-5xl lg:@[600px]:text-6xl">
             Ingresa a tu cuenta
           </h1>
           <p className="mt-4 text-base italic text-muted">

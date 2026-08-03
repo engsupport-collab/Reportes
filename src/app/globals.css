@@ -3,92 +3,59 @@
 /**
  * Sistema de diseño.
  *
- * Los colores se definen una sola vez aquí como variables y se consumen desde
- * las clases de Tailwind (bg-surface, text-muted, ...). Así el modo oscuro se
- * resuelve cambiando las variables en un solo lugar, en vez de repartir
- * `dark:` por cada componente.
+ * La aplicación es **solo oscura**: no hay modo claro, ni conmutador, ni
+ * variante según la preferencia del sistema. Por eso hay un único juego de
+ * colores y no dos. Antes convivían los dos y cada color necesitaba su pareja;
+ * con una sola, lo que se define aquí es lo que se ve, sin excepciones.
  *
- * La paleta sigue el dashboard de referencia: fondo gris muy claro, tarjetas
- * blancas, bordes suaves y un acento turquesa.
- */
-
-:root {
-  --bg: #f4f6f8;
-  --surface: #ffffff;
-  --surface-muted: #f8fafc;
-  --border: #e3e8ee;
-  --text: #10151c;
-  --text-muted: #64748b;
-
-  --brand: #0d9aaa;
-  --brand-strong: #0b7f8d;
-  --brand-soft: #e6f6f8;
-
-  --success: #16a34a;
-  --danger: #dc2626;
-  /* Ámbar de las alertas de "falta documento" / "falta firma". */
-  --warning: #b45309;
-  --warning-soft: #fef3c7;
-
-  /* Acento secundario, para lo que no es marca ni estado. */
-  --accent: #6d5ce0;
-  --accent-soft: #eeebfd;
-
-  /**
-   * Azul de Eng-Support, medido sobre su logotipo.
-   *
-   * Son dos pasos del mismo tono, no dos colores: el azul de la marca está
-   * pensado para papel y fondos claros, y sobre nuestro fondo casi negro se
-   * queda en 2,6:1 — ilegible. El paso claro sube a 4,6:1 sin dejar de ser
-   * reconociblemente su azul.
-   */
-  --marca: #2256aa;
-
-  --ring: #0d9aaa;
-}
-
-/**
- * Modo oscuro: negro real, no azul marino.
- *
- * Los grises son neutros (mismo valor en los tres canales, apenas un punto de
- * azul) para que el fondo se lea como negro y no como "azul oscuro". Sobre esa
- * base, cada color hace un trabajo distinto y se distingue de los demás:
- * turquesa la marca, ámbar los pendientes, rojo lo que se borra o falla, verde
- * lo terminado, violeta el acento secundario.
+ * Negro real, no azul marino: los grises son neutros —mismo valor en los tres
+ * canales, apenas un punto de azul— para que el fondo se lea como negro. Sobre
+ * esa base, cada color hace un trabajo distinto: turquesa la marca, ámbar los
+ * pendientes, rojo lo que se borra o falla, verde lo terminado, violeta el
+ * acento secundario.
  *
  * Todos los valores están comprobados contra este fondo (#0c0c0e) con el
  * validador de la guía de color: contraste mínimo 3:1 y, en el caso de los tres
  * acentos (turquesa, naranja, violeta), separación suficiente para distinguirse
- * también con daltonismo. Ámbar/rojo/verde no se separan entre sí bajo deuteranopía
- * —es la confusión clásica—, pero aquí nunca cargan el significado solos: cada
- * etiqueta de estado lleva además su ícono y su texto.
+ * también con daltonismo. Ámbar/rojo/verde no se separan entre sí bajo
+ * deuteranopía —es la confusión clásica—, pero aquí nunca cargan el significado
+ * solos: cada etiqueta de estado lleva además su ícono y su texto.
  */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #0c0c0e;
-    --surface: #151518;
-    --surface-muted: #1c1c20;
-    --border: #2b2b31;
-    --text: #f0f0f2;
-    --text-muted: #a3a3ad;
 
-    --brand: #17a2b8;
-    --brand-strong: #22bcd4;
-    --brand-soft: #0e2f36;
+:root {
+  /**
+   * Le dice al navegador que la página es oscura, para que pinte en oscuro lo
+   * que no controlamos con CSS: barras de desplazamiento, menús de los
+   * desplegables y controles nativos. Sin esto, quien tenga el sistema en
+   * claro vería barras blancas alrededor de una aplicación negra.
+   */
+  color-scheme: dark;
 
-    --success: #3fb968;
-    --danger: #e0484f;
-    --warning: #d9a520;
-    --warning-soft: #33280a;
+  --bg: #0c0c0e;
+  --surface: #151518;
+  --surface-muted: #1c1c20;
+  --border: #2b2b31;
+  --text: #f0f0f2;
+  --text-muted: #a3a3ad;
 
-    --accent: #8b7cf0;
-    --accent-soft: #1e1a3a;
+  --brand: #17a2b8;
+  --brand-strong: #22bcd4;
+  --brand-soft: #0e2f36;
 
-    /* Paso claro del azul de marca. Ver la nota en el bloque de arriba. */
-    --marca: #4a80d4;
+  --success: #3fb968;
+  --danger: #e0484f;
+  /* Ámbar de las alertas de "falta documento" / "falta firma". */
+  --warning: #d9a520;
+  --warning-soft: #33280a;
 
-    --ring: #17a2b8;
-  }
+  /* Acento secundario, para lo que no es marca ni estado. */
+  --accent: #8b7cf0;
+  --accent-soft: #1e1a3a;
+
+  /** Azul del titular de la pantalla de ingreso. Da 12,7:1 sobre el fondo. */
+  --titular: #8fe3ff;
+
+  --ring: #17a2b8;
 }
 
 @theme inline {
@@ -109,7 +76,7 @@
   --color-warning-soft: var(--warning-soft);
   --color-accent: var(--accent);
   --color-accent-soft: var(--accent-soft);
-  --color-marca: var(--marca);
+  --color-titular: var(--titular);
 
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
