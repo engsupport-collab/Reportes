@@ -39,12 +39,11 @@ export default function LoginPage() {
             <Logotipo alto={108} />
           </div>
 
-          {/* En violeta y no en el azul de la marca: repetir el azul del
-              logotipo en la palabra de encima del titular los ata visualmente
-              y la página se queda en un solo tono. Este es el acento
-              secundario de la paleta, el que existe justo para lo que no es
-              ni marca ni estado. */}
-          <p className="mt-14 text-xs font-bold uppercase tracking-[0.2em] text-accent">
+          {/* `text-text` y no `text-white`: en modo oscuro es #f0f0f2, o sea
+              blanco a la vista, que es lo que se pidió. Escrito como blanco
+              fijo desaparecería en modo claro, donde esta media pantalla es
+              blanca. */}
+          <p className="mt-14 text-xs font-bold uppercase tracking-[0.2em] text-text">
             Bienvenido
           </p>
           {/* En el azul de la marca: el logotipo está justo encima y el
