@@ -96,17 +96,26 @@ export default function LoginPage() {
           <div className="absolute bottom-1/3 left-1/4 h-56 w-80 -rotate-12 rounded-full bg-white/5" />
         </div>
 
-        <div className="relative max-w-lg p-12 xl:p-16">
-          <p className="text-xs font-semibold uppercase tracking-widest text-white/70">
-            Todo en un solo reporte
-          </p>
-          <p className="mt-4 text-4xl font-semibold leading-tight tracking-tight text-white xl:text-5xl">
-            Cada trabajo,
+        {/* El bloque no va pegado al borde inferior: apoyado abajo del todo se
+            lee como un pie de página. Levantado, queda a la altura de la
+            mirada y se lee como el mensaje del panel. */}
+        {/* El relleno lateral se queda en px-12 y no sube en `xl`: con px-16 la
+            columna útil bajaba a 592px en una pantalla de 1440, justo por
+            debajo de los 609 que necesita el titular, y se quedaba en el
+            tamaño pequeño en una medida de pantalla muy común. */}
+        <div className="@container relative max-w-3xl px-12 pb-32 xl:pb-40">
+          {/* 44px es el tamaño pedido, y se usa en cuanto hay sitio: la
+              primera frase necesita 609px de ancho para caber en una línea.
+              Los escalones de reserva existen para que el titular siempre
+              queden dos líneas — sin ellos se partía en cuatro. */}
+          <p className="text-[28px] font-bold leading-[1.12] tracking-tight text-white @[450px]:text-[32px] @[610px]:text-[44px]">
+            Menos tiempo administrando.
             <br />
-            con su respaldo.
+            Más tiempo ejecutando.
           </p>
-          <p className="mt-4 text-sm text-white/80">
-            Fotos, firma y viáticos en el mismo lugar.
+          <p className="mt-6 text-[18px] font-normal leading-[30px] text-white/80">
+            Toda la información de campo, organizada de forma simple, segura y
+            accesible.
           </p>
         </div>
       </div>
