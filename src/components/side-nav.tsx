@@ -238,13 +238,12 @@ export function SideNav({
           abierto ? "translate-x-0" : "-translate-x-full"
         }`}
       >
-        <div className="flex items-center gap-2.5 px-4 py-4">
-          <Link href={inicio} className="flex items-center gap-2.5">
-            {/* Solo el monograma: el lockup completo a esta altura deja el
-                subtítulo del logotipo ilegible. El nombre del sistema va al
-                lado, en texto, que además es lo que aquí hace falta saber. */}
-            <Logotipo variante="monograma" alto={30} />
-            <span className="text-sm font-semibold text-text">Reportes</span>
+        {/* El lockup completo ocupa el ancho del rail. Sin la palabra
+            "Reportes" al lado: el logotipo ya trae su propio subtítulo, y dos
+            rótulos pegados se estorban. */}
+        <div className="px-4 py-4">
+          <Link href={inicio} className="block">
+            <Logotipo alto={68} className="w-full" />
           </Link>
         </div>
 

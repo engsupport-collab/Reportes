@@ -44,12 +44,15 @@ export function Logotipo({
       className={`inline-block max-w-full ${className}`}
       style={{ width: ancho }}
     >
+      {/* `w-full h-auto` y no medidas fijas: así la imagen sigue al ancho del
+          contenedor cuando este es menor que el natural, conservando la
+          proporción en vez de recortarse o desbordar. */}
       <img
         src={`/${base}-claro.png`}
         alt="Eng-Support Corp."
         width={ancho}
         height={alto}
-        className="block h-auto w-auto"
+        className="block h-auto w-full"
       />
     </span>
   );
