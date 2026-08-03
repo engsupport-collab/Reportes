@@ -2,6 +2,8 @@
    public/, con tamaño fijo y conocido; el optimizador de Next no aporta nada
    aquí y obligaría a pasar por su ruta de imágenes para un logo de 76 KB. */
 
+import { MEDIDAS } from "./logotipo-medidas";
+
 /**
  * Marca del sistema.
  *
@@ -22,19 +24,17 @@ type Props = {
   className?: string;
 };
 
-const RELACION = {
-  // Proporciones reales de los archivos generados.
-  completo: 1046 / 319,
-  monograma: 229 / 319,
-} as const;
-
 export function Logotipo({
   variante = "completo",
   alto = 36,
   className = "",
 }: Props) {
   const base = variante === "completo" ? "logo" : "monograma";
-  const ancho = Math.round(alto * RELACION[variante]);
+  // Las medidas las genera scripts/generar-logos.ts junto con las imágenes, en
+  // vez de estar copiadas aquí: al cambiar el logotipo cambia la proporción, y
+  // un número copiado se quedaría desactualizado sin dar ningún error.
+  const m = MEDIDAS[variante];
+  const ancho = Math.round(alto * (m.ancho / m.alto));
 
   return (
     // `maxWidth: 100%` y no un ancho fijo: en una pantalla de 320px el lockup
