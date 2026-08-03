@@ -52,8 +52,8 @@
   --accent: #8b7cf0;
   --accent-soft: #1e1a3a;
 
-  /** Azul del titular de la pantalla de ingreso. Da 12,7:1 sobre el fondo. */
-  --titular: #8fe3ff;
+  /** Turquesa del titular de la pantalla de ingreso. Da 8,9:1 sobre el panel. */
+  --titular: #2fc7d3;
 
   --ring: #17a2b8;
 }
