@@ -27,7 +27,10 @@ export default function LoginPage() {
   return (
     <main className="grid min-h-screen lg:grid-cols-2">
       <div className="flex items-center justify-center bg-surface px-6 py-12 sm:px-14">
-        <div className="w-full max-w-md">
+        {/* 40rem = 640px, porque el titular necesita 593px para caber en una
+            sola línea a 60px. Con los 448px de antes partía en dos.
+            `@container` para poder medir el titular contra ESTA columna. */}
+        <div className="@container w-full max-w-[40rem]">
           {/* El lockup completo y grande: es la única pantalla donde el
               logotipo se lee entero, subtítulo incluido. Centrado, aunque el
               resto de la columna vaya alineado a la izquierda: la marca
@@ -46,7 +49,15 @@ export default function LoginPage() {
           </p>
           {/* En el azul de la marca: el logotipo está justo encima y el
               titular en otro color se leería como que no van juntos. */}
-          <h1 className="mt-3 text-6xl font-bold leading-[1.05] tracking-wide text-marca">
+          {/* El titular escala para caber siempre en una sola línea.
+              Los cortes se miden contra la columna (`@`), no contra la
+              ventana: cuando aparece el panel de la derecha, la columna pasa a
+              ser la mitad de la pantalla, así que una ventana ancha puede
+              tener una columna estrecha y los cortes por ventana fallaban.
+
+              Cada umbral es el ancho que ese tamaño necesita, medido:
+              24px→237, 30px→296, 36px→355, 48px→474, 60px→593. */}
+          <h1 className="mt-3 text-2xl font-bold leading-[1.05] tracking-wide text-marca @[310px]:text-3xl @[370px]:text-4xl @[490px]:text-5xl @[610px]:text-6xl">
             Ingresa a tu cuenta
           </h1>
           <p className="mt-4 text-base italic text-muted">

@@ -125,3 +125,30 @@ body {
   outline: 2px solid var(--ring);
   outline-offset: 2px;
 }
+
+/**
+ * Campos autorrellenados por el navegador.
+ *
+ * Chrome los repinta con su propio fondo (un lavanda claro) y su propia
+ * tipografía, ignorando los estilos de la página. En modo oscuro el resultado
+ * es un recuadro claro en medio de una pantalla negra, con la letra del
+ * sistema en vez de la nuestra — que es justo lo que se ve al volver a entrar
+ * con las credenciales guardadas.
+ *
+ * El fondo no se puede sobrescribir con `background-color`: el navegador lo
+ * aplica por encima. La sombra interior gigante es la forma habitual de
+ * taparlo, porque sí respeta la nuestra.
+ */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--text);
+  -webkit-box-shadow: 0 0 0 1000px var(--surface) inset;
+  box-shadow: 0 0 0 1000px var(--surface) inset;
+  caret-color: var(--text);
+  font-family: inherit;
+  font-size: inherit;
+  /* Chrome reaplica su fondo tras una transición; con una lo bastante larga
+     no llega a ocurrir nunca. */
+  transition: background-color 100000s ease-in-out 0s;
+}

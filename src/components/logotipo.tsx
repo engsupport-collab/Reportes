@@ -43,17 +43,19 @@ export function Logotipo({
   const comun = "block w-auto";
 
   return (
+    // `maxWidth: 100%` y no un ancho fijo: en una pantalla de 320px el lockup
+    // a su tamaño natural se sale por la derecha y arrastra a toda la página
+    // con scroll horizontal. Así encoge conservando la proporción.
     <span
-      className={`inline-block shrink-0 ${className}`}
-      style={{ height: alto, width: ancho }}
+      className={`inline-block max-w-full ${className}`}
+      style={{ width: ancho }}
     >
       <img
         src={`/${base}-azul.png`}
         alt="Eng-Support Corp."
         width={ancho}
         height={alto}
-        className={`${comun} dark:hidden`}
-        style={{ height: alto }}
+        className={`${comun} h-auto dark:hidden`}
       />
       <img
         src={`/${base}-claro.png`}
@@ -61,8 +63,7 @@ export function Logotipo({
         aria-hidden
         width={ancho}
         height={alto}
-        className={`${comun} hidden dark:block`}
-        style={{ height: alto }}
+        className={`${comun} hidden h-auto dark:block`}
       />
     </span>
   );
