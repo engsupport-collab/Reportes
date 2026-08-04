@@ -71,6 +71,13 @@
       "when": 1785807000060,
       "tag": "0009_mysterious_natasha_romanoff",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1785812400000,
+      "tag": "0010_rename_empresas",
+      "breakpoints": true
     }
   ]
 }

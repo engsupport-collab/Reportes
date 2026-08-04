@@ -18,9 +18,14 @@ export type { ReportStatus, UserRole } from "@/lib/roles";
 /**
  * Las dos empresas del grupo.
  *
- * El identificador es la propia sigla ("corp", "saas") en vez de un UUID: se
+ * El identificador es una cadena corta ("corp", "saas") en vez de un UUID: se
  * lee en la base sin tener que cruzar tablas, aparece legible en las URLs, y
  * permitió que la migración pudiera asignar las filas que ya existían.
+ *
+ * Ya no coincide con el nombre visible —hoy son "LLC" y "SAS", las siglas
+ * reales de cada sociedad— y no se renombró a propósito: el id es la llave
+ * foránea de cada reporte y de cada acceso de usuario, así que cambiarlo
+ * obligaría a reescribir todas esas filas para que nadie note la diferencia.
  *
  * Es una tabla y no un campo de texto con dos valores fijos porque el nombre
  * visible tiene que poder cambiarse sin tocar código, y porque agregar una
@@ -74,7 +79,7 @@ export const users = sqliteTable(
  * A qué empresas puede entrar cada usuario.
  *
  * Es una tabla aparte y no una columna en `users` porque la relación es de
- * muchos a muchos: alguien puede trabajar solo en Corp, solo en SaaS, o en las
+ * muchos a muchos: alguien puede trabajar solo en LLC, solo en SAS, o en las
  * dos. Con una columna habría que inventar valores como "ambas", y agregar una
  * tercera empresa obligaría a rehacerlo.
  */

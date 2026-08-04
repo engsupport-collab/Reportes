@@ -65,7 +65,7 @@ export default async function AdminReportesPage({ searchParams }: Params) {
       : undefined;
 
   // El filtro de empleado se recalcula según la empresa elegida: alguien de
-  // Corp no tiene sentido como opción cuando se está mirando solo SaaS.
+  // LLC no tiene sentido como opción cuando se está mirando solo SAS.
   const empleados = await empleadosDeEmpresa(empresaFiltro);
   const empleadoId = empleados.some((e) => e.id === params.empleado)
     ? params.empleado

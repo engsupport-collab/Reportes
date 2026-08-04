@@ -36,7 +36,7 @@ const ICONOS = {
  * Elemento del rail que despliega opciones en vez de navegar.
  *
  * Arranca abierto si ya se está dentro de una de sus opciones: al entrar a las
- * analíticas de SaaS, el menú tiene que mostrar dónde estás, no obligarte a
+ * analíticas de SAS, el menú tiene que mostrar dónde estás, no obligarte a
  * desplegarlo otra vez para descubrirlo.
  */
 function NavDesplegable({

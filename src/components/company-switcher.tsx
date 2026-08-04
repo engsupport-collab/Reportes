@@ -9,8 +9,8 @@ import type { Empresa } from "@/lib/queries/companies";
  *
  * Muestra siempre en qué empresa se está trabajando, no solo cuando se
  * despliega. Es el dato que determina todo lo que se ve en pantalla: si no
- * estuviera a la vista, alguien podría registrar un trabajo de Corp creyendo
- * que está en SaaS.
+ * estuviera a la vista, alguien podría registrar un trabajo de LLC creyendo
+ * que está en SAS.
  *
  * Si el usuario pertenece a una sola empresa, se muestra como etiqueta fija: no
  * hay nada que elegir.

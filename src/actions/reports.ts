@@ -221,7 +221,7 @@ export async function actualizarReporteAction(
   }
 
   // La empresa de un reporte no se cambia al editarlo, solo al crearlo: mover
-  // un reporte ya existente entre Corp y SaaS es una operación distinta, con
+  // un reporte ya existente entre LLC y SAS es una operación distinta, con
   // sus propias implicaciones, y no algo que deba pasar sin querer al corregir
   // el nombre de un cliente.
   await db
