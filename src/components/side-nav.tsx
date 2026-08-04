@@ -7,6 +7,7 @@ import { useState } from "react";
 
 import {
   IconAnaliticas,
+  IconCotizaciones,
   IconNuevo,
   IconPanel,
   IconReportes,
@@ -19,7 +20,7 @@ import type { CurrentUser } from "@/lib/auth-guard";
 export type NavItem = {
   href: string;
   label: string;
-  icono: "panel" | "reportes" | "nuevo" | "usuarios" | "analiticas";
+  icono: "panel" | "reportes" | "cotizaciones" | "nuevo" | "usuarios" | "analiticas";
   /** Si viene, el elemento despliega estas opciones en vez de navegar. */
   hijos?: { href: string; label: string }[];
 };
@@ -27,6 +28,7 @@ export type NavItem = {
 const ICONOS = {
   panel: IconPanel,
   reportes: IconReportes,
+  cotizaciones: IconCotizaciones,
   nuevo: IconNuevo,
   usuarios: IconUsuarios,
   analiticas: IconAnaliticas,

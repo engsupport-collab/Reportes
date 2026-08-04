@@ -28,6 +28,11 @@ async function navPara(user: CurrentUser): Promise<NavItem[]> {
       { href: "/admin", label: t("panel"), icono: "panel" },
       { href: "/admin/reportes", label: t("reportes"), icono: "reportes" },
       {
+        href: "/admin/cotizaciones",
+        label: t("cotizaciones"),
+        icono: "cotizaciones",
+      },
+      {
         // Las opciones salen de las empresas reales del sistema: si mañana hay
         // una tercera, aparece sola sin tocar este archivo. El nombre de cada
         // empresa no se traduce: es un dato, no texto de la interfaz.

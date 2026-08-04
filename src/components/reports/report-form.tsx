@@ -1,19 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { useTranslations } from "next-intl";
 
 import type { ReporteState } from "@/actions/reports";
 import { ETIQUETAS_TRABAJO, TIPOS_SERVICIO } from "@/lib/etiquetas";
 import type { Empresa } from "@/lib/queries/companies";
+import { QuoteSelector, type OpcionCotizacionSelector } from "./quote-selector";
 
 type Valores = {
-  projectName: string;
-  purchaseOrderNo: string;
-  quoteNumber: string;
-  clientName: string;
+  quoteId: string;
   workDate: string;
   serviceType: string;
   etiquetas: string[];
@@ -44,6 +42,11 @@ function Guardar({ etiqueta }: { etiqueta: string }) {
  * Es el mismo componente en las dos vistas: cambia la acción que recibe, no el
  * formulario. Mantener dos copias haría que un campo nuevo se agregara en una y
  * se olvidara en la otra.
+ *
+ * Proyecto, cliente, orden de compra y número de cotización YA NO se escriben
+ * aquí — se eligen con `QuoteSelector` y el servidor los copia de la
+ * cotización elegida. Es lo que evita que el mismo proyecto termine escrito de
+ * tres formas distintas por distintos técnicos.
  */
 export function ReportForm({
   action,
@@ -51,6 +54,8 @@ export function ReportForm({
   etiqueta,
   cancelarHref,
   empresas,
+  companyIdFijo,
+  cotizacionesPorEmpresa,
 }: {
   action: (estado: ReporteState, formData: FormData) => Promise<ReporteState>;
   valores?: Valores;
@@ -66,6 +71,10 @@ export function ReportForm({
    * reporte que crea.
    */
   empresas?: Empresa[];
+  /** Para un empleado, o al editar: la empresa ya fijada. */
+  companyIdFijo?: string;
+  /** Cotizaciones activas, por empresa, para el selector. */
+  cotizacionesPorEmpresa: { companyId: string; opciones: OpcionCotizacionSelector[] }[];
 }) {
   const [state, formAction] = useActionState<ReporteState, FormData>(
     action,
@@ -76,11 +85,22 @@ export function ReportForm({
   // usa el PDF, que no pasa por next-intl. En pantalla se traducen por id.
   const tEtiquetas = useTranslations("etiquetas");
 
+  // La empresa se sube a estado del componente (a diferencia del resto del
+  // formulario, no controlado) porque el selector de cotización necesita
+  // saber cuál está elegida para filtrar su propia lista.
+  const [companyId, setCompanyId] = useState(
+    companyIdFijo ?? empresas?.[0]?.id ?? "",
+  );
+
+  const opciones =
+    cotizacionesPorEmpresa.find((e) => e.companyId === companyId)?.opciones ??
+    [];
+
   return (
     <form action={formAction} className="space-y-5">
       <div className="grid gap-5 sm:grid-cols-2">
-        {/* Va primero: es la decisión que condiciona todo lo demás, y conviene
-            tomarla antes de llenar el resto del formulario, no al final. */}
+        {/* Va primero: es la decisión que condiciona todo lo demás, incluida
+            qué cotizaciones aparecen para elegir. */}
         {empresas ? (
           <fieldset className="space-y-2 sm:col-span-2">
             <legend className="mb-2 block text-sm font-medium text-text">
@@ -97,6 +117,8 @@ export function ReportForm({
                     name="companyId"
                     value={e.id}
                     required
+                    checked={companyId === e.id}
+                    onChange={() => setCompanyId(e.id)}
                     className="sr-only"
                   />
                   {e.name}
@@ -106,77 +128,15 @@ export function ReportForm({
           </fieldset>
         ) : null}
 
-        <div className="space-y-1.5 sm:col-span-2">
-          <label
-            htmlFor="projectName"
-            className="block text-sm font-medium text-text"
-          >
-            {t("nombreProyecto")}
-          </label>
-          <input
-            id="projectName"
-            name="projectName"
-            required
-            maxLength={200}
-            defaultValue={valores?.projectName}
-            className={CAMPO}
-            placeholder={t("placeholderProyecto")}
-          />
-        </div>
-
-        <div className="space-y-1.5">
-          <label
-            htmlFor="purchaseOrderNo"
-            className="block text-sm font-medium text-text"
-          >
-            {t("ordenCompra")}{" "}
-            <span className="font-normal text-muted">{t("opcional")}</span>
-          </label>
-          <input
-            id="purchaseOrderNo"
-            name="purchaseOrderNo"
-            maxLength={60}
-            defaultValue={valores?.purchaseOrderNo}
-            className={CAMPO}
-            placeholder={t("placeholderOC")}
-          />
-        </div>
-
-        <div className="space-y-1.5">
-          <label
-            htmlFor="quoteNumber"
-            className="block text-sm font-medium text-text"
-          >
-            {t("cotizacion")}
-          </label>
-          <input
-            id="quoteNumber"
-            name="quoteNumber"
-            required
-            maxLength={60}
-            defaultValue={valores?.quoteNumber}
-            className={CAMPO}
-            placeholder={t("placeholderCotizacion")}
-          />
-        </div>
-
-        <div className="space-y-1.5">
-          <label
-            htmlFor="clientName"
-            className="block text-sm font-medium text-text"
-          >
-            {t("cliente")}
-          </label>
-          <input
-            id="clientName"
-            name="clientName"
-            required
-            maxLength={200}
-            defaultValue={valores?.clientName}
-            className={CAMPO}
-            placeholder={t("placeholderCliente")}
-          />
-        </div>
+        {/* `key`: al cambiar de empresa el selector tiene que arrancar de
+            cero con la lista de la nueva empresa, no conservar en su estado
+            interno una cotización que ya no le corresponde. */}
+        <QuoteSelector
+          key={companyId}
+          companyId={companyId}
+          opcionesIniciales={opciones}
+          valorInicial={valores?.quoteId}
+        />
 
         <div className="space-y-1.5">
           <label

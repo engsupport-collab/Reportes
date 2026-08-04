@@ -70,6 +70,15 @@ export function IconUsuarios(props: IconProps) {
   );
 }
 
+export function IconCotizaciones(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M3 11.5V5a2 2 0 0 1 2-2h6.5L21 11.5 12.5 20 3 11.5Z" />
+      <circle cx="7.5" cy="7.5" r="1.25" />
+    </Svg>
+  );
+}
+
 export function IconFiltros(props: IconProps) {
   return (
     <Svg {...props}>

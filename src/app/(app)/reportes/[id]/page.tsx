@@ -246,10 +246,25 @@ export default async function DetalleReportePage({ params }: Params) {
           </div>
 
           <dl className="mt-6 grid gap-5 sm:grid-cols-2">
-            <Dato
-              etiqueta={t("cotizacion")}
-              valor={reporte.quoteNumber ?? t("sinAsignar")}
-            />
+            <div>
+              <dt className="text-xs font-medium uppercase tracking-wide text-muted">
+                {t("cotizacion")}
+              </dt>
+              <dd className="mt-1 text-sm text-text">
+                {/* El enlace a la cotización de origen solo tiene sentido para
+                    el admin: es la única vista que existe de ella. */}
+                {esAdmin && reporte.quoteId ? (
+                  <Link
+                    href={`/admin/cotizaciones/${reporte.quoteId}`}
+                    className="text-brand hover:underline"
+                  >
+                    {reporte.quoteNumber ?? t("sinAsignar")}
+                  </Link>
+                ) : (
+                  (reporte.quoteNumber ?? t("sinAsignar"))
+                )}
+              </dd>
+            </div>
             <Dato
               etiqueta={t("ordenCompra")}
               valor={reporte.purchaseOrderNo ?? t("sinAsignar")}

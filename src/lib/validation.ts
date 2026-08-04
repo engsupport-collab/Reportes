@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { ESTADOS_COTIZACION } from "./cotizaciones";
 import { TIPOS_SERVICIO_IDS, esEtiquetaValida } from "./etiquetas";
 import { parseFechaISO } from "./fechas";
 import { PASSWORD_MIN_LENGTH } from "./password";
@@ -78,35 +79,18 @@ export function cambiarContrasenaSchema(t: T) {
 /**
  * Reporte de servicio.
  *
+ * Proyecto, cliente, orden de compra y número de cotización YA NO se escriben
+ * aquí: se copian del servidor a partir de la cotización elegida
+ * (`quoteId`) — es lo que evita que el mismo proyecto termine escrito de tres
+ * formas distintas. Ver `crearReporteAction` en `src/actions/reports.ts`, que
+ * hace esa copia después de validar este esquema.
+ *
  * Los límites de longitud no son decorativos: sin ellos, alguien puede mandar
  * un campo de varios megabytes por una Server Action y llenar la base.
  */
 export function reporteSchema(t: T) {
   return z.object({
-    projectName: z
-      .string()
-      .trim()
-      .min(1, t("ingresaNombreProyecto"))
-      .max(200, t("nombreProyectoLargo")),
-    // Opcional: se guarda `null` si viene vacío, nunca una cadena vacía — así
-    // "sin orden" es una sola condición (`IS NULL`) en vez de dos.
-    purchaseOrderNo: z
-      .string()
-      .trim()
-      .max(60, t("ordenLarga"))
-      .transform((v) => (v.length > 0 ? v : null)),
-    // A diferencia de la orden de compra, la cotización sí es obligatoria: la
-    // pide siempre finanzas para dar de alta el reporte.
-    quoteNumber: z
-      .string()
-      .trim()
-      .min(1, t("ingresaCotizacion"))
-      .max(60, t("cotizacionLarga")),
-    clientName: z
-      .string()
-      .trim()
-      .min(1, t("ingresaCliente"))
-      .max(200, t("clienteLargo")),
+    quoteId: z.string().trim().min(1, t("eligeCotizacion")),
     workDate: z
       .string()
       .trim()
@@ -225,6 +209,91 @@ export function leerEtiquetas(valores: (FormDataEntryValue | null)[]): string[] 
 }
 
 export const estadoReporteSchema = z.enum(REPORT_STATUSES);
+
+/**
+ * Cotización, creada o editada por un administrador.
+ *
+ * Todos los campos aquí son opcionales salvo proyecto y cliente: una
+ * cotización puede registrarse sin número todavía asignado, sin orden de
+ * compra, sin fecha comprometida — son datos que llegan en momentos distintos
+ * y el admin los va completando.
+ */
+export function cotizacionSchema(t: T) {
+  return z.object({
+    quoteNumber: z
+      .string()
+      .trim()
+      .max(60, t("cotizacionLarga"))
+      .transform((v) => (v.length > 0 ? v : null)),
+    projectName: z
+      .string()
+      .trim()
+      .min(1, t("ingresaNombreProyecto"))
+      .max(200, t("nombreProyectoLargo")),
+    clientName: z
+      .string()
+      .trim()
+      .min(1, t("ingresaCliente"))
+      .max(200, t("clienteLargo")),
+    purchaseOrderNo: z
+      .string()
+      .trim()
+      .max(60, t("ordenLarga"))
+      .transform((v) => (v.length > 0 ? v : null)),
+    dueDate: z
+      .string()
+      .trim()
+      .transform((valor, ctx) => {
+        if (valor.length === 0) return null;
+        const fecha = parseFechaISO(valor);
+        if (!fecha) {
+          ctx.addIssue({ code: "custom", message: t("fechaInvalida") });
+          return z.NEVER;
+        }
+        return fecha;
+      }),
+    description: z
+      .string()
+      .trim()
+      .max(2000, t("descripcionLarga"))
+      .transform((v) => (v.length > 0 ? v : null)),
+    amount: z
+      .string()
+      .trim()
+      .transform((valor, ctx) => {
+        if (valor.length === 0) return null;
+        const numero = Number(valor);
+        if (!Number.isFinite(numero) || numero < 0) {
+          ctx.addIssue({ code: "custom", message: t("montoInvalido") });
+          return z.NEVER;
+        }
+        return Math.round(numero);
+      }),
+  });
+}
+
+/**
+ * Cotización mínima, creada por un técnico desde campo cuando el trabajo se
+ * acordó de palabra o es urgente y todavía no existe en el sistema. Solo pide
+ * lo que el técnico realmente tiene a mano — nada de número de cotización, que
+ * es justo el dato que le correspondería inventar si se le exigiera.
+ */
+export function cotizacionCampoSchema(t: T) {
+  return z.object({
+    projectName: z
+      .string()
+      .trim()
+      .min(1, t("ingresaNombreProyecto"))
+      .max(200, t("nombreProyectoLargo")),
+    clientName: z
+      .string()
+      .trim()
+      .min(1, t("ingresaCliente"))
+      .max(200, t("clienteLargo")),
+  });
+}
+
+export const estadoCotizacionSchema = z.enum(ESTADOS_COTIZACION);
 
 /**
  * Nombre de usuario para cuentas nuevas.

@@ -8,6 +8,7 @@ import {
   text,
 } from "drizzle-orm/sqlite-core";
 
+import { ESTADOS_COTIZACION } from "@/lib/cotizaciones";
 import { TIPOS_SERVICIO_IDS } from "@/lib/etiquetas";
 import { IDIOMAS } from "@/lib/idiomas";
 import { REPORT_STATUSES, USER_ROLES } from "@/lib/roles";
@@ -103,6 +104,73 @@ export const userCompanies = sqliteTable(
 );
 
 /**
+ * Cotizaciones: la fuente oficial de qué trabajos existen.
+ *
+ * Antes esta información vivía en un Excel y el técnico copiaba a mano el
+ * proyecto y el cliente en cada reporte, con el resultado de que el mismo
+ * proyecto aparecía escrito de tres formas. Ahora el reporte se crea eligiendo
+ * una cotización de esta tabla.
+ *
+ * `quoteNumber` admite null y NO es único, las dos cosas a propósito: una
+ * cotización creada en campo todavía no tiene número asignado, y en el control
+ * que lleva el cliente hay números repetidos de forma legítima (una misma
+ * cotización con varias entregas mensuales comparte número).
+ */
+export const quotes = sqliteTable(
+  "quotes",
+  {
+    id: text("id").primaryKey(),
+    companyId: text("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "restrict" }),
+
+    quoteNumber: text("quote_number"),
+    projectName: text("project_name").notNull(),
+    clientName: text("client_name").notNull(),
+
+    status: text("status", { enum: ESTADOS_COTIZACION })
+      .notNull()
+      .default("pendiente_autorizacion"),
+
+    // Llega después de que el cliente autoriza. Null mientras tanto — que es
+    // justo el caso de la autorización verbal, donde el trabajo ya arrancó.
+    purchaseOrderNo: text("purchase_order_no"),
+    /** Fecha comprometida de entrega. */
+    dueDate: integer("due_date", { mode: "timestamp_ms" }),
+    description: text("description"),
+    /** Valor cotizado, en pesos y sin decimales. Opcional. */
+    amount: integer("amount"),
+
+    /**
+     * Falsa solo en las cotizaciones creadas por un técnico desde campo, que
+     * nacen con lo mínimo (proyecto y cliente) y necesitan que un admin las
+     * complete. Es lo que alimenta el filtro "sin revisar" del panel.
+     */
+    revisada: integer("revisada", { mode: "boolean" }).notNull().default(true),
+
+    createdBy: text("created_by")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
+      .notNull()
+      .default(sql`(unixepoch() * 1000)`),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" })
+      .notNull()
+      .default(sql`(unixepoch() * 1000)`),
+    updatedBy: text("updated_by").references(() => users.id, {
+      onDelete: "set null",
+    }),
+  },
+  (table) => [
+    // El selector del técnico filtra siempre por empresa y estado; el panel del
+    // admin agrega el filtro de "sin revisar".
+    index("quotes_company_status_idx").on(table.companyId, table.status),
+    index("quotes_company_revisada_idx").on(table.companyId, table.revisada),
+    index("quotes_project_idx").on(table.projectName),
+  ],
+);
+
+/**
  * Un reporte por trabajo terminado.
  *
  * El estado "incompleto" (terminado pero sin adjuntos) NO se guarda aquí:
@@ -150,6 +218,25 @@ export const reports = sqliteTable(
       { onDelete: "set null" },
     ),
 
+    /**
+     * A qué cotización pertenece este reporte. `onDelete: "set null"` y no
+     * `cascade`: borrar la cotización no debe borrar el registro de un
+     * trabajo que sí se hizo. Null en los reportes de viáticos y en los de
+     * servicio creados antes de que existiera el módulo de cotizaciones.
+     */
+    quoteId: text("quote_id").references(() => quotes.id, {
+      onDelete: "set null",
+    }),
+
+    /**
+     * `projectName`, `purchaseOrderNo`, `quoteNumber` y `clientName` son la
+     * COPIA de esos mismos datos en la cotización, tomada al crear el
+     * reporte — no una referencia en vivo. Es deliberado: un reporte que el
+     * cliente ya firmó es una constancia, y no debe cambiar si después se
+     * corrige la cotización. La única excepción es la revisión de una
+     * cotización creada en campo (ver `revisarCotizacionAction`), y solo
+     * alcanza a los reportes de ese origen que todavía no estén firmados.
+     */
     projectName: text("project_name").notNull(),
     // Opcional: algunos trabajos no tienen orden de compra todavía cuando se
     // registra el reporte. A diferencia de "sin documento" o "sin firma", esto
@@ -211,6 +298,7 @@ export const reports = sqliteTable(
     index("reports_purchase_order_idx").on(table.purchaseOrderNo),
     index("reports_type_idx").on(table.companyId, table.type),
     index("reports_linked_report_idx").on(table.linkedReportId),
+    index("reports_quote_idx").on(table.quoteId),
   ],
 );
 
@@ -339,6 +427,8 @@ export type Company = typeof companies.$inferSelect;
 export type UserCompany = typeof userCompanies.$inferSelect;
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
+export type Quote = typeof quotes.$inferSelect;
+export type NewQuote = typeof quotes.$inferInsert;
 export type Report = typeof reports.$inferSelect;
 export type NewReport = typeof reports.$inferInsert;
 export type ReportTag = typeof reportTags.$inferSelect;

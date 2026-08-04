@@ -380,6 +380,7 @@ export async function obtenerReporte(id: string) {
       authorName: users.fullName,
       type: reports.type,
       linkedReportId: reports.linkedReportId,
+      quoteId: reports.quoteId,
       projectName: reports.projectName,
       purchaseOrderNo: reports.purchaseOrderNo,
       quoteNumber: reports.quoteNumber,

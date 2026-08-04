@@ -7,8 +7,10 @@ import { redirect } from "next/navigation";
 
 import { db } from "@/db";
 import { reportTags, reports } from "@/db/schema";
+import { obtenerCotizacionActivaDeEmpresa } from "@/actions/quotes";
 import { puedeAccederAReporte, requireAccesoReportes } from "@/lib/auth-guard";
 import { listarEmpresas } from "@/lib/queries/companies";
+import { obtenerCotizacion } from "@/lib/queries/quotes";
 import {
   obtenerReporte,
   obtenerReporteServicioParaEnlazar,
@@ -25,10 +27,7 @@ export type ReporteState = { error?: string };
 async function leerFormulario(formData: FormData) {
   const t = await getTranslations("validacion");
   return reporteSchema(t).safeParse({
-    projectName: formData.get("projectName"),
-    purchaseOrderNo: formData.get("purchaseOrderNo"),
-    quoteNumber: formData.get("quoteNumber"),
-    clientName: formData.get("clientName"),
+    quoteId: formData.get("quoteId"),
     workDate: formData.get("workDate"),
     serviceType: formData.get("serviceType"),
     details: formData.get("details"),
@@ -115,6 +114,16 @@ export async function crearReporteAction(
     companyId = user.empresaActiva.id;
   }
 
+  // La cotización sostiene proyecto, cliente, orden de compra y número de
+  // cotización: se comprueba que exista, esté activa y sea de esta empresa
+  // antes de copiar nada. Sin esto, un id inventado o el de otra empresa
+  // crearía un reporte con datos que no le corresponden.
+  const { quoteId, ...resto } = parsed.data;
+  const cotizacion = await obtenerCotizacionActivaDeEmpresa(quoteId, companyId);
+  if (!cotizacion) {
+    return { error: tValidacion("eligeCotizacion") };
+  }
+
   const id = crypto.randomUUID();
 
   await db.insert(reports).values({
@@ -122,7 +131,12 @@ export async function crearReporteAction(
     companyId,
     authorId: user.id,
     type: "servicio",
-    ...parsed.data,
+    quoteId: cotizacion.id,
+    projectName: cotizacion.projectName,
+    clientName: cotizacion.clientName,
+    purchaseOrderNo: cotizacion.purchaseOrderNo,
+    quoteNumber: cotizacion.quoteNumber,
+    ...resto,
     status: "en_proceso",
   });
 
@@ -220,6 +234,25 @@ export async function actualizarReporteAction(
     return { error: parsed.error.issues[0]?.message ?? tValidacion("revisaLosDatos") };
   }
 
+  // Cambiar de cotización vuelve a copiar sus datos — es la misma regla que al
+  // crear. La empresa del reporte no se toca aquí, así que la cotización tiene
+  // que ser de la empresa que el reporte ya tiene, no de la que sea.
+  //
+  // Si es la misma cotización que el reporte ya tenía, no se exige que siga
+  // activa: una cotización se cierra cuando el trabajo termina, y justo
+  // entonces es cuando más falta hace poder editar el reporte (por ejemplo,
+  // para completar los detalles). La exigencia de "activa" solo aplica al
+  // elegir una cotización distinta.
+  const { quoteId, ...resto } = parsed.data;
+  const cotizacion =
+    quoteId === reporte.quoteId
+      ? await obtenerCotizacion(quoteId)
+      : await obtenerCotizacionActivaDeEmpresa(quoteId, reporte.companyId);
+
+  if (!cotizacion || cotizacion.companyId !== reporte.companyId) {
+    return { error: tValidacion("eligeCotizacion") };
+  }
+
   // La empresa de un reporte no se cambia al editarlo, solo al crearlo: mover
   // un reporte ya existente entre LLC y SAS es una operación distinta, con
   // sus propias implicaciones, y no algo que deba pasar sin querer al corregir
@@ -227,7 +260,12 @@ export async function actualizarReporteAction(
   await db
     .update(reports)
     .set({
-      ...parsed.data,
+      quoteId: cotizacion.id,
+      projectName: cotizacion.projectName,
+      clientName: cotizacion.clientName,
+      purchaseOrderNo: cotizacion.purchaseOrderNo,
+      quoteNumber: cotizacion.quoteNumber,
+      ...resto,
       updatedAt: new Date(),
       // Deja rastro de quién editó: el admin puede modificar reportes ajenos y
       // el autor tiene que poder ver que alguien más lo tocó.

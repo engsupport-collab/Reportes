@@ -6,6 +6,7 @@ import { useTranslations } from "next-intl";
 import type { ReporteState } from "@/actions/reports";
 import type { Empresa } from "@/lib/queries/companies";
 import { ReportForm } from "./report-form";
+import type { OpcionCotizacionSelector } from "./quote-selector";
 import { ViaticoReportForm, type OpcionReporteEnlazable } from "./viatico-report-form";
 
 type Tipo = "servicio" | "viaticos";
@@ -24,23 +25,25 @@ export function NuevoReporteSelector({
   accionViatico,
   cancelarHref,
   empresas,
+  companyIdFijo,
   valoresServicio,
+  cotizacionesPorEmpresa,
   reportesPorEmpresa,
 }: {
   accionServicio: (estado: ReporteState, formData: FormData) => Promise<ReporteState>;
   accionViatico: (estado: ReporteState, formData: FormData) => Promise<ReporteState>;
   cancelarHref: string;
   empresas?: Empresa[];
+  /** Para un empleado: su empresa activa, ya fija. */
+  companyIdFijo?: string;
   valoresServicio: {
-    projectName: string;
-    purchaseOrderNo: string;
-    quoteNumber: string;
-    clientName: string;
+    quoteId: string;
     workDate: string;
     serviceType: string;
     etiquetas: string[];
     details: string;
   };
+  cotizacionesPorEmpresa: { companyId: string; opciones: OpcionCotizacionSelector[] }[];
   reportesPorEmpresa: { companyId: string; opciones: OpcionReporteEnlazable[] }[];
 }) {
   const [tipo, setTipo] = useState<Tipo>("servicio");
@@ -82,7 +85,9 @@ export function NuevoReporteSelector({
             etiqueta={t("crear")}
             cancelarHref={cancelarHref}
             empresas={empresas}
+            companyIdFijo={companyIdFijo}
             valores={valoresServicio}
+            cotizacionesPorEmpresa={cotizacionesPorEmpresa}
           />
         ) : (
           <ViaticoReportForm
