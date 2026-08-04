@@ -434,7 +434,9 @@
     "verReporte": "View report",
     "editar": "Edit",
     "firmado": "Signed",
-    "sinFirmar": "Unsigned"
+    "sinFirmar": "Unsigned",
+    "crearReporte": "Create report with this quote",
+    "noActivaAviso": "This quote isn't active: set its status to pending authorization or in progress to create reports from it."
   },
   "quoteSelector": {
     "label": "Quote",

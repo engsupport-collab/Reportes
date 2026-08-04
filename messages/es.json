@@ -434,7 +434,9 @@
     "verReporte": "Ver reporte",
     "editar": "Editar",
     "firmado": "Firmado",
-    "sinFirmar": "Sin firmar"
+    "sinFirmar": "Sin firmar",
+    "crearReporte": "Crear reporte con esta cotización",
+    "noActivaAviso": "Esta cotización no está activa: pon el estado en pendiente por autorización o en curso para poder crear reportes desde ella."
   },
   "quoteSelector": {
     "label": "Cotización",

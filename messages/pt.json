@@ -434,7 +434,9 @@
     "verReporte": "Ver relatório",
     "editar": "Editar",
     "firmado": "Assinado",
-    "sinFirmar": "Sem assinatura"
+    "sinFirmar": "Sem assinatura",
+    "crearReporte": "Criar relatório com esta cotação",
+    "noActivaAviso": "Esta cotação não está ativa: mude o status para pendente de autorização ou em andamento para poder criar relatórios a partir dela."
   },
   "quoteSelector": {
     "label": "Cotação",

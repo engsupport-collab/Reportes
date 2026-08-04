@@ -13,6 +13,7 @@ import {
 } from "@/components/admin/quote-actions";
 import { QuoteStatusBadge } from "@/components/admin/quote-status-badge";
 import { requireAdmin } from "@/lib/auth-guard";
+import { esEstadoActivo } from "@/lib/cotizaciones";
 import { formatFechaLarga, formatInstante } from "@/lib/fechas";
 import { formatearMonto } from "@/lib/moneda";
 import { listarReportesDeCotizacion, obtenerCotizacion } from "@/lib/queries/quotes";
@@ -120,7 +121,18 @@ export default async function DetalleCotizacionPage({ params }: Params) {
             >
               {t("editar")}
             </Link>
+            {esEstadoActivo(cotizacion.status) ? (
+              <Link
+                href={`/reportes/nuevo?companyId=${cotizacion.companyId}&quoteId=${id}`}
+                className="rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-strong"
+              >
+                {t("crearReporte")}
+              </Link>
+            ) : null}
           </div>
+          {!esEstadoActivo(cotizacion.status) ? (
+            <p className="mt-3 text-xs text-muted">{t("noActivaAviso")}</p>
+          ) : null}
         </div>
 
         <div className="rounded-2xl border border-border bg-surface p-5 sm:p-6">
