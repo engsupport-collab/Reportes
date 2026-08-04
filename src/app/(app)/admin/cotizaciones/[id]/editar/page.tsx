@@ -40,6 +40,7 @@ export default async function EditarCotizacionPage({ params }: Params) {
             etiqueta={t("guardar")}
             cancelarHref={`/admin/cotizaciones/${id}`}
             empresaFija={cotizacion.companyName}
+            monedaFija={cotizacion.currency}
             valores={{
               quoteNumber: cotizacion.quoteNumber ?? "",
               projectName: cotizacion.projectName,

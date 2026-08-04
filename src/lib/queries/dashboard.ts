@@ -107,8 +107,12 @@ export async function obtenerResumen(
 
   const terminado = eq(reports.status, "terminado");
 
+  // `${reports.id}` sin calificar renderiza como "id" a secas, que dentro de
+  // este subselect resuelve contra attachments.id (su propia clave) en vez
+  // del reports.id de fuera — las dos tablas tienen una columna "id". Con la
+  // tabla calificada a mano no hay ambigüedad posible.
   const sinAdjuntos = sql`(
-    SELECT COUNT(*) FROM attachments WHERE attachments.report_id = ${reports.id}
+    SELECT COUNT(*) FROM attachments WHERE attachments.report_id = reports.id
   ) = 0`;
 
   const [

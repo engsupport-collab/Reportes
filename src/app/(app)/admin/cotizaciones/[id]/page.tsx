@@ -85,7 +85,7 @@ export default async function DetalleCotizacionPage({ params }: Params) {
               }
             />
             {cotizacion.amount !== null ? (
-              <Dato etiqueta={tForm("amount")} valor={formatearMonto(cotizacion.amount)} />
+              <Dato etiqueta={tForm("amount")} valor={formatearMonto(cotizacion.amount, cotizacion.currency)} />
             ) : null}
             <Dato etiqueta={t("creadaPor")} valor={cotizacion.createdByName} />
             <Dato etiqueta={t("creadaEl")} valor={formatInstante(cotizacion.createdAt)} />

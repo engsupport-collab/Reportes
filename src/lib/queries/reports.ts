@@ -26,9 +26,15 @@ import type { ReportStatus } from "@/lib/roles";
  * adjuntos fila por fila— y el índice `attachments_report_idx` la resuelve de
  * inmediato.
  */
+// `${reports.id}` sin calificar renderiza como "id" a secas, que dentro de
+// este subselect resuelve contra attachments.id (su propia clave) en vez del
+// reports.id de fuera — las dos tablas tienen una columna "id", así que
+// SQLite toma la del alcance más cercano. El resultado era un conteo igual
+// en todas las filas: el total de adjuntos de todo el sistema, no los de
+// cada reporte. Con la tabla calificada a mano no hay ambigüedad posible.
 const conteoAdjuntos = sql<number>`(
   SELECT COUNT(*) FROM ${attachments}
-  WHERE ${attachments.reportId} = ${reports.id}
+  WHERE ${attachments.reportId} = reports.id
 )`;
 
 /**
@@ -73,7 +79,7 @@ function csvAEtiquetas(csv: string | null): string[] {
 const esIncompleto = sql`(
   ${reports.type} = 'servicio'
   AND ${reports.status} = 'terminado'
-  AND (SELECT COUNT(*) FROM ${attachments} WHERE ${attachments.reportId} = ${reports.id}) = 0
+  AND (SELECT COUNT(*) FROM ${attachments} WHERE ${attachments.reportId} = reports.id) = 0
 )`;
 
 /**
@@ -376,6 +382,7 @@ export async function obtenerReporte(id: string) {
       id: reports.id,
       companyId: reports.companyId,
       companyName: companies.name,
+      currency: companies.currency,
       authorId: reports.authorId,
       authorName: users.fullName,
       type: reports.type,
@@ -484,9 +491,15 @@ export async function listarViaticosEnlazadosA(
       id: reports.id,
       status: reports.status,
       createdAt: reports.createdAt,
+      // `${reports.id}` sin calificar quedaba como "id" a secas: dentro del
+      // subselect eso resuelve contra report_viaticos.id (su propia clave),
+      // no contra el reports.id de fuera — las dos tablas tienen una columna
+      // "id", así que SQLite la toma del alcance más cercano. El total daba
+      // siempre 0 porque comparaba el id de cada gasto con su propio
+      // report_id. Con la tabla calificada a mano no hay ambigüedad posible.
       totalGastos: sql<number>`(
         SELECT COALESCE(SUM(amount), 0) FROM report_viaticos
-        WHERE report_viaticos.report_id = ${reports.id}
+        WHERE report_viaticos.report_id = reports.id
       )`,
     })
     .from(reports)

@@ -66,6 +66,7 @@ export async function obtenerViaticoConDueno(id: string) {
       sizeBytes: reportViaticos.sizeBytes,
       authorId: reports.authorId,
       companyId: reports.companyId,
+      linkedReportId: reports.linkedReportId,
     })
     .from(reportViaticos)
     .innerJoin(reports, eq(reports.id, reportViaticos.reportId))

@@ -7,6 +7,7 @@ import type { ViaticoState } from "@/actions/viaticos";
 import { EXTENSIONES_PERMITIDAS, validarArchivo } from "@/lib/archivos";
 import { prepararArchivo } from "@/lib/imagen-cliente";
 import { aValorInput } from "@/lib/fechas";
+import type { Moneda } from "@/lib/moneda";
 
 /**
  * Agregar un gasto: concepto, monto y fecha propios, más su foto de respaldo.
@@ -18,8 +19,11 @@ import { aValorInput } from "@/lib/fechas";
  */
 export function ViaticoUploader({
   action,
+  moneda,
 }: {
   action: (estado: ViaticoState, formData: FormData) => Promise<ViaticoState>;
+  /** La de la empresa del reporte: LLC cobra en dólares y SAS en pesos. */
+  moneda: Moneda;
 }) {
   const [estado, setEstado] = useState<ViaticoState>({});
   const [procesando, setProcesando] = useState(false);
@@ -164,7 +168,7 @@ export function ViaticoUploader({
             step="1"
             inputMode="numeric"
             disabled={ocupado}
-            placeholder="COP"
+            placeholder={moneda}
             className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text placeholder:text-muted focus:border-brand focus:outline-none"
           />
         </div>

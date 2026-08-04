@@ -5,7 +5,7 @@ import { useTranslations } from "next-intl";
 
 import { esImagen, formatearTamano } from "@/lib/archivos";
 import { formatFechaLarga } from "@/lib/fechas";
-import { formatearMonto } from "@/lib/moneda";
+import { formatearMonto, type Moneda } from "@/lib/moneda";
 import type { ViaticoEnLista } from "@/lib/queries/viaticos";
 
 function IconoArchivo({ mimeType }: { mimeType: string }) {
@@ -46,9 +46,11 @@ function BotonBorrar({
 
 export function ViaticoList({
   viaticos,
+  moneda,
   onEliminar,
 }: {
   viaticos: ViaticoEnLista[];
+  moneda: Moneda;
   onEliminar: (id: string) => void | Promise<void>;
 }) {
   const t = useTranslations("viaticosForm");
@@ -85,7 +87,7 @@ export function ViaticoList({
             </p>
             <p className="text-xs text-muted">
               {v.fechaGasto ? `${formatFechaLarga(v.fechaGasto)} · ` : ""}
-              {v.amount !== null ? formatearMonto(v.amount) : t("sinMonto")}
+              {v.amount !== null ? formatearMonto(v.amount, moneda) : t("sinMonto")}
             </p>
             <a
               href={`/api/viaticos/${v.id}`}

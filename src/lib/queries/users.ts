@@ -79,7 +79,11 @@ export async function existeUsername(username: string): Promise<boolean> {
 
 export async function todasLasEmpresas() {
   return db
-    .select({ id: companies.id, name: companies.name })
+    .select({
+      id: companies.id,
+      name: companies.name,
+      currency: companies.currency,
+    })
     .from(companies)
     .orderBy(asc(companies.name));
 }

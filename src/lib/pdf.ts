@@ -422,7 +422,7 @@ export async function generarReporteViaticoPdf(
   );
 
   let y2 = inicioFilas;
-  y2 = agregarLista(portada, font, columna2, y2, "TOTAL", formatearMonto(total));
+  y2 = agregarLista(portada, font, columna2, y2, "TOTAL", formatearMonto(total, reporte.currency));
   y2 = agregarLista(portada, font, columna2, y2, "CREADO POR", reporte.authorName);
   y2 = agregarLista(
     portada,
@@ -441,7 +441,7 @@ export async function generarReporteViaticoPdf(
   for (const g of gastos) {
     if (y < MARGEN + 40) break;
     const linea = `${g.concepto ?? "Sin concepto"} — ${
-      g.amount !== null ? formatearMonto(g.amount) : "Sin monto"
+      g.amount !== null ? formatearMonto(g.amount, reporte.currency) : "Sin monto"
     }${g.fechaGasto ? ` — ${formatFechaLarga(g.fechaGasto)}` : ""}`;
     portada.drawText(`• ${linea}`, {
       x: MARGEN,

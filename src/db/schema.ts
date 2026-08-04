@@ -11,6 +11,7 @@ import {
 import { ESTADOS_COTIZACION } from "@/lib/cotizaciones";
 import { TIPOS_SERVICIO_IDS } from "@/lib/etiquetas";
 import { IDIOMAS } from "@/lib/idiomas";
+import { MONEDAS } from "@/lib/moneda";
 import { REPORT_STATUSES, USER_ROLES } from "@/lib/roles";
 
 export { REPORT_STATUSES, USER_ROLES };
@@ -36,6 +37,13 @@ export const companies = sqliteTable("companies", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
   isActive: integer("is_active", { mode: "boolean" }).notNull().default(true),
+  /**
+   * Moneda en la que esta empresa cotiza y cobra — determina cómo se
+   * formatea cada monto de sus cotizaciones y viáticos (agrupamiento de
+   * miles, decimales). LLC ("corp") factura en dólares; SAS, en pesos
+   * colombianos, que por eso queda como valor por defecto.
+   */
+  currency: text("currency", { enum: MONEDAS }).notNull().default("COP"),
   createdAt: integer("created_at", { mode: "timestamp_ms" })
     .notNull()
     .default(sql`(unixepoch() * 1000)`),

@@ -24,6 +24,18 @@ export type ViaticoState = { error?: string; ok?: string };
 /** Igual que el máximo de adjuntos: acota cuántas filas puede crear una sola petición. */
 const MAX_VIATICOS_POR_REPORTE = 30;
 
+/**
+ * Agregar o borrar un gasto cambia el total que se ve en dos sitios: el
+ * propio reporte de viáticos, y la sección "Reportes de viáticos" del
+ * reporte de servicio que enlaza — sin revalidar ese segundo también, se
+ * queda mostrando el total de antes de este gasto hasta que algo más
+ * refresque esa página.
+ */
+function revalidarViatico(reportId: string, linkedReportId: string | null) {
+  revalidatePath(`/reportes/${reportId}`);
+  if (linkedReportId) revalidatePath(`/reportes/${linkedReportId}`);
+}
+
 export async function agregarViaticoAction(
   reportId: string,
   _prevState: ViaticoState,
@@ -110,7 +122,7 @@ export async function agregarViaticoAction(
     amount,
   });
 
-  revalidatePath(`/reportes/${reportId}`);
+  revalidarViatico(reportId, reporte.linkedReportId);
 
   return { ok: t("gastoAgregado") };
 }
@@ -126,5 +138,5 @@ export async function eliminarViaticoAction(id: string) {
   await borrarArchivo(viatico.blobUrl);
   if (viatico.thumbnailUrl) await borrarArchivo(viatico.thumbnailUrl);
 
-  revalidatePath(`/reportes/${viatico.reportId}`);
+  revalidarViatico(viatico.reportId, viatico.linkedReportId);
 }

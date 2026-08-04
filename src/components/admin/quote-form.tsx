@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { useTranslations } from "next-intl";
 
 import type { CotizacionState } from "@/actions/quotes";
+import type { Moneda } from "@/lib/moneda";
 import type { Empresa } from "@/lib/queries/companies";
 
 type Valores = {
@@ -50,6 +51,7 @@ export function QuoteForm({
   cancelarHref,
   empresas,
   empresaFija,
+  monedaFija,
 }: {
   action: (estado: CotizacionState, formData: FormData) => Promise<CotizacionState>;
   valores?: Valores;
@@ -59,12 +61,22 @@ export function QuoteForm({
   empresas?: Empresa[];
   /** Solo al editar: la empresa ya fijada, de solo lectura. */
   empresaFija?: string;
+  /** Solo al editar: la moneda de esa empresa fija. */
+  monedaFija?: Moneda;
 }) {
   const [state, formAction] = useActionState<CotizacionState, FormData>(
     action,
     {},
   );
   const t = useTranslations("cotizacionForm");
+
+  // La empresa se sube a estado (a diferencia del resto del formulario, no
+  // controlado) solo para saber en qué moneda se está cotizando: LLC factura
+  // en dólares y SAS en pesos, y escribir la cifra sin saber cuál de las dos
+  // es lo que hace que el monto acabe mal.
+  const [companyId, setCompanyId] = useState(empresas?.[0]?.id ?? "");
+  const moneda =
+    monedaFija ?? empresas?.find((e) => e.id === companyId)?.currency ?? "COP";
 
   return (
     <form action={formAction} className="space-y-5">
@@ -85,6 +97,8 @@ export function QuoteForm({
                     name="companyId"
                     value={e.id}
                     required
+                    checked={companyId === e.id}
+                    onChange={() => setCompanyId(e.id)}
                     className="sr-only"
                   />
                   {e.name}
@@ -202,7 +216,7 @@ export function QuoteForm({
             step="1"
             inputMode="numeric"
             defaultValue={valores?.amount}
-            placeholder="COP"
+            placeholder={moneda}
             className={CAMPO}
           />
         </div>

@@ -120,7 +120,7 @@ async function DetalleViatico({
         <dl className="mt-6 grid gap-5 sm:grid-cols-2">
           <Dato etiqueta={t("creadoPor")} valor={reporte.authorName} />
           <Dato etiqueta={t("creadoEl")} valor={formatInstante(reporte.createdAt)} />
-          <Dato etiqueta={t("totalGastos")} valor={formatearMonto(total)} />
+          <Dato etiqueta={t("totalGastos")} valor={formatearMonto(total, reporte.currency)} />
         </dl>
       </div>
 
@@ -131,8 +131,15 @@ async function DetalleViatico({
         </div>
 
         <div className="space-y-4">
-          <ViaticoList viaticos={gastos} onEliminar={eliminarViaticoAction} />
-          <ViaticoUploader action={agregarViaticoAction.bind(null, reporte.id)} />
+          <ViaticoList
+            viaticos={gastos}
+            moneda={reporte.currency}
+            onEliminar={eliminarViaticoAction}
+          />
+          <ViaticoUploader
+            action={agregarViaticoAction.bind(null, reporte.id)}
+            moneda={reporte.currency}
+          />
         </div>
       </div>
 
@@ -349,7 +356,7 @@ export default async function DetalleReportePage({ params }: Params) {
                       {formatInstante(v.createdAt)}
                     </span>
                     <span className="font-medium text-text">
-                      {formatearMonto(v.totalGastos)}
+                      {formatearMonto(v.totalGastos, reporte.currency)}
                     </span>
                   </Link>
                 </li>

@@ -136,7 +136,11 @@ export async function estadoDocumental(
   );
   const terminado = eq(reports.status, "terminado");
 
-  const conAdjunto = sql`EXISTS (SELECT 1 FROM ${attachments} WHERE ${attachments.reportId} = ${reports.id})`;
+  // `${reports.id}` sin calificar renderiza como "id" a secas, que dentro de
+  // este subselect resuelve contra attachments.id (su propia clave) en vez
+  // del reports.id de fuera — las dos tablas tienen una columna "id". Con la
+  // tabla calificada a mano no hay ambigüedad posible.
+  const conAdjunto = sql`EXISTS (SELECT 1 FROM ${attachments} WHERE ${attachments.reportId} = reports.id)`;
 
   const contar = async (condicion: ReturnType<typeof and>): Promise<number> => {
     const [fila] = await db
@@ -248,7 +252,7 @@ export async function obtenerAnaliticas(
         and(
           deLaEmpresa,
           eq(reports.status, "terminado"),
-          sql`NOT EXISTS (SELECT 1 FROM ${attachments} WHERE ${attachments.reportId} = ${reports.id})`,
+          sql`NOT EXISTS (SELECT 1 FROM ${attachments} WHERE ${attachments.reportId} = reports.id)`,
         ),
       ),
   ]);

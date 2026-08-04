@@ -4,13 +4,18 @@ import { and, asc, eq } from "drizzle-orm";
 
 import { db } from "@/db";
 import { companies, userCompanies } from "@/db/schema";
+import type { Moneda } from "@/lib/moneda";
 
-export type Empresa = { id: string; name: string };
+export type Empresa = { id: string; name: string; currency: Moneda };
 
 /** Empresas activas a las que este usuario puede entrar. */
 export async function empresasDelUsuario(userId: string): Promise<Empresa[]> {
   return db
-    .select({ id: companies.id, name: companies.name })
+    .select({
+      id: companies.id,
+      name: companies.name,
+      currency: companies.currency,
+    })
     .from(userCompanies)
     .innerJoin(companies, eq(companies.id, userCompanies.companyId))
     .where(
@@ -48,7 +53,11 @@ export async function puedeEntrarAEmpresa(
 
 export async function listarEmpresas(): Promise<Empresa[]> {
   return db
-    .select({ id: companies.id, name: companies.name })
+    .select({
+      id: companies.id,
+      name: companies.name,
+      currency: companies.currency,
+    })
     .from(companies)
     .where(eq(companies.isActive, true))
     .orderBy(asc(companies.name));

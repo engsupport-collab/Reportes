@@ -5,6 +5,7 @@ import { and, desc, eq, like, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { companies, quotes, reports, users } from "@/db/schema";
 import { ESTADOS_ACTIVOS, type EstadoCotizacion } from "@/lib/cotizaciones";
+import type { Moneda } from "@/lib/moneda";
 
 /**
  * Consultas de cotizaciones.
@@ -56,6 +57,7 @@ export type CotizacionEnLista = {
   id: string;
   companyId: string;
   companyName: string;
+  currency: Moneda;
   quoteNumber: string | null;
   projectName: string;
   clientName: string;
@@ -112,6 +114,7 @@ export async function listarCotizaciones(filtros: FiltrosCotizaciones): Promise<
         id: quotes.id,
         companyId: quotes.companyId,
         companyName: companies.name,
+        currency: companies.currency,
         quoteNumber: quotes.quoteNumber,
         projectName: quotes.projectName,
         clientName: quotes.clientName,
@@ -167,6 +170,7 @@ export async function obtenerCotizacion(
       id: quotes.id,
       companyId: quotes.companyId,
       companyName: companies.name,
+      currency: companies.currency,
       quoteNumber: quotes.quoteNumber,
       projectName: quotes.projectName,
       clientName: quotes.clientName,
