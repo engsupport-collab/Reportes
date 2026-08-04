@@ -10,7 +10,10 @@ import { quotes, reports } from "@/db/schema";
 import { requireAccesoReportes, requireAdmin } from "@/lib/auth-guard";
 import { esEstadoActivo } from "@/lib/cotizaciones";
 import { listarEmpresas } from "@/lib/queries/companies";
-import { obtenerCotizacion } from "@/lib/queries/quotes";
+import {
+  insertarCotizacionConNumeroAutomatico,
+  obtenerCotizacion,
+} from "@/lib/queries/quotes";
 import {
   cotizacionCampoSchema,
   cotizacionSchema,
@@ -68,18 +71,49 @@ export async function crearCotizacionAction(
 
   // El estado lo elige el admin al crear, con "en curso" ya preseleccionado:
   // si él la registra, es la autoridad y no hay a quién pedirle permiso. Un
-  // valor que no sea de la lista se ignora y cae en el default del esquema.
+  // valor que no sea de la lista se ignora y cae en "en curso".
   const estado = estadoCotizacionSchema.safeParse(formData.get("status"));
+  const status = estado.success ? estado.data : "en_curso";
 
   const id = crypto.randomUUID();
 
-  await db.insert(quotes).values({
-    id,
-    companyId: empresa.id,
-    createdBy: user.id,
-    ...(estado.success ? { status: estado.data } : {}),
-    ...parsed.data,
-  });
+  // El campo de número ya llega con una sugerencia escrita (ver
+  // src/lib/queries/quotes.ts, siguienteNumeroCotizacionSugerido), para que
+  // el admin no tenga que digitarla. Si la dejó tal cual, ese valor puede
+  // haber quedado obsoleto para cuando por fin envía el formulario — otro
+  // admin pudo crear una cotización mientras tanto — así que se ignora y el
+  // número de verdad se asigna al guardar, de forma atómica. Si en cambio
+  // escribió otra cosa a propósito, esa elección se respeta tal cual.
+  const quoteNumberEnviado = String(formData.get("quoteNumber") ?? "").trim();
+  const quoteNumberSugerido = String(
+    formData.get("quoteNumberSugerido") ?? "",
+  ).trim();
+  const usarNumeroAutomatico =
+    quoteNumberSugerido.length > 0 && quoteNumberEnviado === quoteNumberSugerido;
+
+  if (usarNumeroAutomatico) {
+    await insertarCotizacionConNumeroAutomatico({
+      id,
+      companyId: empresa.id,
+      createdBy: user.id,
+      status,
+      projectName: parsed.data.projectName,
+      clientName: parsed.data.clientName,
+      purchaseOrderNo: parsed.data.purchaseOrderNo,
+      dueDate: parsed.data.dueDate ? parsed.data.dueDate.getTime() : null,
+      description: parsed.data.description,
+      amount: parsed.data.amount,
+      revisada: true,
+    });
+  } else {
+    await db.insert(quotes).values({
+      id,
+      companyId: empresa.id,
+      createdBy: user.id,
+      status,
+      ...parsed.data,
+    });
+  }
 
   revalidarListas();
   redirect(`/admin/cotizaciones/${id}`);
@@ -221,12 +255,21 @@ export async function crearCotizacionCampoAction(
 
   const id = crypto.randomUUID();
 
-  await db.insert(quotes).values({
+  // Aquí no hay número visible que sugerir — a diferencia del alta del
+  // admin, este formulario no lo pide. Se asigna siempre con el generador
+  // atómico, sin ninguna comparación previa.
+  await insertarCotizacionConNumeroAutomatico({
     id,
     companyId,
     createdBy: user.id,
+    status: "en_curso",
+    projectName: parsed.data.projectName,
+    clientName: parsed.data.clientName,
+    purchaseOrderNo: null,
+    dueDate: null,
+    description: null,
+    amount: null,
     revisada: false,
-    ...parsed.data,
   });
 
   revalidatePath("/reportes/nuevo");

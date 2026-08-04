@@ -53,6 +53,7 @@ export function QuoteForm({
   empresas,
   empresaFija,
   monedaFija,
+  numeroSugerido,
 }: {
   action: (estado: CotizacionState, formData: FormData) => Promise<CotizacionState>;
   valores?: Valores;
@@ -64,6 +65,12 @@ export function QuoteForm({
   empresaFija?: string;
   /** Solo al editar: la moneda de esa empresa fija. */
   monedaFija?: Moneda;
+  /**
+   * Solo al crear: el siguiente número calculado para mostrarlo ya escrito.
+   * No es la asignación real — es una sugerencia; ver crearCotizacionAction,
+   * que decide si usarla o generar el número de verdad al guardar.
+   */
+  numeroSugerido?: string;
 }) {
   const [state, formAction] = useActionState<CotizacionState, FormData>(
     action,
@@ -190,10 +197,17 @@ export function QuoteForm({
             id="quoteNumber"
             name="quoteNumber"
             maxLength={60}
-            defaultValue={valores?.quoteNumber}
+            defaultValue={valores?.quoteNumber ?? numeroSugerido}
             className={CAMPO}
             placeholder={t("placeholderQuoteNumber")}
           />
+          {/* Compara contra esto al guardar: si el admin no tocó el campo,
+              el valor sigue siendo idéntico a esta sugerencia, y el servidor
+              la descarta para generar el número de verdad de forma atómica
+              en vez de confiar en un valor que pudo quedar obsoleto. */}
+          {numeroSugerido ? (
+            <input type="hidden" name="quoteNumberSugerido" value={numeroSugerido} />
+          ) : null}
         </div>
 
         <div className="space-y-1.5">

@@ -203,6 +203,84 @@ export type ReporteDeCotizacion = {
 };
 
 /**
+ * Prefijo del año en curso para el número de cotización, p. ej. "Q2026_". El
+ * consecutivo reinicia solo con que cambie el año, sin ningún paso manual.
+ */
+function prefijoNumeroCotizacion(): string {
+  return `Q${new Date().getFullYear()}_`;
+}
+
+/**
+ * Siguiente número de cotización, SOLO para mostrarlo en el formulario antes
+ * de guardar. No es atómico — es una lectura suelta, y puede quedar obsoleta
+ * si otro admin crea una cotización mientras el formulario sigue abierto. La
+ * asignación real, la que sí tiene que ser segura, ocurre en
+ * `insertarCotizacionConNumeroAutomatico`, en el momento de guardar.
+ */
+export async function siguienteNumeroCotizacionSugerido(): Promise<string> {
+  const prefijo = prefijoNumeroCotizacion();
+
+  const [fila] = await db
+    .select({ maximo: sql<string | null>`MAX(${quotes.quoteNumber})` })
+    .from(quotes)
+    .where(like(quotes.quoteNumber, `${prefijo}%`));
+
+  const ultimo = fila?.maximo ? Number(fila.maximo.slice(prefijo.length)) : 0;
+  const siguiente = (Number.isFinite(ultimo) ? ultimo : 0) + 1;
+
+  return `${prefijo}${String(siguiente).padStart(3, "0")}`;
+}
+
+/**
+ * Inserta una cotización asignándole el siguiente número del año de forma
+ * atómica: el cálculo del consecutivo y la inserción ocurren en una sola
+ * sentencia SQL (un `INSERT ... SELECT` con `MAX` sobre la propia tabla), así
+ * que dos cotizaciones creadas al mismo tiempo no pueden recibir el mismo
+ * número — a diferencia de `siguienteNumeroCotizacionSugerido`, que solo lee.
+ *
+ * `substr(quote_number, N)` usa índice 1: con el prefijo "Q2026_" (6
+ * caracteres), el primer dígito del consecutivo empieza en la posición 7.
+ */
+export async function insertarCotizacionConNumeroAutomatico(valores: {
+  id: string;
+  companyId: string;
+  createdBy: string;
+  status: EstadoCotizacion;
+  projectName: string;
+  clientName: string;
+  purchaseOrderNo: string | null;
+  dueDate: number | null;
+  description: string | null;
+  amount: number | null;
+  revisada: boolean;
+}): Promise<void> {
+  const prefijo = prefijoNumeroCotizacion();
+  const inicioConsecutivo = prefijo.length + 1;
+
+  await db.run(sql`
+    INSERT INTO ${quotes} (
+      id, company_id, quote_number, project_name, client_name, status,
+      purchase_order_no, due_date, description, amount, revisada, created_by
+    )
+    SELECT
+      ${valores.id},
+      ${valores.companyId},
+      ${prefijo} || printf('%03d', COALESCE(MAX(CAST(substr(quote_number, ${inicioConsecutivo}) AS INTEGER)), 0) + 1),
+      ${valores.projectName},
+      ${valores.clientName},
+      ${valores.status},
+      ${valores.purchaseOrderNo},
+      ${valores.dueDate},
+      ${valores.description},
+      ${valores.amount},
+      ${valores.revisada ? 1 : 0},
+      ${valores.createdBy}
+    FROM ${quotes}
+    WHERE quote_number LIKE ${`${prefijo}%`}
+  `);
+}
+
+/**
  * Reportes creados desde una cotización, para mostrarlos en su detalle y para
  * saber a cuáles alcanza la propagación al marcar la cotización como revisada
  * (los que no tengan firma).

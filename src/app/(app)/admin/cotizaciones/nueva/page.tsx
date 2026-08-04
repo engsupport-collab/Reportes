@@ -4,10 +4,14 @@ import { crearCotizacionAction } from "@/actions/quotes";
 import { AppShell } from "@/components/app-shell";
 import { QuoteForm } from "@/components/admin/quote-form";
 import { requireAdmin } from "@/lib/auth-guard";
+import { siguienteNumeroCotizacionSugerido } from "@/lib/queries/quotes";
 
 export default async function NuevaCotizacionPage() {
-  const user = await requireAdmin();
-  const t = await getTranslations("cotizacionForm");
+  const [user, t, numeroSugerido] = await Promise.all([
+    requireAdmin(),
+    getTranslations("cotizacionForm"),
+    siguienteNumeroCotizacionSugerido(),
+  ]);
 
   return (
     <AppShell user={user}>
@@ -22,6 +26,7 @@ export default async function NuevaCotizacionPage() {
             etiqueta={t("crear")}
             cancelarHref="/admin/cotizaciones"
             empresas={user.empresas}
+            numeroSugerido={numeroSugerido}
           />
         </div>
       </div>
