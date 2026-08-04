@@ -240,7 +240,13 @@ export function TopBar({
                 {user.fullName}
               </span>
               <span className="block text-xs leading-tight text-muted">
-                {user.role === "admin" ? t("nav.administrador") : t("nav.empleado")}
+                {t(
+                  user.role === "admin"
+                    ? "nav.administrador"
+                    : user.role === "contable"
+                      ? "nav.contable"
+                      : "nav.empleado",
+                )}
               </span>
             </span>
             <span

@@ -12,7 +12,8 @@
     "cerrarMenu": "Close menu",
     "abrirMenu": "Open menu",
     "administrador": "Admin",
-    "empleado": "Employee"
+    "empleado": "Employee",
+    "contable": "Accountant"
   },
   "buscador": {
     "placeholder": "Search reports or go to a section…",

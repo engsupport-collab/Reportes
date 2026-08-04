@@ -1,6 +1,10 @@
 import { SignJWT, jwtVerify } from "jose";
 
-import type { UserRole } from "./roles";
+import { USER_ROLES, type UserRole } from "./roles";
+
+function esUserRole(valor: unknown): valor is UserRole {
+  return (USER_ROLES as readonly unknown[]).includes(valor);
+}
 
 /**
  * Firma y verificación del token de sesión.
@@ -89,7 +93,7 @@ export async function verifySession(
       typeof payload.sub !== "string" ||
       typeof payload.username !== "string" ||
       typeof payload.name !== "string" ||
-      (payload.role !== "admin" && payload.role !== "empleado")
+      !esUserRole(payload.role)
     ) {
       return null;
     }

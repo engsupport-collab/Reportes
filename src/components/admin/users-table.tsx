@@ -141,7 +141,7 @@ export function UsersTable({
                   {esUnoMismo ? <span className="ml-2 text-xs font-normal text-muted">{t("tu")}</span> : null}
                 </p>
                 <p className="text-xs text-muted">
-                  {u.username} · {u.role === "admin" ? tNav("administrador") : tNav("empleado")}
+                  {u.username} · {tNav(u.role === "admin" ? "administrador" : u.role === "contable" ? "contable" : "empleado")}
                   {!u.isActive ? ` · ${t("desactivado")}` : ""}
                 </p>
               </div>
@@ -155,8 +155,9 @@ export function UsersTable({
             {/* Un admin no depende de user_companies para nada: ve las dos
                 empresas siempre, por definición del rol. Mostrarle
                 interruptores de acceso sugeriría que algo cambia al tocarlos,
-                y no es así. */}
-            {u.role === "empleado" ? (
+                y no es así. Un contable sí depende de user_companies, igual
+                que un empleado — mismos permisos por ahora. */}
+            {u.role !== "admin" ? (
               <div className="mt-3 flex flex-wrap items-center gap-2">
                 <span className="text-xs font-medium uppercase tracking-wide text-muted">
                   {t("accesoA")}

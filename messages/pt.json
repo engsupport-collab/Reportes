@@ -12,7 +12,8 @@
     "cerrarMenu": "Fechar menu",
     "abrirMenu": "Abrir menu",
     "administrador": "Administrador",
-    "empleado": "Funcionário"
+    "empleado": "Funcionário",
+    "contable": "Contador"
   },
   "buscador": {
     "placeholder": "Buscar relatórios ou ir a uma seção…",

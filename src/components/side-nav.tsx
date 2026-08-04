@@ -126,7 +126,9 @@ function MenuCuenta({
   const t = useTranslations("nav");
   const [abierto, setAbierto] = useState(false);
   const inicial = user.fullName.trim().charAt(0).toUpperCase();
-  const rol = user.role === "admin" ? t("administrador") : t("empleado");
+  const rol = t(
+    user.role === "admin" ? "administrador" : user.role === "contable" ? "contable" : "empleado",
+  );
 
   return (
     <div className="relative">

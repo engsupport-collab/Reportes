@@ -37,7 +37,7 @@ export function CrearUsuarioForm({ empresas }: { empresas: Empresa[] }) {
     {},
   );
   const [copiado, setCopiado] = useState(false);
-  const [role, setRole] = useState<"empleado" | "admin">("empleado");
+  const [role, setRole] = useState<"empleado" | "admin" | "contable">("empleado");
 
   if (state.credenciales) {
     return (
@@ -121,6 +121,16 @@ export function CrearUsuarioForm({ empresas }: { empresas: Empresa[] }) {
             <input
               type="radio"
               name="role"
+              value="contable"
+              className="accent-brand"
+              onChange={() => setRole("contable")}
+            />
+            {tNav("contable")}
+          </label>
+          <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-border px-4 py-2.5 text-sm text-text transition hover:bg-surface-muted has-checked:border-brand has-checked:bg-brand-soft has-checked:font-semibold has-checked:text-brand">
+            <input
+              type="radio"
+              name="role"
               value="admin"
               className="accent-brand"
               onChange={() => setRole("admin")}
@@ -130,10 +140,13 @@ export function CrearUsuarioForm({ empresas }: { empresas: Empresa[] }) {
         </div>
       </fieldset>
 
-      {/* Solo aplica a un empleado: el admin ve las dos empresas siempre, por
-          definición del rol, y no depende de esto para nada. Se oculta en vez
-          de deshabilitarse para no dejar un bloque muerto en la pantalla. */}
-      {role === "empleado" ? (
+      {/* Aplica a empleado y a contable: los dos necesitan empresa asignada
+          porque hoy tienen los mismos permisos (implementación temporal — ver
+          USER_ROLES en src/lib/roles.ts). Solo el admin ve las dos empresas
+          siempre, por definición del rol, y no depende de esto para nada. Se
+          oculta en vez de deshabilitarse para no dejar un bloque muerto en la
+          pantalla. */}
+      {role !== "admin" ? (
         <fieldset className="space-y-2">
           <legend className="mb-1 text-sm font-medium text-text">
             {t("empresasAcceso")}

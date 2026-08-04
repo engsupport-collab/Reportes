@@ -325,11 +325,14 @@ export function crearUsuarioSchema(t: T) {
       companyIds: z.array(z.string()).default([]),
     })
     .refine(
-      // Al menos una empresa, pero solo para un empleado: sin ninguna, no
-      // podría entrar nunca — quedaría creado pero inservible. El admin no
-      // depende de esto para nada: ve las dos empresas siempre, por definición
-      // del rol, así que exigirle elegir sería pedirle algo que no usa.
-      (data) => data.role !== "empleado" || data.companyIds.length > 0,
+      // Al menos una empresa, para cualquiera que no sea admin: sin ninguna,
+      // no podría entrar nunca — quedaría creado pero inservible. Un contable
+      // hoy tiene los mismos permisos que un empleado (implementación
+      // temporal, ver USER_ROLES en src/lib/roles.ts) y depende igual de
+      // user_companies. El admin no depende de esto para nada: ve las dos
+      // empresas siempre, por definición del rol, así que exigirle elegir
+      // sería pedirle algo que no usa.
+      (data) => data.role === "admin" || data.companyIds.length > 0,
       { message: t("seleccionaEmpresa"), path: ["companyIds"] },
     );
 }

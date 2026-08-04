@@ -4,12 +4,13 @@ import { asc, eq } from "drizzle-orm";
 
 import { db } from "@/db";
 import { companies, userCompanies, users } from "@/db/schema";
+import type { UserRole } from "@/lib/roles";
 
 export type UsuarioConAccesos = {
   id: string;
   username: string;
   fullName: string;
-  role: "admin" | "empleado";
+  role: UserRole;
   isActive: boolean;
   empresas: string[];
 };

@@ -47,7 +47,7 @@ export async function crearUsuarioAction(
   // siempre y no depende de user_companies.
   const validas = new Set((await todasLasEmpresas()).map((e) => e.id));
   const companyIds = parsed.data.companyIds.filter((id) => validas.has(id));
-  if (parsed.data.role === "empleado" && companyIds.length === 0) {
+  if (parsed.data.role !== "admin" && companyIds.length === 0) {
     return { error: t("seleccionaEmpresaValida") };
   }
 

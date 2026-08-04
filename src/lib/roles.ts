@@ -7,7 +7,14 @@
  * encarecería todas las peticiones. Ver PLAN.md, sección 7.1.
  */
 
-export const USER_ROLES = ["admin", "empleado"] as const;
+/**
+ * "contable" nace con exactamente los mismos permisos que "empleado" — es una
+ * implementación temporal. Más adelante tendrá su propia capa de permisos
+ * (acceso solo a lo financiero y a viáticos); hasta entonces, cualquier
+ * comprobación de acceso debe tratarlo como empleado, nunca excluirlo por
+ * comparar contra `"empleado"` en positivo. Ver auth-guard.ts.
+ */
+export const USER_ROLES = ["admin", "empleado", "contable"] as const;
 export type UserRole = (typeof USER_ROLES)[number];
 
 export const REPORT_STATUSES = ["en_proceso", "terminado"] as const;

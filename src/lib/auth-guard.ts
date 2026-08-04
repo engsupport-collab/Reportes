@@ -51,17 +51,25 @@ export type CurrentUser = {
  * Usuario ya autorizado a operar sobre reportes, con la ambigüedad de la
  * empresa resuelta según el rol.
  *
- * Es una unión discriminada por `role` a propósito: en la rama "empleado",
+ * Es una unión discriminada por `role` a propósito: en la rama no-admin,
  * `empresaActiva` es `Empresa` (nunca null), así que el compilador lo exige en
  * cada sitio donde antes había que confiar en que "ya se comprobó antes". En
  * la rama "admin", sigue siendo `Empresa | null` porque no aplica — quien use
  * este tipo tiene que decidir explícitamente qué hacer en cada caso, en vez de
  * asumir un valor que para el admin nunca está.
+ *
+ * La rama no-admin conserva el rol real (`"empleado"` o `"contable"`), no lo
+ * fuerza a `"empleado"`: `requireAccesoReportes` solo usa esto para exigir
+ * empresa elegida, y ese requisito aplica a los dos por igual porque hoy
+ * tienen los mismos permisos (implementación temporal). Pero el valor de
+ * `role` también llega hasta la interfaz (la etiqueta del rol en la barra
+ * superior y el menú de cuenta), y ahí sí importa que diga la verdad — un
+ * contable no debe verse a sí mismo etiquetado como "Empleado".
  */
 export type UserConAcceso =
   | (Omit<CurrentUser, "role"> & { role: "admin" })
-  | (Omit<CurrentUser, "role" | "empresaActiva"> & {
-      role: "empleado";
+  | (Omit<CurrentUser, "empresaActiva"> & {
+      role: Exclude<UserRole, "admin">;
       empresaActiva: Empresa;
     });
 
@@ -179,9 +187,14 @@ export async function requireUser(): Promise<CurrentUser> {
  * Es lo que usan las páginas y acciones de reportes, adjuntos y firma —
  * compartidas entre las dos vistas. `redirect()` no retorna (su tipo es
  * `never`), así que tras comprobar `role === "admin"` el compilador angosta el
- * tipo de retorno a la rama "empleado" de `UserConAcceso`, donde
- * `empresaActiva` deja de admitir null. Quien llama después no necesita volver
- * a comprobarlo.
+ * tipo de retorno a la rama no-admin de `UserConAcceso`, donde `empresaActiva`
+ * deja de admitir null. Quien llama después no necesita volver a comprobarlo.
+ *
+ * Un usuario "contable" también cae en la rama no-admin — con el mismo
+ * requisito de empresa elegida que un empleado, porque hoy tiene los mismos
+ * permisos (implementación temporal) — pero conserva su rol real, sin
+ * coercionarlo. Eso es lo que evita que se muestre como "Empleado" en la
+ * interfaz.
  */
 export async function requireAccesoReportes(): Promise<UserConAcceso> {
   const user = await requireUser();
@@ -192,7 +205,7 @@ export async function requireAccesoReportes(): Promise<UserConAcceso> {
 
   if (!user.empresaActiva) redirect("/empresas");
 
-  return { ...user, role: "empleado", empresaActiva: user.empresaActiva };
+  return { ...user, empresaActiva: user.empresaActiva };
 }
 
 /**

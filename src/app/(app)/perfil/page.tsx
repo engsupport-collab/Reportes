@@ -68,7 +68,7 @@ export default async function PerfilPage() {
                   {cuenta.fullName}
                 </h2>
                 <span className="rounded-full bg-surface-muted px-2 py-0.5 text-xs font-medium text-muted">
-                  {esAdmin ? tNav("administrador") : tNav("empleado")}
+                  {tNav(esAdmin ? "administrador" : user.role === "contable" ? "contable" : "empleado")}
                 </span>
               </div>
               <p className="mt-0.5 text-sm text-muted">@{cuenta.username}</p>
