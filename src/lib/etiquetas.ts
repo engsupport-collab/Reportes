@@ -23,8 +23,21 @@ export const TIPOS_SERVICIO_IDS = [
 ] as const;
 export type TipoServicio = (typeof TIPOS_SERVICIO_IDS)[number];
 
+export const ETIQUETAS_TRABAJO_IDS = [
+  "preventivo",
+  "urgencia",
+  "online",
+  "proyecto",
+] as const;
+export type EtiquetaTrabajo = (typeof ETIQUETAS_TRABAJO_IDS)[number];
+
 export type OpcionEtiqueta = {
-  id: string;
+  /**
+   * Tipado como el catálogo cerrado que es, no como `string`: los diccionarios
+   * de idioma tienen una clave por cada uno de estos ids, y con `string` el
+   * compilador no puede comprobar que exista la traducción.
+   */
+  id: EtiquetaTrabajo;
   label: string;
   /** Se destaca en rojo: una urgencia tiene que saltar a la vista en la lista. */
   urgente?: boolean;
@@ -45,14 +58,26 @@ export const ETIQUETAS_TRABAJO: OpcionEtiqueta[] = [
   { id: "proyecto", label: "Proyecto" },
 ];
 
-const ETIQUETAS_POR_ID = new Map(ETIQUETAS_TRABAJO.map((o) => [o.id, o]));
+const ETIQUETAS_POR_ID = new Map<string, OpcionEtiqueta>(
+  ETIQUETAS_TRABAJO.map((o) => [o.id, o]),
+);
 
-export function esEtiquetaValida(id: string): boolean {
+/**
+ * Además de responder sí o no, estrecha el tipo: después de comprobarlo, el
+ * compilador ya sabe que ese texto suelto es una etiqueta del catálogo y no
+ * hay que volver a afirmarlo a mano.
+ */
+export function esEtiquetaValida(id: string): id is EtiquetaTrabajo {
   return ETIQUETAS_POR_ID.has(id);
 }
 
 export function etiquetaPorId(id: string): OpcionEtiqueta | undefined {
   return ETIQUETAS_POR_ID.get(id);
+}
+
+/** Igual que `esEtiquetaValida`, para el tipo de servicio. */
+export function esTipoServicioValido(id: string): id is TipoServicio {
+  return (TIPOS_SERVICIO_IDS as readonly string[]).includes(id);
 }
 
 export function tipoServicioLabel(id: string | null): string | null {

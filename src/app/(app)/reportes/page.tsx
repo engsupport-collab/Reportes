@@ -12,9 +12,8 @@ import { requireAccesoReportes } from "@/lib/auth-guard";
 import {
   ETIQUETAS_TRABAJO,
   TIPOS_SERVICIO,
-  TIPOS_SERVICIO_IDS,
-  type TipoServicio,
   esEtiquetaValida,
+  esTipoServicioValido,
 } from "@/lib/etiquetas";
 import {
   contarIncompletos,
@@ -50,10 +49,13 @@ export default async function ReportesPage({ searchParams }: Params) {
   if (user.role === "admin") redirect("/admin/reportes");
 
   const params = await searchParams;
-  const [t, tFiltros, tNav] = await Promise.all([
+  const [t, tFiltros, tNav, tEtiquetas] = await Promise.all([
     getTranslations("reportesPage"),
     getTranslations("filtros"),
     getTranslations("nav"),
+    // El catálogo guarda los nombres en español porque los usa el PDF; en
+    // pantalla se traducen por id.
+    getTranslations("etiquetas"),
   ]);
 
   const soloIncompletos = params.faltantes === "1";
@@ -61,9 +63,10 @@ export default async function ReportesPage({ searchParams }: Params) {
   const companyId = user.empresaActiva.id;
 
   // Los valores que llegan por URL se validan contra el catálogo antes de usarse.
-  const servicio = TIPOS_SERVICIO_IDS.includes(params.servicio as TipoServicio)
-    ? (params.servicio as TipoServicio)
-    : undefined;
+  const servicio =
+    params.servicio && esTipoServicioValido(params.servicio)
+      ? params.servicio
+      : undefined;
   const etiqueta =
     params.etiqueta && esEtiquetaValida(params.etiqueta)
       ? params.etiqueta
@@ -135,7 +138,10 @@ export default async function ReportesPage({ searchParams }: Params) {
       label: tFiltros("tipoServicio"),
       valor: servicio ?? "",
       vacio: tFiltros("todos"),
-      opciones: TIPOS_SERVICIO.map((t) => ({ value: t.id, label: t.label })),
+      opciones: TIPOS_SERVICIO.map((s) => ({
+        value: s.id,
+        label: tEtiquetas(s.id),
+      })),
     },
     {
       tipo: "select",
@@ -145,7 +151,7 @@ export default async function ReportesPage({ searchParams }: Params) {
       vacio: tFiltros("todas"),
       opciones: ETIQUETAS_TRABAJO.map((e) => ({
         value: e.id,
-        label: e.label,
+        label: tEtiquetas(e.id),
       })),
     },
     {

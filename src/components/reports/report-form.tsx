@@ -72,6 +72,9 @@ export function ReportForm({
     {},
   );
   const t = useTranslations("reportForm");
+  // El catálogo de `lib/etiquetas.ts` guarda los nombres en español porque los
+  // usa el PDF, que no pasa por next-intl. En pantalla se traducen por id.
+  const tEtiquetas = useTranslations("etiquetas");
 
   return (
     <form action={formAction} className="space-y-5">
@@ -212,7 +215,7 @@ export function ReportForm({
                   defaultChecked={valores?.serviceType === tipo.id}
                   className="accent-brand"
                 />
-                {tipo.label}
+                {tEtiquetas(tipo.id)}
               </label>
             ))}
           </div>
@@ -239,7 +242,7 @@ export function ReportForm({
                   defaultChecked={valores?.etiquetas.includes(etiqueta.id)}
                   className="accent-brand"
                 />
-                {etiqueta.label}
+                {tEtiquetas(etiqueta.id)}
               </label>
             ))}
           </div>

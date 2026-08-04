@@ -26,6 +26,13 @@ export type PuntoMes = {
 
 export type Segmento = { nombre: string; total: number };
 
+/**
+ * Un reparto que todavía no tiene nombre: lleva el id del catálogo, y la
+ * pantalla lo traduce al idioma de quien mira. Se separa de `Segmento`
+ * porque ahí el nombre ya es texto final (un cliente, por ejemplo).
+ */
+export type SegmentoPorId = { id: string; total: number };
+
 export type Analiticas = {
   total: number;
   terminados: number;
@@ -34,8 +41,8 @@ export type Analiticas = {
   sinFirma: number;
   sinOrden: number;
   porMes: PuntoMes[];
-  porServicio: Segmento[];
-  porEtiqueta: Segmento[];
+  porServicio: SegmentoPorId[];
+  porEtiqueta: SegmentoPorId[];
   topClientes: Segmento[];
 };
 
@@ -254,20 +261,8 @@ export async function obtenerAnaliticas(
     if (i !== undefined) porMes[i]!.total = Number(fila.n);
   }
 
-  const etiquetaServicio: Record<string, string> = {
-    electrico: "Eléctrico",
-    mecanico: "Mecánico",
-    programacion: "Programación",
-    soporte: "Soporte",
-  };
-  const etiquetaTrabajo: Record<string, string> = {
-    preventivo: "Mantenimiento preventivo",
-    urgencia: "Urgencia",
-    online: "Trabajo online",
-    proyecto: "Proyecto",
-  };
-
-  const ordenar = (a: Segmento, b: Segmento) => b.total - a.total;
+  const ordenar = (a: { total: number }, b: { total: number }) =>
+    b.total - a.total;
 
   return {
     total,
@@ -277,18 +272,18 @@ export async function obtenerAnaliticas(
     sinFirma,
     sinOrden,
     porMes,
+    // Estas dos series salen por id, no por nombre: el nombre depende del
+    // idioma de quien mira, y eso solo se sabe al pintar la pantalla. Un
+    // reporte sin tipo de servicio queda con id vacío, que la pantalla
+    // traduce como "Sin definir".
     porServicio: filasServicio
-      .map((f) => ({
-        nombre: etiquetaServicio[f.nombre ?? ""] ?? "Sin definir",
-        total: Number(f.n),
-      }))
+      .map((f) => ({ id: f.nombre ?? "", total: Number(f.n) }))
       .sort(ordenar),
     porEtiqueta: filasEtiqueta
-      .map((f) => ({
-        nombre: etiquetaTrabajo[f.nombre] ?? f.nombre,
-        total: Number(f.n),
-      }))
+      .map((f) => ({ id: f.nombre, total: Number(f.n) }))
       .sort(ordenar),
+    // Los clientes son nombres reales escritos por la gente, no un catálogo:
+    // no se traducen.
     topClientes: filasClientes.map((f) => ({
       nombre: f.nombre,
       total: Number(f.n),

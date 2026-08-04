@@ -333,7 +333,8 @@
     "notaPendientes": "Relatórios concluídos aos quais falta algo",
     "sinDocumento": "Sem documento",
     "sinFirmar": "Sem assinatura",
-    "sinDatos": "Ainda não há dados."
+    "sinDatos": "Ainda não há dados.",
+    "sinDefinir": "Não definido"
   },
   "validacion": {
     "ingresaUsuario": "Digite seu usuário",

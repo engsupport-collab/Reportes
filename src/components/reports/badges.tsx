@@ -1,6 +1,6 @@
 import { getTranslations } from "next-intl/server";
 
-import { ordenarEtiquetas, TIPOS_SERVICIO_IDS } from "@/lib/etiquetas";
+import { esTipoServicioValido, ordenarEtiquetas } from "@/lib/etiquetas";
 import type { ReportStatus } from "@/lib/roles";
 
 /**
@@ -53,9 +53,7 @@ export async function Clasificacion({
   const t = await getTranslations("etiquetas");
 
   const tipo =
-    serviceType && (TIPOS_SERVICIO_IDS as readonly string[]).includes(serviceType)
-      ? t(serviceType as (typeof TIPOS_SERVICIO_IDS)[number])
-      : null;
+    serviceType && esTipoServicioValido(serviceType) ? t(serviceType) : null;
   const marcas = ordenarEtiquetas(etiquetas);
 
   if (!tipo && marcas.length === 0) return null;
@@ -77,7 +75,7 @@ export async function Clasificacion({
               : "bg-surface-muted text-muted"
           }`}
         >
-          {t(marca.id as Parameters<typeof t>[0])}
+          {t(marca.id)}
         </span>
       ))}
     </>

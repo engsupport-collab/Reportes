@@ -6,6 +6,7 @@ import { AppShell } from "@/components/app-shell";
 import { Barras } from "@/components/admin/barras";
 import { GraficaMeses } from "@/components/admin/grafica-meses";
 import { requireAdmin } from "@/lib/auth-guard";
+import { esEtiquetaValida, esTipoServicioValido } from "@/lib/etiquetas";
 import { obtenerAnaliticas } from "@/lib/queries/analytics";
 
 type Params = { params: Promise<{ empresa: string }> };
@@ -88,7 +89,24 @@ export default async function AnaliticasPage({ params }: Params) {
 
   const a = await obtenerAnaliticas(empresa.id);
   const hrefReportes = `/admin/reportes?empresa=${empresa.id}`;
-  const t = await getTranslations("analiticasPage");
+  const [t, tEtiquetas] = await Promise.all([
+    getTranslations("analiticasPage"),
+    getTranslations("etiquetas"),
+  ]);
+
+  /**
+   * Pone nombre a un reparto que vino por id. Un id que no esté en el
+   * catálogo —el vacío de los reportes sin tipo de servicio, o una etiqueta
+   * retirada -- se muestra como "Sin definir" en vez de romper la gráfica.
+   */
+  const conNombre = (datos: { id: string; total: number }[]) =>
+    datos.map((d) => ({
+      nombre:
+        esEtiquetaValida(d.id) || esTipoServicioValido(d.id)
+          ? tEtiquetas(d.id)
+          : t("sinDefinir"),
+      total: d.total,
+    }));
 
   return (
     <AppShell user={user} saludo={false}>
@@ -129,11 +147,11 @@ export default async function AnaliticasPage({ params }: Params) {
 
         <div className="grid gap-4 lg:grid-cols-2">
           <Tarjeta titulo={t("porTipoServicio")}>
-            <Barras datos={a.porServicio} vacio={t("sinDatos")} />
+            <Barras datos={conNombre(a.porServicio)} vacio={t("sinDatos")} />
           </Tarjeta>
 
           <Tarjeta titulo={t("porEtiqueta")} nota={t("notaPorEtiqueta")}>
-            <Barras datos={a.porEtiqueta} vacio={t("sinDatos")} />
+            <Barras datos={conNombre(a.porEtiqueta)} vacio={t("sinDatos")} />
           </Tarjeta>
         </div>
 

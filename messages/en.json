@@ -333,7 +333,8 @@
     "notaPendientes": "Completed reports missing something",
     "sinDocumento": "Missing document",
     "sinFirmar": "Unsigned",
-    "sinDatos": "No data yet."
+    "sinDatos": "No data yet.",
+    "sinDefinir": "Not set"
   },
   "validacion": {
     "ingresaUsuario": "Enter your username",
