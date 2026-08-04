@@ -11,6 +11,8 @@ export type ViaticoEnLista = {
   mimeType: string;
   sizeBytes: number;
   tieneMiniatura: boolean;
+  concepto: string | null;
+  fechaGasto: Date | null;
   amount: number | null;
   uploadedAt: Date;
 };
@@ -25,6 +27,8 @@ export async function listarViaticos(
       mimeType: reportViaticos.mimeType,
       sizeBytes: reportViaticos.sizeBytes,
       thumbnailUrl: reportViaticos.thumbnailUrl,
+      concepto: reportViaticos.concepto,
+      fechaGasto: reportViaticos.fechaGasto,
       amount: reportViaticos.amount,
       uploadedAt: reportViaticos.uploadedAt,
     })
@@ -38,6 +42,8 @@ export async function listarViaticos(
     mimeType: f.mimeType,
     sizeBytes: f.sizeBytes,
     tieneMiniatura: f.thumbnailUrl !== null,
+    concepto: f.concepto,
+    fechaGasto: f.fechaGasto,
     amount: f.amount,
     uploadedAt: f.uploadedAt,
   }));
@@ -69,7 +75,7 @@ export async function obtenerViaticoConDueno(id: string) {
   return fila ?? null;
 }
 
-/** Viáticos con su `blobUrl` y monto, para armar el PDF de descarga del reporte. */
+/** Viáticos con su `blobUrl`, monto y datos del gasto, para armar el PDF de descarga. */
 export async function listarViaticosParaPdf(reportId: string) {
   return db
     .select({
@@ -77,6 +83,8 @@ export async function listarViaticosParaPdf(reportId: string) {
       blobUrl: reportViaticos.blobUrl,
       fileName: reportViaticos.fileName,
       mimeType: reportViaticos.mimeType,
+      concepto: reportViaticos.concepto,
+      fechaGasto: reportViaticos.fechaGasto,
       amount: reportViaticos.amount,
     })
     .from(reportViaticos)

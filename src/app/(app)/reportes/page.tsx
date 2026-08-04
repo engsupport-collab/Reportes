@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { getTranslations } from "next-intl/server";
 
 import { AppShell } from "@/components/app-shell";
 import {
@@ -49,6 +50,11 @@ export default async function ReportesPage({ searchParams }: Params) {
   if (user.role === "admin") redirect("/admin/reportes");
 
   const params = await searchParams;
+  const [t, tFiltros, tNav] = await Promise.all([
+    getTranslations("reportesPage"),
+    getTranslations("filtros"),
+    getTranslations("nav"),
+  ]);
 
   const soloIncompletos = params.faltantes === "1";
   const soloSinOrden = params.sinorden === "1";
@@ -126,17 +132,17 @@ export default async function ReportesPage({ searchParams }: Params) {
     {
       tipo: "select",
       name: "servicio",
-      label: "Tipo de servicio",
+      label: tFiltros("tipoServicio"),
       valor: servicio ?? "",
-      vacio: "Todos",
+      vacio: tFiltros("todos"),
       opciones: TIPOS_SERVICIO.map((t) => ({ value: t.id, label: t.label })),
     },
     {
       tipo: "select",
       name: "etiqueta",
-      label: "Etiqueta",
+      label: tFiltros("etiqueta"),
       valor: etiqueta ?? "",
-      vacio: "Todas",
+      vacio: tFiltros("todas"),
       opciones: ETIQUETAS_TRABAJO.map((e) => ({
         value: e.id,
         label: e.label,
@@ -145,7 +151,7 @@ export default async function ReportesPage({ searchParams }: Params) {
     {
       tipo: "checkbox",
       name: "faltantes",
-      label: "Sin documento",
+      label: tFiltros("sinDocumento"),
       activo: soloIncompletos,
     },
     {
@@ -154,7 +160,7 @@ export default async function ReportesPage({ searchParams }: Params) {
       // ahora o lo deja.
       tipo: "checkbox",
       name: "sinorden",
-      label: `Sin orden${sinOrden > 0 ? ` (${sinOrden})` : ""}`,
+      label: tFiltros("sinOrden", { count: sinOrden }),
       activo: soloSinOrden,
     },
   ];
@@ -171,29 +177,23 @@ export default async function ReportesPage({ searchParams }: Params) {
           >
             <div>
               <p className="text-sm font-medium text-warning">
-                {incompletos === 1
-                  ? "1 reporte terminado sin documento adjunto"
-                  : `${incompletos} reportes terminados sin documento adjunto`}
+                {t("avisoSinDocumento", { count: incompletos })}
               </p>
               {/* La firma se menciona en segundo plano: falta el documento es
                   lo urgente, y dos avisos con el mismo peso no se leen. */}
               {sinFirma > 0 ? (
                 <p className="mt-0.5 text-xs text-warning/80">
-                  {sinFirma === 1
-                    ? "También hay 1 reporte terminado sin firmar"
-                    : `También hay ${sinFirma} reportes terminados sin firmar`}
+                  {t("avisoTambienSinFirma", { count: sinFirma })}
                 </p>
               ) : null}
             </div>
             <span className="whitespace-nowrap text-sm font-semibold text-warning">
-              Ver →
+              {t("ver")}
             </span>
           </Link>
         ) : sinFirma > 0 && !soloIncompletos ? (
           <p className="rounded-2xl border border-border bg-surface px-4 py-3 text-sm text-muted">
-            {sinFirma === 1
-              ? "1 reporte terminado está sin firmar."
-              : `${sinFirma} reportes terminados están sin firmar.`}
+            {t("soloSinFirma", { count: sinFirma })}
           </p>
         ) : null}
 
@@ -206,22 +206,22 @@ export default async function ReportesPage({ searchParams }: Params) {
             href="/reportes/nuevo"
             className="rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-strong"
           >
-            Nuevo reporte
+            {tNav("nuevoReporte")}
           </Link>
         </div>
 
         <div className="flex items-center justify-between gap-3">
           <p className="text-sm text-muted">
-            {resultado.total} {resultado.total === 1 ? "reporte" : "reportes"}
-            {soloIncompletos ? " sin documento" : ""}
-            {params.q ? ` para “${params.q}”` : ""}
+            {t("resultado", { count: resultado.total })}
+            {soloIncompletos ? t("sinDocumentoSufijo") : ""}
+            {params.q ? t("paraQuery", { q: params.q }) : ""}
           </p>
           {hayFiltros ? (
             <Link
               href="/reportes"
               className="text-sm font-medium text-brand hover:underline"
             >
-              Quitar filtros
+              {t("quitarFiltros")}
             </Link>
           ) : null}
         </div>

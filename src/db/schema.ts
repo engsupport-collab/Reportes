@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
+  type AnySQLiteColumn,
   index,
   integer,
   primaryKey,
@@ -123,6 +124,27 @@ export const reports = sqliteTable(
       .notNull()
       .references(() => users.id, { onDelete: "restrict" }),
 
+    /**
+     * Servicio o viáticos. Se elige antes de crear el reporte y no cambia
+     * después: son dos formularios distintos, con campos que no tienen
+     * equivalente en el otro (un reporte de viáticos no tiene orden de compra
+     * ni firma; uno de servicio no tiene gastos). Por defecto "servicio"
+     * porque así eran todos los reportes antes de que existiera esta columna.
+     */
+    type: text("type", { enum: ["servicio", "viaticos"] })
+      .notNull()
+      .default("servicio"),
+    /**
+     * A qué reporte de servicio justifica este reporte de viáticos. Solo se
+     * usa cuando `type` es "viaticos" — un reporte de servicio no lo llena.
+     * `onDelete: "set null"` y no `cascade`: borrar el reporte de servicio no
+     * debe borrar de paso el registro de gastos que ya se hicieron.
+     */
+    linkedReportId: text("linked_report_id").references(
+      (): AnySQLiteColumn => reports.id,
+      { onDelete: "set null" },
+    ),
+
     projectName: text("project_name").notNull(),
     // Opcional: algunos trabajos no tienen orden de compra todavía cuando se
     // registra el reporte. A diferencia de "sin documento" o "sin firma", esto
@@ -130,6 +152,10 @@ export const reports = sqliteTable(
     // proceso o terminado, porque es un dato administrativo, no de avance del
     // trabajo.
     purchaseOrderNo: text("purchase_order_no"),
+    // Número de cotización. Obligatorio por formulario para un reporte de
+    // servicio; admite null solo por los reportes creados antes de existir
+    // este campo. No aplica a un reporte de viáticos.
+    quoteNumber: text("quote_number"),
     clientName: text("client_name").notNull(),
     workDate: integer("work_date", { mode: "timestamp_ms" }).notNull(),
     // Opcional a propósito: el detalle es una ayuda para quien lee el reporte
@@ -151,6 +177,11 @@ export const reports = sqliteTable(
 
     signatureUrl: text("signature_url"),
     signatureName: text("signature_name"),
+    // Correo de quien firma: recibe una copia del reporte (con sus fotos)
+    // por un enlace seguro con caducidad al momento de firmar. Obligatorio
+    // por formulario desde que existe este campo; admite null solo por los
+    // reportes firmados antes.
+    signatureEmail: text("signature_email"),
     signedAt: integer("signed_at", { mode: "timestamp_ms" }),
 
     createdAt: integer("created_at", { mode: "timestamp_ms" })
@@ -173,6 +204,8 @@ export const reports = sqliteTable(
     index("reports_company_service_idx").on(table.companyId, table.serviceType),
     index("reports_work_date_idx").on(table.workDate),
     index("reports_purchase_order_idx").on(table.purchaseOrderNo),
+    index("reports_type_idx").on(table.companyId, table.type),
+    index("reports_linked_report_idx").on(table.linkedReportId),
   ],
 );
 
@@ -230,14 +263,20 @@ export const attachments = sqliteTable(
 );
 
 /**
- * Viáticos de un reporte: gastos del trabajo, cada uno con su foto (recibo o
- * evidencia) y un monto opcional — opcional porque el monto casi siempre ya se
- * lee en la propia foto, y no vale la pena obligar a transcribirlo dos veces.
+ * Cada fila es un gasto dentro de un reporte de tipo "viaticos": qué se gastó
+ * (`concepto`), cuánto (`amount`) y cuándo (`fechaGasto`), con su foto (recibo
+ * o evidencia) como respaldo. `reportId` apunta al reporte contenedor —el de
+ * tipo "viaticos"—, no al reporte de servicio que justifica: ese enlace vive
+ * en `reports.linkedReportId`, un nivel más arriba.
+ *
+ * `concepto`, `fechaGasto` y `amount` admiten null solo por los viáticos
+ * creados antes de existir estos campos (cuando el monto era opcional y no
+ * había concepto ni fecha propios); el formulario los exige desde ahora.
  *
  * Es una tabla aparte de `attachments` y no una variante de esa misma tabla
- * porque tiene un campo propio (`amount`) que no aplica a evidencia genérica, y
- * porque mezclar los dos ahí complicaría el conteo de "sin documento" del
- * reporte, que solo debe mirar la evidencia del trabajo, no los recibos.
+ * porque tiene campos propios que no aplican a evidencia genérica, y porque
+ * mezclar los dos ahí complicaría el conteo de "sin documento" del reporte de
+ * servicio, que solo debe mirar la evidencia del trabajo, no los recibos.
  */
 export const reportViaticos = sqliteTable(
   "report_viaticos",
@@ -246,12 +285,15 @@ export const reportViaticos = sqliteTable(
     reportId: text("report_id")
       .notNull()
       .references(() => reports.id, { onDelete: "cascade" }),
+    concepto: text("concepto"),
+    fechaGasto: integer("fecha_gasto", { mode: "timestamp_ms" }),
     blobUrl: text("blob_url").notNull(),
     thumbnailUrl: text("thumbnail_url"),
     fileName: text("file_name").notNull(),
     mimeType: text("mime_type").notNull(),
     sizeBytes: integer("size_bytes").notNull(),
-    // En pesos, sin decimales. Null cuando no se transcribió el monto.
+    // En pesos, sin decimales. Null solo en filas creadas antes de que el
+    // monto fuera obligatorio.
     amount: integer("amount"),
     uploadedAt: integer("uploaded_at", { mode: "timestamp_ms" })
       .notNull()

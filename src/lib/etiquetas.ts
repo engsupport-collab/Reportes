@@ -1,9 +1,10 @@
 /**
  * Clasificación de un reporte. Son dos marcas distintas:
  *
- *   1. **Tipo de servicio** — eléctrico o mecánico. Una sola, excluyente. Por
- *      eso es una columna del propio reporte y no una etiqueta suelta: la base
- *      impide que un reporte quede marcado como las dos cosas a la vez.
+ *   1. **Tipo de servicio** — eléctrico, mecánico, programación o soporte.
+ *      Una sola, excluyente. Por eso es una columna del propio reporte y no
+ *      una etiqueta suelta: la base impide que un reporte quede marcado como
+ *      dos cosas a la vez.
  *
  *   2. **Etiquetas del trabajo** — preventivo, urgencia, online, proyecto.
  *      Varias a la vez. Viven en su propia tabla, con índice, porque el admin
@@ -14,7 +15,12 @@
  * obligaría a acordarse de tocarlo en varios sitios.
  */
 
-export const TIPOS_SERVICIO_IDS = ["electrico", "mecanico"] as const;
+export const TIPOS_SERVICIO_IDS = [
+  "electrico",
+  "mecanico",
+  "programacion",
+  "soporte",
+] as const;
 export type TipoServicio = (typeof TIPOS_SERVICIO_IDS)[number];
 
 export type OpcionEtiqueta = {
@@ -27,6 +33,8 @@ export type OpcionEtiqueta = {
 export const TIPOS_SERVICIO: { id: TipoServicio; label: string }[] = [
   { id: "electrico", label: "Eléctrico" },
   { id: "mecanico", label: "Mecánico" },
+  { id: "programacion", label: "Programación" },
+  { id: "soporte", label: "Soporte" },
 ];
 
 /** Cómo se originó o bajo qué modalidad se hizo. Se pueden marcar varias. */

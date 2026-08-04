@@ -57,6 +57,20 @@
       "when": 1785790396293,
       "tag": "0007_low_tyger_tiger",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1785803805083,
+      "tag": "0008_careful_sprite",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1785807000060,
+      "tag": "0009_mysterious_natasha_romanoff",
+      "breakpoints": true
     }
   ]
 }

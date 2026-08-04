@@ -1,6 +1,7 @@
 "use client";
 
 import { useFormStatus } from "react-dom";
+import { useTranslations } from "next-intl";
 
 import type { ReportStatus } from "@/lib/roles";
 
@@ -13,6 +14,7 @@ function BotonEstado({
 }) {
   const { pending } = useFormStatus();
   const marcandoTerminado = status === "en_proceso";
+  const t = useTranslations("reportActions");
 
   return (
     <button
@@ -23,12 +25,7 @@ function BotonEstado({
       // reporte como terminado. El faltante queda señalado hasta que se suba.
       onClick={(e) => {
         if (marcandoTerminado && sinAdjuntos) {
-          const seguir = window.confirm(
-            "Este reporte no tiene ningún archivo adjunto.\n\n" +
-              "Puedes marcarlo como terminado igual, pero va a quedar señalado " +
-              "como incompleto —para ti y para el administrador— hasta que " +
-              "subas el documento.\n\n¿Marcar como terminado?",
-          );
+          const seguir = window.confirm(t("confirmTerminado"));
           if (!seguir) e.preventDefault();
         }
       }}
@@ -39,10 +36,10 @@ function BotonEstado({
       }`}
     >
       {pending
-        ? "Guardando…"
+        ? t("guardando")
         : marcandoTerminado
-          ? "Marcar como terminado"
-          : "Volver a en proceso"}
+          ? t("marcarTerminado")
+          : t("volverEnProceso")}
     </button>
   );
 }
@@ -70,20 +67,19 @@ export function EstadoToggle({
 
 function BotonEliminar() {
   const { pending } = useFormStatus();
+  const t = useTranslations("reportActions");
 
   return (
     <button
       type="submit"
       disabled={pending}
       onClick={(e) => {
-        const seguir = window.confirm(
-          "¿Eliminar este reporte? Esta acción no se puede deshacer.",
-        );
+        const seguir = window.confirm(t("confirmEliminar"));
         if (!seguir) e.preventDefault();
       }}
       className="rounded-lg border border-danger/40 px-4 py-2.5 text-sm font-medium text-danger transition hover:bg-danger/10 disabled:cursor-not-allowed disabled:opacity-60"
     >
-      {pending ? "Eliminando…" : "Eliminar"}
+      {pending ? t("eliminando") : t("eliminar")}
     </button>
   );
 }

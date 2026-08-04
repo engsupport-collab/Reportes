@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
+import { useTranslations } from "next-intl";
 
 import type { FirmaState } from "@/actions/signature";
 import {
@@ -36,6 +37,7 @@ export function SignaturePad({
   const [tieneTrazo, setTieneTrazo] = useState(false);
   const [estado, setEstado] = useState<FirmaState>({});
   const [pendiente, startTransition] = useTransition();
+  const t = useTranslations("firma");
 
   /**
    * "Escribir" es lo primero que se ofrece a propósito: dibujar con el dedo no
@@ -265,7 +267,7 @@ export function SignaturePad({
       startTransition(async () => {
         const blob = await generarFirmaEscrita(nombre, pila);
         if (!blob) {
-          setEstado({ error: "No se pudo generar la firma. Intenta de nuevo." });
+          setEstado({ error: t("errorGenerarFirma") });
           return;
         }
         formData.set("firma", archivoFirma(blob));
@@ -276,13 +278,13 @@ export function SignaturePad({
 
     const canvas = canvasRef.current;
     if (!canvas || !hayTrazo.current) {
-      setEstado({ error: "Dibuja la firma antes de guardar." });
+      setEstado({ error: t("errorDibujaFirma") });
       return;
     }
 
     canvas.toBlob((blob) => {
       if (!blob) {
-        setEstado({ error: "No se pudo generar la firma. Intenta de nuevo." });
+        setEstado({ error: t("errorGenerarFirma") });
         return;
       }
       formData.set("firma", archivoFirma(blob));
@@ -299,7 +301,7 @@ export function SignaturePad({
           htmlFor="signatureName"
           className="block text-sm font-medium text-text"
         >
-          Nombre de quien firma
+          {t("nombreQuienFirma")}
         </label>
         <input
           id="signatureName"
@@ -309,8 +311,27 @@ export function SignaturePad({
           value={nombre}
           onChange={(e) => setNombre(e.target.value)}
           className="w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-sm text-text placeholder:text-muted focus:border-brand focus:outline-none"
-          placeholder="Nombre y apellido"
+          placeholder={t("placeholderNombre")}
         />
+      </div>
+
+      <div className="space-y-1.5">
+        <label
+          htmlFor="signatureEmail"
+          className="block text-sm font-medium text-text"
+        >
+          {t("correoQuienFirma")}
+        </label>
+        <input
+          id="signatureEmail"
+          name="signatureEmail"
+          type="email"
+          required
+          maxLength={200}
+          className="w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-sm text-text placeholder:text-muted focus:border-brand focus:outline-none"
+          placeholder={t("placeholderCorreo")}
+        />
+        <p className="text-xs text-muted">{t("ayudaCorreo")}</p>
       </div>
 
       {/* Dos formas de firmar. Escribir va primero porque funciona en
@@ -318,13 +339,13 @@ export function SignaturePad({
           celulares (ver PLAN.md). */}
       <div
         role="tablist"
-        aria-label="Forma de firmar"
+        aria-label={t("formaDeFirmar")}
         className="inline-flex rounded-lg border border-border p-0.5"
       >
         {(
           [
-            ["escribir", "Escribir"],
-            ["dibujar", "Dibujar"],
+            ["escribir", t("escribir")],
+            ["dibujar", t("dibujar")],
           ] as const
         ).map(([id, texto]) => (
           <button
@@ -350,7 +371,7 @@ export function SignaturePad({
       {modo === "escribir" ? (
         <div>
           <p className="mb-1.5 text-sm font-medium text-text">
-            Así se va a ver tu firma
+            {t("asiSeVeraFirma")}
           </p>
           <div
             ref={vistaPreviaRef}
@@ -361,13 +382,13 @@ export function SignaturePad({
                 genera con la fuente que esté aplicada a este recuadro. */}
             {nombre.trim() || (
               <span className="font-sans text-base text-neutral-400">
-                Escribe el nombre arriba
+                {t("escribeNombreArriba")}
               </span>
             )}
           </div>
 
           <div className="mt-2 flex flex-wrap items-center gap-2">
-            <span className="text-xs text-muted">Estilo:</span>
+            <span className="text-xs text-muted">{t("estilo")}</span>
             {ESTILOS_FIRMA.map((e) => (
               <button
                 key={e.id}
@@ -387,7 +408,7 @@ export function SignaturePad({
         </div>
       ) : (
         <div>
-          <p className="mb-1.5 text-sm font-medium text-text">Firma</p>
+          <p className="mb-1.5 text-sm font-medium text-text">{t("firmaLabel")}</p>
           <canvas
             ref={canvasRef}
             // touchAction en línea además de la clase: es la propiedad que impide
@@ -398,14 +419,14 @@ export function SignaturePad({
           />
           <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
             <p className="text-xs text-muted">
-              Firma con el mouse o con el dedo dentro del recuadro.
+              {t("firmaConMouseODedo")}
             </p>
             <button
               type="button"
               onClick={limpiar}
               className="text-xs font-medium text-muted transition hover:text-text"
             >
-              Borrar y volver a empezar
+              {t("borrarYEmpezar")}
             </button>
           </div>
 
@@ -441,7 +462,7 @@ export function SignaturePad({
         }
         className="rounded-lg bg-brand px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-strong disabled:cursor-not-allowed disabled:opacity-60"
       >
-        {pendiente ? "Guardando…" : "Guardar firma"}
+        {pendiente ? t("guardando") : t("guardarFirma")}
       </button>
     </form>
   );

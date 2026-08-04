@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
+import { useTranslations } from "next-intl";
 
 import type { ReporteState } from "@/actions/reports";
 import { ETIQUETAS_TRABAJO, TIPOS_SERVICIO } from "@/lib/etiquetas";
@@ -11,6 +12,7 @@ import type { Empresa } from "@/lib/queries/companies";
 type Valores = {
   projectName: string;
   purchaseOrderNo: string;
+  quoteNumber: string;
   clientName: string;
   workDate: string;
   serviceType: string;
@@ -23,6 +25,7 @@ const CAMPO =
 
 function Guardar({ etiqueta }: { etiqueta: string }) {
   const { pending } = useFormStatus();
+  const t = useTranslations("reportForm");
 
   return (
     <button
@@ -30,7 +33,7 @@ function Guardar({ etiqueta }: { etiqueta: string }) {
       disabled={pending}
       className="rounded-lg bg-brand px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-strong disabled:cursor-not-allowed disabled:opacity-60"
     >
-      {pending ? "Guardando…" : etiqueta}
+      {pending ? t("guardando") : etiqueta}
     </button>
   );
 }
@@ -68,6 +71,7 @@ export function ReportForm({
     action,
     {},
   );
+  const t = useTranslations("reportForm");
 
   return (
     <form action={formAction} className="space-y-5">
@@ -77,7 +81,7 @@ export function ReportForm({
         {empresas ? (
           <fieldset className="space-y-2 sm:col-span-2">
             <legend className="mb-2 block text-sm font-medium text-text">
-              Empresa
+              {t("empresa")}
             </legend>
             <div className="flex gap-2 rounded-xl border border-border bg-surface-muted p-1">
               {empresas.map((e) => (
@@ -104,7 +108,7 @@ export function ReportForm({
             htmlFor="projectName"
             className="block text-sm font-medium text-text"
           >
-            Nombre del proyecto
+            {t("nombreProyecto")}
           </label>
           <input
             id="projectName"
@@ -113,7 +117,7 @@ export function ReportForm({
             maxLength={200}
             defaultValue={valores?.projectName}
             className={CAMPO}
-            placeholder="Mantenimiento planta norte"
+            placeholder={t("placeholderProyecto")}
           />
         </div>
 
@@ -122,8 +126,8 @@ export function ReportForm({
             htmlFor="purchaseOrderNo"
             className="block text-sm font-medium text-text"
           >
-            No. orden de compra{" "}
-            <span className="font-normal text-muted">(opcional)</span>
+            {t("ordenCompra")}{" "}
+            <span className="font-normal text-muted">{t("opcional")}</span>
           </label>
           <input
             id="purchaseOrderNo"
@@ -131,7 +135,25 @@ export function ReportForm({
             maxLength={60}
             defaultValue={valores?.purchaseOrderNo}
             className={CAMPO}
-            placeholder="OC-2026-0148 — se puede completar después"
+            placeholder={t("placeholderOC")}
+          />
+        </div>
+
+        <div className="space-y-1.5">
+          <label
+            htmlFor="quoteNumber"
+            className="block text-sm font-medium text-text"
+          >
+            {t("cotizacion")}
+          </label>
+          <input
+            id="quoteNumber"
+            name="quoteNumber"
+            required
+            maxLength={60}
+            defaultValue={valores?.quoteNumber}
+            className={CAMPO}
+            placeholder={t("placeholderCotizacion")}
           />
         </div>
 
@@ -140,7 +162,7 @@ export function ReportForm({
             htmlFor="clientName"
             className="block text-sm font-medium text-text"
           >
-            Cliente
+            {t("cliente")}
           </label>
           <input
             id="clientName"
@@ -149,7 +171,7 @@ export function ReportForm({
             maxLength={200}
             defaultValue={valores?.clientName}
             className={CAMPO}
-            placeholder="Industrias del Valle S.A."
+            placeholder={t("placeholderCliente")}
           />
         </div>
 
@@ -158,7 +180,7 @@ export function ReportForm({
             htmlFor="workDate"
             className="block text-sm font-medium text-text"
           >
-            Fecha del trabajo
+            {t("fechaTrabajo")}
           </label>
           <input
             id="workDate"
@@ -174,7 +196,7 @@ export function ReportForm({
             forma del control ya comunica que solo se puede elegir uno. */}
         <fieldset className="space-y-2 sm:col-span-2">
           <legend className="mb-2 block text-sm font-medium text-text">
-            Tipo de servicio
+            {t("tipoServicio")}
           </legend>
           <div className="flex flex-wrap gap-2">
             {TIPOS_SERVICIO.map((tipo) => (
@@ -199,9 +221,9 @@ export function ReportForm({
         {/* Etiquetas: se pueden marcar varias, por eso son casillas. */}
         <fieldset className="space-y-2 sm:col-span-2">
           <legend className="mb-2 block text-sm font-medium text-text">
-            Etiquetas{" "}
+            {t("etiquetasLegend")}{" "}
             <span className="font-normal text-muted">
-              — marca todas las que apliquen
+              {t("etiquetasAyuda")}
             </span>
           </legend>
           <div className="flex flex-wrap gap-2">
@@ -228,8 +250,8 @@ export function ReportForm({
             htmlFor="details"
             className="block text-sm font-medium text-text"
           >
-            Detalles del trabajo{" "}
-            <span className="font-normal text-muted">(opcional)</span>
+            {t("detallesTrabajo")}{" "}
+            <span className="font-normal text-muted">{t("opcional")}</span>
           </label>
           <textarea
             id="details"
@@ -238,7 +260,7 @@ export function ReportForm({
             maxLength={5000}
             defaultValue={valores?.details}
             className={`${CAMPO} resize-y`}
-            placeholder="Describe qué se hizo, materiales usados, observaciones…"
+            placeholder={t("placeholderDetalles")}
           />
         </div>
       </div>
@@ -258,7 +280,7 @@ export function ReportForm({
           href={cancelarHref}
           className="rounded-lg border border-border px-5 py-2.5 text-sm font-medium text-muted transition hover:bg-surface-muted hover:text-text"
         >
-          Cancelar
+          {t("cancelar")}
         </Link>
       </div>
     </form>

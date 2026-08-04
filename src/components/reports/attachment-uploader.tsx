@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
+import { useTranslations } from "next-intl";
 
 import type { AdjuntoState } from "@/actions/attachments";
 import {
@@ -29,6 +30,7 @@ export function AttachmentUploader({
   const [procesando, setProcesando] = useState(false);
   const [pendiente, startTransition] = useTransition();
   const inputRef = useRef<HTMLInputElement>(null);
+  const t = useTranslations("adjuntos");
 
   const ocupado = procesando || pendiente;
 
@@ -40,7 +42,7 @@ export function AttachmentUploader({
 
     if (elegidos.length > restantes) {
       setEstado({
-        error: `Solo puedes subir ${restantes} archivo(s) más en este reporte.`,
+        error: t("limiteArchivos", { restantes }),
       });
       e.target.value = "";
       return;
@@ -82,7 +84,7 @@ export function AttachmentUploader({
   if (restantes <= 0) {
     return (
       <p className="text-sm text-muted">
-        Este reporte ya tiene el máximo de {MAX_ARCHIVOS_POR_REPORTE} archivos.
+        {t("maximoArchivos", { max: MAX_ARCHIVOS_POR_REPORTE })}
       </p>
     );
   }
@@ -107,14 +109,16 @@ export function AttachmentUploader({
       >
         <span className="block text-sm font-medium text-text">
           {procesando
-            ? "Preparando archivos…"
+            ? t("preparando")
             : pendiente
-              ? "Subiendo…"
-              : "Elegir archivos"}
+              ? t("subiendo")
+              : t("elegirArchivos")}
         </span>
         <span className="mt-1 block text-xs text-muted">
-          PDF, imágenes y documentos · hasta {formatearTamano(4 * 1024 * 1024)}{" "}
-          cada uno · quedan {restantes}
+          {t("ayudaArchivos", {
+            tamano: formatearTamano(4 * 1024 * 1024),
+            restantes,
+          })}
         </span>
       </button>
 

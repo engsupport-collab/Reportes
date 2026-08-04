@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { getCurrentUser, puedeAccederAReporte } from "@/lib/auth-guard";
+import { verificarEnlacePublico } from "@/lib/enlace-firma";
 import { generarReportePdf, generarReporteViaticoPdf } from "@/lib/pdf";
 import { listarAdjuntosParaPdf } from "@/lib/queries/attachments";
 import {
@@ -10,23 +10,26 @@ import {
 import { listarViaticosParaPdf } from "@/lib/queries/viaticos";
 
 /**
- * PDF descargable del reporte completo. Se arma en el momento a partir de los
- * datos actuales — no se guarda una copia — así que siempre coincide con lo
- * que muestra el sistema. Ver PLAN.md, "Pendiente A".
+ * PDF de un reporte, para quien lo firmó, sin sesión.
+ *
+ * El token es la única credencial: firmado con el mismo secreto que las
+ * cookies de sesión, con expiración y con un `purpose` propio que impide
+ * reutilizar un token de otro fin. No hay usuario ni permiso que comprobar
+ * más allá de que el token sea válido — para eso se emitió, al firmar.
  */
 export async function GET(
   _request: Request,
-  { params }: { params: Promise<{ id: string }> },
+  { params }: { params: Promise<{ token: string }> },
 ) {
-  const user = await getCurrentUser();
-  if (!user) {
-    return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+  const { token } = await params;
+  const reportId = await verificarEnlacePublico(token);
+
+  if (!reportId) {
+    return NextResponse.json({ error: "Enlace inválido o vencido" }, { status: 404 });
   }
 
-  const { id } = await params;
-  const reporte = await obtenerReporte(id);
-
-  if (!reporte || !puedeAccederAReporte(user, reporte)) {
+  const reporte = await obtenerReporte(reportId);
+  if (!reporte) {
     return NextResponse.json({ error: "Sin acceso" }, { status: 404 });
   }
 
@@ -34,7 +37,7 @@ export async function GET(
     reporte.type === "viaticos"
       ? await (async () => {
           const [gastos, enlazado] = await Promise.all([
-            listarViaticosParaPdf(id),
+            listarViaticosParaPdf(reportId),
             reporte.linkedReportId
               ? obtenerReporteServicioParaEnlazar(reporte.linkedReportId)
               : Promise.resolve(null),
@@ -46,7 +49,7 @@ export async function GET(
           );
         })()
       : await (async () => {
-          const adjuntos = await listarAdjuntosParaPdf(id);
+          const adjuntos = await listarAdjuntosParaPdf(reportId);
           return generarReportePdf(reporte, adjuntos);
         })();
 
@@ -55,7 +58,7 @@ export async function GET(
   return new NextResponse(Buffer.from(pdf), {
     headers: {
       "Content-Type": "application/pdf",
-      "Content-Disposition": `attachment; filename="${nombreArchivo}"`,
+      "Content-Disposition": `inline; filename="${nombreArchivo}"`,
       "Cache-Control": "private, no-store",
       "X-Content-Type-Options": "nosniff",
     },

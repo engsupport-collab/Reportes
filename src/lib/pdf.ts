@@ -34,7 +34,6 @@ const COLOR_TEXTO = rgb(0.06, 0.08, 0.11);
 const COLOR_MUTED = rgb(0.4, 0.45, 0.52);
 
 type Adjunto = { id: string; blobUrl: string; fileName: string; mimeType: string };
-type Viatico = Adjunto & { amount: number | null };
 
 function envolverTexto(
   texto: string,
@@ -182,7 +181,6 @@ function agregarLista(
 
 export async function generarReportePdf(
   reporte: ReporteCompleto,
-  viaticos: Viatico[],
   adjuntos: Adjunto[],
 ): Promise<Uint8Array> {
   const doc = await PDFDocument.create();
@@ -217,6 +215,14 @@ export async function generarReportePdf(
   const inicioFilas = y;
 
   y = agregarLista(portada, font, columna1, y, "CLIENTE", reporte.clientName);
+  y = agregarLista(
+    portada,
+    font,
+    columna1,
+    y,
+    "COTIZACIÓN",
+    reporte.quoteNumber ?? "Sin asignar",
+  );
   y = agregarLista(
     portada,
     font,
@@ -305,18 +311,6 @@ export async function generarReportePdf(
     }
   }
 
-  // --- Viáticos ---
-  for (const [i, v] of viaticos.entries()) {
-    await agregarArchivo(
-      doc,
-      fontBold,
-      v,
-      `Viático ${i + 1} de ${viaticos.length}`,
-      v.amount !== null ? formatearMonto(v.amount) : "Sin monto",
-      sinFusionar,
-    );
-  }
-
   // --- Adjuntos ---
   for (const [i, a] of adjuntos.entries()) {
     await agregarArchivo(
@@ -330,6 +324,148 @@ export async function generarReportePdf(
   }
 
   // --- Página final: lo que no se pudo fusionar ---
+  if (sinFusionar.length > 0) {
+    const notaPage = doc.addPage(A4);
+    let yNota = alto - MARGEN;
+    notaPage.drawText("Archivos no incluidos en este PDF", {
+      x: MARGEN,
+      y: yNota,
+      size: 13,
+      font: fontBold,
+      color: COLOR_TEXTO,
+    });
+    yNota -= 20;
+    notaPage.drawText(
+      "Formato no compatible para fusionar (Word, Excel u otro) o no se pudo leer. Descárguelos por separado desde el reporte.",
+      { x: MARGEN, y: yNota, size: 10, font, color: COLOR_MUTED, maxWidth: ancho - MARGEN * 2 },
+    );
+    yNota -= 26;
+    for (const nombre of sinFusionar) {
+      notaPage.drawText(`• ${nombre}`, {
+        x: MARGEN,
+        y: yNota,
+        size: 10.5,
+        font,
+        color: COLOR_TEXTO,
+      });
+      yNota -= 16;
+    }
+  }
+
+  return doc.save();
+}
+
+type GastoViatico = Adjunto & {
+  concepto: string | null;
+  fechaGasto: Date | null;
+  amount: number | null;
+};
+
+/**
+ * PDF de un reporte de viáticos: la ficha con el total y a qué reporte
+ * justifica, seguida de cada gasto con su foto de respaldo fusionada — igual
+ * que el PDF de un reporte de servicio, pero sin firma, adjuntos genéricos, ni
+ * los campos que no le aplican (orden de compra, tipo de servicio, etiquetas).
+ */
+export async function generarReporteViaticoPdf(
+  reporte: ReporteCompleto,
+  gastos: GastoViatico[],
+  proyectoEnlazado: string | null,
+): Promise<Uint8Array> {
+  const doc = await PDFDocument.create();
+  const font = await doc.embedFont(StandardFonts.Helvetica);
+  const fontBold = await doc.embedFont(StandardFonts.HelveticaBold);
+
+  const portada = doc.addPage(A4);
+  const [ancho, alto] = A4;
+  let y = alto - MARGEN;
+
+  portada.drawText("Reporte de viáticos", {
+    x: MARGEN,
+    y,
+    size: 18,
+    font: fontBold,
+    color: COLOR_TEXTO,
+    maxWidth: ancho - MARGEN * 2,
+  });
+  y -= 28;
+  portada.drawText(reporte.companyName, {
+    x: MARGEN,
+    y,
+    size: 11,
+    font,
+    color: COLOR_MUTED,
+  });
+  y -= 34;
+
+  const total = gastos.reduce((suma, g) => suma + (g.amount ?? 0), 0);
+
+  const columna1 = MARGEN;
+  const columna2 = MARGEN + (ancho - MARGEN * 2) / 2;
+  const inicioFilas = y;
+
+  y = agregarLista(
+    portada,
+    font,
+    columna1,
+    y,
+    "JUSTIFICA A",
+    proyectoEnlazado ?? "Reporte eliminado",
+  );
+  y = agregarLista(
+    portada,
+    font,
+    columna1,
+    y,
+    "ESTADO",
+    reporte.status === "terminado" ? "Terminado" : "En proceso",
+  );
+
+  let y2 = inicioFilas;
+  y2 = agregarLista(portada, font, columna2, y2, "TOTAL", formatearMonto(total));
+  y2 = agregarLista(portada, font, columna2, y2, "CREADO POR", reporte.authorName);
+  y2 = agregarLista(
+    portada,
+    font,
+    columna2,
+    y2,
+    "CREADO EL",
+    formatInstante(reporte.createdAt),
+  );
+
+  y = Math.min(y, y2) - 10;
+
+  portada.drawText("GASTOS", { x: MARGEN, y, size: 9, font, color: COLOR_MUTED });
+  y -= 18;
+
+  for (const g of gastos) {
+    if (y < MARGEN + 40) break;
+    const linea = `${g.concepto ?? "Sin concepto"} — ${
+      g.amount !== null ? formatearMonto(g.amount) : "Sin monto"
+    }${g.fechaGasto ? ` — ${formatFechaLarga(g.fechaGasto)}` : ""}`;
+    portada.drawText(`• ${linea}`, {
+      x: MARGEN,
+      y,
+      size: 10.5,
+      font,
+      color: COLOR_TEXTO,
+      maxWidth: ancho - MARGEN * 2,
+    });
+    y -= 16;
+  }
+
+  const sinFusionar: string[] = [];
+  for (const [i, g] of gastos.entries()) {
+    await agregarArchivo(
+      doc,
+      fontBold,
+      g,
+      `Gasto ${i + 1} de ${gastos.length}`,
+      g.concepto ?? undefined,
+      sinFusionar,
+    );
+  }
+
   if (sinFusionar.length > 0) {
     const notaPage = doc.addPage(A4);
     let yNota = alto - MARGEN;

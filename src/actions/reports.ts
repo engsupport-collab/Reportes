@@ -1,6 +1,7 @@
 "use server";
 
 import { eq } from "drizzle-orm";
+import { getTranslations } from "next-intl/server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
@@ -8,19 +9,25 @@ import { db } from "@/db";
 import { reportTags, reports } from "@/db/schema";
 import { puedeAccederAReporte, requireAccesoReportes } from "@/lib/auth-guard";
 import { listarEmpresas } from "@/lib/queries/companies";
-import { obtenerReporte } from "@/lib/queries/reports";
+import {
+  obtenerReporte,
+  obtenerReporteServicioParaEnlazar,
+} from "@/lib/queries/reports";
 import {
   estadoReporteSchema,
   leerEtiquetas,
   reporteSchema,
+  reporteViaticoSchema,
 } from "@/lib/validation";
 
 export type ReporteState = { error?: string };
 
-function leerFormulario(formData: FormData) {
-  return reporteSchema.safeParse({
+async function leerFormulario(formData: FormData) {
+  const t = await getTranslations("validacion");
+  return reporteSchema(t).safeParse({
     projectName: formData.get("projectName"),
     purchaseOrderNo: formData.get("purchaseOrderNo"),
+    quoteNumber: formData.get("quoteNumber"),
     clientName: formData.get("clientName"),
     workDate: formData.get("workDate"),
     serviceType: formData.get("serviceType"),
@@ -78,10 +85,11 @@ export async function crearReporteAction(
   formData: FormData,
 ): Promise<ReporteState> {
   const user = await requireAccesoReportes();
-  const parsed = leerFormulario(formData);
+  const tValidacion = await getTranslations("validacion");
+  const parsed = await leerFormulario(formData);
 
   if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Revisa los datos." };
+    return { error: parsed.error.issues[0]?.message ?? tValidacion("revisaLosDatos") };
   }
 
   let companyId: string;
@@ -97,7 +105,7 @@ export async function crearReporteAction(
     const valida = empresas.find((e) => e.id === enviado);
 
     if (!valida) {
-      return { error: "Elige para cuál empresa es este reporte." };
+      return { error: tValidacion("eligeEmpresaReporte") };
     }
     companyId = valida.id;
   } else {
@@ -113,11 +121,81 @@ export async function crearReporteAction(
     id,
     companyId,
     authorId: user.id,
+    type: "servicio",
     ...parsed.data,
     status: "en_proceso",
   });
 
   await guardarEtiquetas(id, leerEtiquetas(formData.getAll("etiquetas")));
+
+  revalidarListas();
+  redirect(`/reportes/${id}`);
+}
+
+/**
+ * Crea un reporte de viáticos. A diferencia del de servicio, no pide sus
+ * propios proyecto y cliente: los copia del reporte de servicio que justifica
+ * al momento de crearse, así que no se le pregunta algo que ya está escrito
+ * ahí. `workDate` queda en la fecha de creación — el dato que sí importa por
+ * gasto es su propia fecha, capturada en cada línea, no en el reporte.
+ */
+export async function crearReporteViaticoAction(
+  _prevState: ReporteState,
+  formData: FormData,
+): Promise<ReporteState> {
+  const user = await requireAccesoReportes();
+  const t = await getTranslations("validacion");
+
+  const parsed = reporteViaticoSchema(t).safeParse({
+    linkedReportId: formData.get("linkedReportId"),
+  });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? t("revisaLosDatos") };
+  }
+
+  const enlazado = await obtenerReporteServicioParaEnlazar(
+    parsed.data.linkedReportId,
+  );
+
+  // El reporte enlazado tiene que existir, ser de servicio, y de la empresa
+  // en la que el usuario está creando este reporte de viáticos. Un empleado
+  // no puede enlazar un reporte de la otra empresa; el admin, tampoco puede
+  // mezclarlas — el enlace se valida contra la misma empresa que se asigna
+  // abajo.
+  let companyId: string;
+  if (user.role === "admin") {
+    const enviado = formData.get("companyId");
+    const empresas = await listarEmpresas();
+    const valida = empresas.find((e) => e.id === enviado);
+    if (!valida) {
+      return { error: t("eligeEmpresaReporte") };
+    }
+    companyId = valida.id;
+  } else {
+    companyId = user.empresaActiva.id;
+  }
+
+  if (
+    !enlazado ||
+    enlazado.type !== "servicio" ||
+    enlazado.companyId !== companyId
+  ) {
+    return { error: t("eligeReporteAEnlazar") };
+  }
+
+  const id = crypto.randomUUID();
+
+  await db.insert(reports).values({
+    id,
+    companyId,
+    authorId: user.id,
+    type: "viaticos",
+    linkedReportId: enlazado.id,
+    projectName: enlazado.projectName,
+    clientName: enlazado.clientName,
+    workDate: new Date(),
+    status: "en_proceso",
+  });
 
   revalidarListas();
   redirect(`/reportes/${id}`);
@@ -129,11 +207,17 @@ export async function actualizarReporteAction(
   formData: FormData,
 ): Promise<ReporteState> {
   const { user, reporte } = await cargarConPermiso(id);
-  if (!reporte) return { error: "El reporte no existe o no tienes acceso." };
+  const tValidacion = await getTranslations("validacion");
+  // Un reporte de viáticos no tiene formulario de edición propio: sus únicos
+  // datos editables son las líneas de gasto, que se agregan y borran desde su
+  // detalle. Llegar aquí con uno solo puede ser una petición manipulada.
+  if (!reporte || reporte.type !== "servicio") {
+    return { error: tValidacion("reporteNoExiste") };
+  }
 
-  const parsed = leerFormulario(formData);
+  const parsed = await leerFormulario(formData);
   if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Revisa los datos." };
+    return { error: parsed.error.issues[0]?.message ?? tValidacion("revisaLosDatos") };
   }
 
   // La empresa de un reporte no se cambia al editarlo, solo al crearlo: mover

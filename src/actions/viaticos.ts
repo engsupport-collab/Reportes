@@ -1,6 +1,7 @@
 "use server";
 
 import { eq } from "drizzle-orm";
+import { getTranslations } from "next-intl/server";
 import { revalidatePath } from "next/cache";
 
 import { db } from "@/db";
@@ -16,6 +17,7 @@ import { puedeAccederAReporte, requireAccesoReportes } from "@/lib/auth-guard";
 import { obtenerReporte } from "@/lib/queries/reports";
 import { contarViaticos, obtenerViaticoConDueno } from "@/lib/queries/viaticos";
 import { borrarArchivo, guardarArchivo } from "@/lib/storage";
+import { gastoViaticoSchema } from "@/lib/validation";
 
 export type ViaticoState = { error?: string; ok?: string };
 
@@ -28,22 +30,35 @@ export async function agregarViaticoAction(
   formData: FormData,
 ): Promise<ViaticoState> {
   const user = await requireAccesoReportes();
-  const reporte = await obtenerReporte(reportId);
+  const [reporte, t] = await Promise.all([
+    obtenerReporte(reportId),
+    getTranslations("validacion"),
+  ]);
 
-  if (!reporte || !puedeAccederAReporte(user, reporte)) {
-    return { error: "El reporte no existe o no tienes acceso." };
+  // Los gastos solo se agregan a un reporte de viáticos: uno de servicio ya
+  // no aloja esta sección, así que llegar aquí con otro tipo solo puede ser
+  // una petición manipulada.
+  if (!reporte || reporte.type !== "viaticos" || !puedeAccederAReporte(user, reporte)) {
+    return { error: t("reporteNoExiste") };
+  }
+
+  const parsed = gastoViaticoSchema(t).safeParse({
+    concepto: formData.get("concepto"),
+    fechaGasto: formData.get("fechaGasto"),
+    amount: formData.get("amount"),
+  });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? t("revisaLosDatos") };
   }
 
   const archivo = formData.get("archivo");
   if (!(archivo instanceof File) || archivo.size === 0) {
-    return { error: "Selecciona una foto o archivo del gasto." };
+    return { error: t("seleccionaFoto") };
   }
 
   const yaHay = await contarViaticos(reportId);
   if (yaHay >= MAX_VIATICOS_POR_REPORTE) {
-    return {
-      error: `Un reporte admite hasta ${MAX_VIATICOS_POR_REPORTE} viáticos.`,
-    };
+    return { error: t("maximoViaticos", { max: MAX_VIATICOS_POR_REPORTE }) };
   }
 
   const validacion = validarArchivo({
@@ -55,21 +70,10 @@ export async function agregarViaticoAction(
 
   const datos = await archivo.arrayBuffer();
   if (!contenidoCoincide(datos, archivo.type)) {
-    return {
-      error: `El contenido de "${archivo.name}" no corresponde a su extensión.`,
-    };
+    return { error: t("contenidoNoCoincide", { nombre: archivo.name }) };
   }
 
-  // Opcional: el monto casi siempre ya se lee en la foto del recibo.
-  const montoTexto = String(formData.get("amount") ?? "").trim();
-  let amount: number | null = null;
-  if (montoTexto.length > 0) {
-    const numero = Number(montoTexto);
-    if (!Number.isFinite(numero) || numero < 0) {
-      return { error: "El monto no es un número válido." };
-    }
-    amount = Math.round(numero);
-  }
+  const { concepto, fechaGasto, amount } = parsed.data;
 
   const extension = extensionDe(archivo.name);
   const blobUrl = await guardarArchivo(datos, {
@@ -96,6 +100,8 @@ export async function agregarViaticoAction(
   await db.insert(reportViaticos).values({
     id: crypto.randomUUID(),
     reportId,
+    concepto,
+    fechaGasto,
     blobUrl,
     thumbnailUrl,
     fileName: sanearNombre(archivo.name),
@@ -106,7 +112,7 @@ export async function agregarViaticoAction(
 
   revalidatePath(`/reportes/${reportId}`);
 
-  return { ok: "Viático agregado." };
+  return { ok: t("gastoAgregado") };
 }
 
 export async function eliminarViaticoAction(id: string) {

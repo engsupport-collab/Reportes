@@ -1,0 +1,1 @@
+ALTER TABLE `reports` ADD `signature_email` text;

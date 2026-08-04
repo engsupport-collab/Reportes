@@ -25,6 +25,18 @@ const envSchema = z.object({
   NODE_ENV: z
     .enum(["development", "test", "production"])
     .default("development"),
+
+  // URL pública de la app, para construir el enlace del PDF que recibe por
+  // correo quien firma. Opcional: sin ella, firmar sigue funcionando, pero no
+  // se envía el correo (queda anotado en el registro del servidor).
+  APP_URL: z.string().url("APP_URL debe ser una URL completa").optional(),
+
+  // Webhook de n8n que recibe el aviso de "reporte firmado" y envía el
+  // correo con el enlace. Opcional por la misma razón que APP_URL.
+  N8N_WEBHOOK_URL: z
+    .string()
+    .url("N8N_WEBHOOK_URL debe ser una URL completa")
+    .optional(),
 });
 
 function loadEnv() {

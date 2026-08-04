@@ -63,6 +63,7 @@ async function tendenciaSemanal(
     .from(reports)
     .where(
       and(
+        eq(reports.type, "servicio"),
         companyId ? eq(reports.companyId, companyId) : undefined,
         gte(reports.createdAt, new Date(desde)),
       ),
@@ -89,7 +90,13 @@ export async function obtenerResumen(
   const esteMes = inicioDeMes(0);
   const mesPasado = inicioDeMes(1);
 
-  const deEstaEmpresa = companyId ? eq(reports.companyId, companyId) : undefined;
+  // El panel resume reportes de servicio: son los que tienen documento, firma
+  // y orden de compra que rastrear. Un reporte de viáticos se consulta desde
+  // el reporte de servicio al que justifica, no aquí.
+  const deEstaEmpresa = and(
+    eq(reports.type, "servicio"),
+    companyId ? eq(reports.companyId, companyId) : undefined,
+  );
 
   const enEsteMes = and(deEstaEmpresa, gte(reports.createdAt, esteMes));
   const enMesAnterior = and(

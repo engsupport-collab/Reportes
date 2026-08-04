@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { getTranslations } from "next-intl/server";
 
 import { actualizarReporteAction } from "@/actions/reports";
 import { AppShell } from "@/components/app-shell";
@@ -16,9 +17,14 @@ export default async function EditarReportePage({ params }: Params) {
 
   const reporte = await obtenerReporte(id);
 
-  if (!reporte || !puedeAccederAReporte(user, reporte)) {
+  // Un reporte de viáticos no tiene este formulario: sus únicos datos
+  // editables son las líneas de gasto, que se agregan y borran desde su
+  // propio detalle.
+  if (!reporte || !puedeAccederAReporte(user, reporte) || reporte.type !== "servicio") {
     notFound();
   }
+
+  const t = await getTranslations("editarReportePage");
 
   return (
     <AppShell user={user}>
@@ -27,11 +33,11 @@ export default async function EditarReportePage({ params }: Params) {
           href={`/reportes/${reporte.id}`}
           className="mb-5 inline-block text-sm font-medium text-muted transition hover:text-text"
         >
-          ← Volver al reporte
+          {t("volver")}
         </Link>
 
         <div className="mb-5">
-          <h2 className="text-lg font-semibold text-text">Editar reporte</h2>
+          <h2 className="text-lg font-semibold text-text">{t("titulo")}</h2>
         </div>
 
         <div className="rounded-2xl border border-border bg-surface p-5 sm:p-6">
@@ -40,13 +46,14 @@ export default async function EditarReportePage({ params }: Params) {
             // formulario, así que no se puede cambiar desde el navegador para
             // editar otro reporte.
             action={actualizarReporteAction.bind(null, reporte.id)}
-            etiqueta="Guardar cambios"
+            etiqueta={t("guardarCambios")}
             cancelarHref={`/reportes/${reporte.id}`}
             valores={{
               projectName: reporte.projectName,
               // null se convierte en "" para el input: un campo vacío es como
               // se representa "sin valor todavía" en un formulario.
               purchaseOrderNo: reporte.purchaseOrderNo ?? "",
+              quoteNumber: reporte.quoteNumber ?? "",
               clientName: reporte.clientName,
               workDate: aValorInput(reporte.workDate),
               serviceType: reporte.serviceType ?? "",

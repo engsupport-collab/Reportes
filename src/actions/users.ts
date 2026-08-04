@@ -1,6 +1,7 @@
 "use server";
 
 import { and, eq } from "drizzle-orm";
+import { getTranslations } from "next-intl/server";
 import { revalidatePath } from "next/cache";
 
 import { db } from "@/db";
@@ -27,8 +28,9 @@ export async function crearUsuarioAction(
   formData: FormData,
 ): Promise<UsuarioState> {
   await requireAdmin();
+  const t = await getTranslations("validacion");
 
-  const parsed = crearUsuarioSchema.safeParse({
+  const parsed = crearUsuarioSchema(t).safeParse({
     username: formData.get("username"),
     fullName: formData.get("fullName"),
     role: formData.get("role"),
@@ -36,7 +38,7 @@ export async function crearUsuarioAction(
   });
 
   if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Revisa los datos." };
+    return { error: parsed.error.issues[0]?.message ?? t("revisaLosDatos") };
   }
 
   // Las empresas elegidas se comprueban contra las que existen de verdad: un
@@ -46,7 +48,7 @@ export async function crearUsuarioAction(
   const validas = new Set((await todasLasEmpresas()).map((e) => e.id));
   const companyIds = parsed.data.companyIds.filter((id) => validas.has(id));
   if (parsed.data.role === "empleado" && companyIds.length === 0) {
-    return { error: "Selecciona al menos una empresa válida." };
+    return { error: t("seleccionaEmpresaValida") };
   }
 
   const [existente] = await db
@@ -56,7 +58,7 @@ export async function crearUsuarioAction(
     .limit(1);
 
   if (existente) {
-    return { error: "Ese usuario ya existe. Elige otro nombre." };
+    return { error: t("usuarioYaExiste") };
   }
 
   const password = generarContrasenaTemporal();

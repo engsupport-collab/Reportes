@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useTranslations } from "next-intl";
 
 import {
   alternarAccesoEmpresaAction,
@@ -42,15 +43,18 @@ function ToggleEmpresa({
 
 function BotonActivo({ usuario, esUnoMismo }: { usuario: UsuarioConAccesos; esUnoMismo: boolean }) {
   const [pendiente, startTransition] = useTransition();
+  const t = useTranslations("usuarios");
 
   return (
     <button
       type="button"
       disabled={pendiente || esUnoMismo}
-      title={esUnoMismo ? "No puedes desactivar tu propia cuenta" : undefined}
+      title={esUnoMismo ? t("tooltipNoPropia") : undefined}
       onClick={() => {
-        const accion = usuario.isActive ? "desactivar" : "reactivar";
-        if (!window.confirm(`¿${accion.charAt(0).toUpperCase() + accion.slice(1)} a ${usuario.fullName}?`)) {
+        const mensaje = usuario.isActive
+          ? t("confirmDesactivar", { nombre: usuario.fullName })
+          : t("confirmReactivar", { nombre: usuario.fullName });
+        if (!window.confirm(mensaje)) {
           return;
         }
         startTransition(() => alternarActivoAction(usuario.id));
@@ -61,7 +65,7 @@ function BotonActivo({ usuario, esUnoMismo }: { usuario: UsuarioConAccesos; esUn
           : "border-success/40 text-success hover:bg-success/10"
       }`}
     >
-      {pendiente ? "…" : usuario.isActive ? "Desactivar" : "Reactivar"}
+      {pendiente ? "…" : usuario.isActive ? t("desactivar") : t("reactivar")}
     </button>
   );
 }
@@ -69,6 +73,7 @@ function BotonActivo({ usuario, esUnoMismo }: { usuario: UsuarioConAccesos; esUn
 function BotonResetear({ usuario }: { usuario: UsuarioConAccesos }) {
   const [pendiente, startTransition] = useTransition();
   const [credenciales, setCredenciales] = useState<string | null>(null);
+  const t = useTranslations("usuarios");
 
   if (credenciales) {
     return (
@@ -79,7 +84,7 @@ function BotonResetear({ usuario }: { usuario: UsuarioConAccesos }) {
           onClick={() => setCredenciales(null)}
           className="mt-1 font-medium text-success hover:underline"
         >
-          Listo
+          {t("listo")}
         </button>
       </div>
     );
@@ -90,7 +95,7 @@ function BotonResetear({ usuario }: { usuario: UsuarioConAccesos }) {
       type="button"
       disabled={pendiente}
       onClick={() => {
-        if (!window.confirm(`¿Generar una contraseña nueva para ${usuario.fullName}? La anterior dejará de servir.`)) {
+        if (!window.confirm(t("confirmResetear", { nombre: usuario.fullName }))) {
           return;
         }
         startTransition(async () => {
@@ -100,7 +105,7 @@ function BotonResetear({ usuario }: { usuario: UsuarioConAccesos }) {
       }}
       className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted transition hover:bg-surface-muted hover:text-text disabled:opacity-50"
     >
-      {pendiente ? "…" : "Resetear contraseña"}
+      {pendiente ? "…" : t("resetear")}
     </button>
   );
 }
@@ -114,6 +119,9 @@ export function UsersTable({
   empresas: Empresa[];
   idUsuarioActual: string;
 }) {
+  const t = useTranslations("usuarios");
+  const tNav = useTranslations("nav");
+
   return (
     <div className="space-y-3">
       {usuarios.map((u) => {
@@ -130,11 +138,11 @@ export function UsersTable({
               <div>
                 <p className="text-sm font-semibold text-text">
                   {u.fullName}
-                  {esUnoMismo ? <span className="ml-2 text-xs font-normal text-muted">(tú)</span> : null}
+                  {esUnoMismo ? <span className="ml-2 text-xs font-normal text-muted">{t("tu")}</span> : null}
                 </p>
                 <p className="text-xs text-muted">
-                  {u.username} · {u.role === "admin" ? "Administrador" : "Empleado"}
-                  {!u.isActive ? " · Desactivado" : ""}
+                  {u.username} · {u.role === "admin" ? tNav("administrador") : tNav("empleado")}
+                  {!u.isActive ? ` · ${t("desactivado")}` : ""}
                 </p>
               </div>
 
@@ -151,7 +159,7 @@ export function UsersTable({
             {u.role === "empleado" ? (
               <div className="mt-3 flex flex-wrap items-center gap-2">
                 <span className="text-xs font-medium uppercase tracking-wide text-muted">
-                  Acceso a
+                  {t("accesoA")}
                 </span>
                 {empresas.map((e) => (
                   <ToggleEmpresa key={e.id} usuario={u} empresa={e} />
@@ -159,7 +167,7 @@ export function UsersTable({
               </div>
             ) : (
               <p className="mt-3 text-xs text-muted">
-                Administrador · ve las dos empresas siempre
+                {t("administradorVeTodas")}
               </p>
             )}
           </div>

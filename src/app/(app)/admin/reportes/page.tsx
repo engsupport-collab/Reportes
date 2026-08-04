@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { getTranslations } from "next-intl/server";
 
 import { AppShell } from "@/components/app-shell";
 import {
@@ -44,6 +45,10 @@ type Params = {
 export default async function AdminReportesPage({ searchParams }: Params) {
   const user = await requireAdmin();
   const params = await searchParams;
+  const [t, tFiltros] = await Promise.all([
+    getTranslations("reportesPage"),
+    getTranslations("filtros"),
+  ]);
 
   const empresaFiltro = user.empresas.find((e) => e.id === params.empresa)?.id;
 
@@ -153,33 +158,33 @@ export default async function AdminReportesPage({ searchParams }: Params) {
     {
       tipo: "select",
       name: "empresa",
-      label: "Empresa",
+      label: tFiltros("empresa"),
       valor: empresaFiltro ?? "",
-      vacio: "Todas",
+      vacio: tFiltros("todas"),
       opciones: user.empresas.map((e) => ({ value: e.id, label: e.name })),
     },
     {
       tipo: "select",
       name: "empleado",
-      label: "Empleado",
+      label: tFiltros("empleado"),
       valor: empleadoId ?? "",
-      vacio: "Todos",
+      vacio: tFiltros("todos"),
       opciones: empleados.map((e) => ({ value: e.id, label: e.fullName })),
     },
     {
       tipo: "select",
       name: "servicio",
-      label: "Tipo de servicio",
+      label: tFiltros("tipoServicio"),
       valor: servicio ?? "",
-      vacio: "Todos",
+      vacio: tFiltros("todos"),
       opciones: TIPOS_SERVICIO.map((t) => ({ value: t.id, label: t.label })),
     },
     {
       tipo: "select",
       name: "etiqueta",
-      label: "Etiqueta",
+      label: tFiltros("etiqueta"),
       valor: etiqueta ?? "",
-      vacio: "Todas",
+      vacio: tFiltros("todas"),
       opciones: ETIQUETAS_TRABAJO.map((e) => ({
         value: e.id,
         label: e.label,
@@ -188,19 +193,19 @@ export default async function AdminReportesPage({ searchParams }: Params) {
     {
       tipo: "checkbox",
       name: "faltantes",
-      label: "Sin documento",
+      label: tFiltros("sinDocumento"),
       activo: soloIncompletos,
     },
     {
       tipo: "checkbox",
       name: "sinfirma",
-      label: "Sin firmar",
+      label: tFiltros("sinFirmar"),
       activo: soloSinFirma,
     },
     {
       tipo: "checkbox",
       name: "sinorden",
-      label: "Sin orden",
+      label: tFiltros("sinOrden", { count: 0 }),
       activo: soloSinOrden,
     },
   ];
@@ -214,15 +219,15 @@ export default async function AdminReportesPage({ searchParams }: Params) {
 
         <div className="flex items-center justify-between gap-3">
           <p className="text-sm text-muted">
-            {resultado.total} {resultado.total === 1 ? "reporte" : "reportes"}
-            {params.q ? ` para “${params.q}”` : ""}
+            {t("resultado", { count: resultado.total })}
+            {params.q ? t("paraQuery", { q: params.q }) : ""}
           </p>
           {hayFiltros ? (
             <Link
               href="/admin/reportes"
               className="text-sm font-medium text-brand hover:underline"
             >
-              Quitar filtros
+              {t("quitarFiltros")}
             </Link>
           ) : null}
         </div>

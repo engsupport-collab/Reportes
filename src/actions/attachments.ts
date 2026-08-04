@@ -28,7 +28,9 @@ export async function subirAdjuntosAction(
   const user = await requireAccesoReportes();
   const reporte = await obtenerReporte(reportId);
 
-  if (!reporte || !puedeAccederAReporte(user, reporte)) {
+  // Un reporte de viáticos no tiene adjuntos genéricos: sus archivos son las
+  // fotos de cada gasto, que se agregan por su propia acción.
+  if (!reporte || reporte.type !== "servicio" || !puedeAccederAReporte(user, reporte)) {
     return { error: "El reporte no existe o no tienes acceso." };
   }
 

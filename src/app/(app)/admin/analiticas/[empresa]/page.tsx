@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { getTranslations } from "next-intl/server";
 
 import { AppShell } from "@/components/app-shell";
 import { Barras } from "@/components/admin/barras";
@@ -87,71 +88,72 @@ export default async function AnaliticasPage({ params }: Params) {
 
   const a = await obtenerAnaliticas(empresa.id);
   const hrefReportes = `/admin/reportes?empresa=${empresa.id}`;
+  const t = await getTranslations("analiticasPage");
 
   return (
     <AppShell user={user} saludo={false}>
       <div className="space-y-6">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-text">
-            Analíticas · {empresa.name}
+            {t("titulo", { empresa: empresa.name })}
           </h1>
           <p className="mt-1 text-sm text-muted">
-            Solo los reportes de {empresa.name}.
+            {t("subtitulo", { empresa: empresa.name })}
           </p>
         </div>
 
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <Cifra
-            etiqueta="Total"
+            etiqueta={t("total")}
             valor={a.total}
-            nota="Desde el inicio"
+            nota={t("desdeInicio")}
             href={hrefReportes}
           />
-          <Cifra etiqueta="Terminados" valor={a.terminados} />
-          <Cifra etiqueta="En proceso" valor={a.enProceso} />
+          <Cifra etiqueta={t("terminados")} valor={a.terminados} />
+          <Cifra etiqueta={t("enProceso")} valor={a.enProceso} />
           <Cifra
-            etiqueta="Sin orden"
+            etiqueta={t("sinOrden")}
             valor={a.sinOrden}
-            nota="Falta el número de orden"
+            nota={t("faltaNumeroOrden")}
             href={`${hrefReportes}&sinorden=1`}
             alerta
           />
         </div>
 
         <Tarjeta
-          titulo="Reportes por mes"
-          nota="Últimos 12 meses, por fecha de creación. El mes actual va empezado, por eso su tramo aparece punteado."
+          titulo={t("reportesPorMes")}
+          nota={t("notaReportesPorMes")}
         >
           <GraficaMeses puntos={a.porMes} />
         </Tarjeta>
 
         <div className="grid gap-4 lg:grid-cols-2">
-          <Tarjeta titulo="Por tipo de servicio">
-            <Barras datos={a.porServicio} />
+          <Tarjeta titulo={t("porTipoServicio")}>
+            <Barras datos={a.porServicio} vacio={t("sinDatos")} />
           </Tarjeta>
 
-          <Tarjeta titulo="Por etiqueta" nota="Un reporte puede llevar varias">
-            <Barras datos={a.porEtiqueta} />
+          <Tarjeta titulo={t("porEtiqueta")} nota={t("notaPorEtiqueta")}>
+            <Barras datos={a.porEtiqueta} vacio={t("sinDatos")} />
           </Tarjeta>
         </div>
 
-        <Tarjeta titulo="Clientes con más reportes" nota="Los seis primeros">
-          <Barras datos={a.topClientes} />
+        <Tarjeta titulo={t("clientesTop")} nota={t("notaClientesTop")}>
+          <Barras datos={a.topClientes} vacio={t("sinDatos")} />
         </Tarjeta>
 
         <Tarjeta
-          titulo="Pendientes"
-          nota="Reportes terminados a los que les falta algo"
+          titulo={t("pendientes")}
+          nota={t("notaPendientes")}
         >
           <div className="grid gap-3 sm:grid-cols-2">
             <Cifra
-              etiqueta="Sin documento"
+              etiqueta={t("sinDocumento")}
               valor={a.sinDocumento}
               href={`${hrefReportes}&faltantes=1`}
               alerta
             />
             <Cifra
-              etiqueta="Sin firmar"
+              etiqueta={t("sinFirmar")}
               valor={a.sinFirma}
               href={`${hrefReportes}&sinfirma=1`}
               alerta

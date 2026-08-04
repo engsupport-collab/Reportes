@@ -29,20 +29,18 @@ export async function cambiarMiContrasenaAction(
   formData: FormData,
 ): Promise<PerfilState> {
   const user = await requireUser();
-  const t = await getTranslations("perfil");
+  const [t, tValidacion] = await Promise.all([
+    getTranslations("perfil"),
+    getTranslations("validacion"),
+  ]);
 
-  const parsed = cambiarContrasenaSchema.safeParse({
+  const parsed = cambiarContrasenaSchema(tValidacion).safeParse({
     actual: String(formData.get("actual") ?? ""),
     nueva: String(formData.get("nueva") ?? ""),
     repetir: String(formData.get("repetir") ?? ""),
   });
 
   if (!parsed.success) {
-    // El mensaje detallado (longitud mínima, no coinciden, etc.) viene del
-    // propio esquema Zod y sigue en español: traducirlo exige reconstruir el
-    // esquema por idioma, un trabajo aparte. Este "genérico" es solo la red de
-    // seguridad para cuando el esquema no trae mensaje, algo que en la
-    // práctica no pasa.
     return { error: parsed.error.issues[0]?.message ?? t("datosInvalidos") };
   }
 

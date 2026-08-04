@@ -32,7 +32,10 @@ export async function loginAction(
   _prevState: LoginState,
   formData: FormData,
 ): Promise<LoginState> {
-  const t = await getTranslations("login");
+  const [t, tValidacion] = await Promise.all([
+    getTranslations("login"),
+    getTranslations("validacion"),
+  ]);
 
   /**
    * Mensaje único para credenciales inválidas.
@@ -58,7 +61,7 @@ export async function loginAction(
     return { error: mensajeBloqueo(ipBloqueada) };
   }
 
-  const parsed = loginSchema.safeParse({
+  const parsed = loginSchema(tValidacion).safeParse({
     username: formData.get("username"),
     password: formData.get("password"),
   });

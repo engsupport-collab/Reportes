@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 
 import { IconFiltros } from "@/components/nav-icons";
 
@@ -81,6 +82,7 @@ export function FilterPanel({
 }) {
   const [abierto, setAbierto] = useState(false);
   const router = useRouter();
+  const t = useTranslations("filterPanel");
 
   const activos = campos.filter(estaActivo);
 
@@ -132,7 +134,7 @@ export function FilterPanel({
           className="flex items-center gap-2 rounded-lg border border-border px-3 py-2.5 text-sm font-medium text-muted transition hover:bg-surface-muted hover:text-text"
         >
           <IconFiltros className="h-4 w-4" />
-          Filtros
+          {t("boton")}
           {activos.length > 0 ? (
             <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-brand px-1.5 text-xs font-semibold text-white">
               {activos.length}
@@ -146,7 +148,7 @@ export function FilterPanel({
                 eventos en todo el documento. */}
             <button
               type="button"
-              aria-label="Cerrar filtros"
+              aria-label={t("cerrar")}
               className="fixed inset-0 z-10 cursor-default"
               onClick={() => setAbierto(false)}
             />
@@ -185,7 +187,7 @@ export function FilterPanel({
               {campos.some((c) => c.tipo === "checkbox") ? (
                 <fieldset className="space-y-2">
                   <legend className="mb-1.5 text-xs font-medium uppercase tracking-wide text-muted">
-                    Pendientes
+                    {t("pendientes")}
                   </legend>
                   {campos.map((campo) =>
                     campo.tipo === "checkbox" ? (
@@ -212,7 +214,7 @@ export function FilterPanel({
                   type="submit"
                   className="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-strong"
                 >
-                  Aplicar
+                  {t("aplicar")}
                 </button>
                 {activos.length > 0 ? (
                   // Enlace y no botón de reinicio: "limpiar" tiene que navegar
@@ -226,7 +228,7 @@ export function FilterPanel({
                     onClick={() => setAbierto(false)}
                     className="rounded-lg px-3 py-2 text-sm font-medium text-muted transition hover:text-text"
                   >
-                    Limpiar
+                    {t("limpiar")}
                   </Link>
                 ) : null}
               </div>
@@ -245,7 +247,7 @@ export function FilterPanel({
         >
           {resumen(campo)}
           <span aria-hidden>×</span>
-          <span className="sr-only">Quitar filtro</span>
+          <span className="sr-only">{t("quitarFiltro")}</span>
         </Link>
       ))}
     </div>

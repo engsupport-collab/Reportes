@@ -1,18 +1,20 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
+import { useTranslations } from "next-intl";
 
 import type { ViaticoState } from "@/actions/viaticos";
 import { EXTENSIONES_PERMITIDAS, validarArchivo } from "@/lib/archivos";
 import { prepararArchivo } from "@/lib/imagen-cliente";
+import { aValorInput } from "@/lib/fechas";
 
 /**
- * Agregar un viático: una foto (o documento) más un monto opcional.
+ * Agregar un gasto: concepto, monto y fecha propios, más su foto de respaldo.
  *
  * A diferencia de los adjuntos, aquí no se suben varios archivos a la vez: cada
- * viático es un gasto individual, y el monto solo tiene sentido pegado a su
- * propia foto — mezclarlos en una subida por lotes obligaría a inventar una
- * forma de decir "este monto es del tercer archivo".
+ * gasto es individual, y sus datos solo tienen sentido pegados a su propia
+ * foto — mezclarlos en una subida por lotes obligaría a inventar una forma de
+ * decir "este monto es del tercer archivo".
  */
 export function ViaticoUploader({
   action,
@@ -25,6 +27,7 @@ export function ViaticoUploader({
   const [archivo, setArchivo] = useState<File | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
+  const t = useTranslations("viaticosForm");
 
   const ocupado = procesando || pendiente;
 
@@ -48,13 +51,13 @@ export function ViaticoUploader({
   async function alEnviar(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!archivo) {
-      setEstado({ error: "Selecciona una foto o archivo del gasto." });
+      setEstado({ error: t("seleccionaFoto") });
       return;
     }
 
-    const montoInput = formRef.current?.elements.namedItem(
-      "amount",
-    ) as HTMLInputElement | null;
+    const campo = (nombre: string) =>
+      (formRef.current?.elements.namedItem(nombre) as HTMLInputElement | null)
+        ?.value ?? "";
 
     setProcesando(true);
     const formData = new FormData();
@@ -64,7 +67,9 @@ export function ViaticoUploader({
         await prepararArchivo(archivo);
       formData.append("archivo", preparado);
       if (miniatura) formData.append("miniatura", miniatura);
-      if (montoInput?.value) formData.append("amount", montoInput.value);
+      formData.append("concepto", campo("concepto"));
+      formData.append("fechaGasto", campo("fechaGasto"));
+      formData.append("amount", campo("amount"));
     } finally {
       setProcesando(false);
     }
@@ -86,13 +91,51 @@ export function ViaticoUploader({
       onSubmit={alEnviar}
       className="space-y-3 rounded-xl border border-dashed border-border p-4"
     >
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div className="space-y-1.5">
+          <label
+            htmlFor="viatico-concepto"
+            className="block text-sm font-medium text-text"
+          >
+            {t("concepto")}
+          </label>
+          <input
+            id="viatico-concepto"
+            name="concepto"
+            required
+            maxLength={200}
+            disabled={ocupado}
+            placeholder={t("placeholderConcepto")}
+            className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text placeholder:text-muted focus:border-brand focus:outline-none"
+          />
+        </div>
+
+        <div className="space-y-1.5">
+          <label
+            htmlFor="viatico-fecha"
+            className="block text-sm font-medium text-text"
+          >
+            {t("fechaGasto")}
+          </label>
+          <input
+            id="viatico-fecha"
+            name="fechaGasto"
+            type="date"
+            required
+            defaultValue={aValorInput(new Date())}
+            disabled={ocupado}
+            className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text focus:border-brand focus:outline-none"
+          />
+        </div>
+      </div>
+
       <div className="flex flex-wrap items-end gap-3">
         <div className="min-w-0 flex-1 space-y-1.5">
           <label
             htmlFor="viatico-archivo"
             className="block text-sm font-medium text-text"
           >
-            Foto o archivo del gasto
+            {t("fotoArchivoGasto")}
           </label>
           <input
             ref={inputRef}
@@ -110,13 +153,13 @@ export function ViaticoUploader({
             htmlFor="viatico-monto"
             className="block text-sm font-medium text-text"
           >
-            Monto{" "}
-            <span className="font-normal text-muted">(opcional)</span>
+            {t("monto")}
           </label>
           <input
             id="viatico-monto"
             name="amount"
             type="number"
+            required
             min="0"
             step="1"
             inputMode="numeric"
@@ -131,7 +174,7 @@ export function ViaticoUploader({
           disabled={ocupado || !archivo}
           className="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-strong disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {procesando ? "Preparando…" : pendiente ? "Agregando…" : "Agregar"}
+          {procesando ? t("preparando") : pendiente ? t("agregando") : t("agregar")}
         </button>
       </div>
 

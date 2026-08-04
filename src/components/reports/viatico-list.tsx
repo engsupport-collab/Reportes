@@ -1,8 +1,10 @@
 "use client";
 
 import { useTransition } from "react";
+import { useTranslations } from "next-intl";
 
 import { esImagen, formatearTamano } from "@/lib/archivos";
+import { formatFechaLarga } from "@/lib/fechas";
 import { formatearMonto } from "@/lib/moneda";
 import type { ViaticoEnLista } from "@/lib/queries/viaticos";
 
@@ -24,19 +26,20 @@ function BotonBorrar({
   nombre: string;
 }) {
   const [pendiente, startTransition] = useTransition();
+  const t = useTranslations("viaticosForm");
 
   return (
     <button
       type="button"
       disabled={pendiente}
-      aria-label={`Eliminar ${nombre}`}
+      aria-label={t("eliminarAria", { nombre })}
       onClick={() => {
-        if (!window.confirm(`¿Eliminar "${nombre}"?`)) return;
+        if (!window.confirm(t("confirmEliminar", { nombre }))) return;
         startTransition(onBorrar);
       }}
       className="shrink-0 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted transition hover:border-danger/40 hover:text-danger disabled:opacity-50"
     >
-      {pendiente ? "…" : "Eliminar"}
+      {pendiente ? "…" : t("eliminar")}
     </button>
   );
 }
@@ -48,10 +51,12 @@ export function ViaticoList({
   viaticos: ViaticoEnLista[];
   onEliminar: (id: string) => void | Promise<void>;
 }) {
+  const t = useTranslations("viaticosForm");
+
   if (viaticos.length === 0) {
     return (
       <p className="text-sm text-muted">
-        Todavía no hay viáticos en este reporte.
+        {t("sinViaticos")}
       </p>
     );
   }
@@ -75,20 +80,21 @@ export function ViaticoList({
           )}
 
           <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-medium text-text">
+              {v.concepto ?? t("sinConcepto")}
+            </p>
+            <p className="text-xs text-muted">
+              {v.fechaGasto ? `${formatFechaLarga(v.fechaGasto)} · ` : ""}
+              {v.amount !== null ? formatearMonto(v.amount) : t("sinMonto")}
+            </p>
             <a
               href={`/api/viaticos/${v.id}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="block truncate text-sm font-medium text-text hover:text-brand hover:underline"
+              className="block truncate text-xs text-brand hover:underline"
             >
-              {v.fileName}
+              {v.fileName} · {formatearTamano(v.sizeBytes)}
             </a>
-            <p className="text-xs text-muted">
-              {v.amount !== null
-                ? formatearMonto(v.amount)
-                : "Sin monto"}{" "}
-              · {formatearTamano(v.sizeBytes)}
-            </p>
           </div>
 
           <BotonBorrar nombre={v.fileName} onBorrar={() => onEliminar(v.id)} />

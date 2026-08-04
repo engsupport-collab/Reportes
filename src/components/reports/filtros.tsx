@@ -1,3 +1,5 @@
+import { useTranslations } from "next-intl";
+
 import { FilterChip, FilterGroupLabel } from "@/components/filter-chip";
 import type { Empresa } from "@/lib/queries/companies";
 
@@ -17,11 +19,12 @@ export function FiltroEmpresa({
   empresaId?: string;
   hrefPara: (cambios: { empresa?: string | null }) => string;
 }) {
+  const t = useTranslations("filtros");
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <FilterGroupLabel>Empresa</FilterGroupLabel>
+      <FilterGroupLabel>{t("empresa")}</FilterGroupLabel>
       <FilterChip href={hrefPara({ empresa: null })} activo={!empresaId}>
-        Todas
+        {t("todas")}
       </FilterChip>
       {empresas.map((e) => (
         <FilterChip

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { getTranslations } from "next-intl/server";
 
 import {
   eliminarAdjuntoAction,
@@ -29,8 +30,13 @@ import { ViaticoUploader } from "@/components/reports/viatico-uploader";
 import { MAX_ARCHIVOS_POR_REPORTE } from "@/lib/archivos";
 import { puedeAccederAReporte, requireAccesoReportes } from "@/lib/auth-guard";
 import { formatFechaLarga, formatInstante } from "@/lib/fechas";
+import { formatearMonto } from "@/lib/moneda";
 import { listarAdjuntos } from "@/lib/queries/attachments";
-import { obtenerReporte } from "@/lib/queries/reports";
+import {
+  listarViaticosEnlazadosA,
+  obtenerReporte,
+  obtenerReporteServicioParaEnlazar,
+} from "@/lib/queries/reports";
 import { listarViaticos } from "@/lib/queries/viaticos";
 
 type Params = { params: Promise<{ id: string }> };
@@ -42,6 +48,109 @@ function Dato({ etiqueta, valor }: { etiqueta: string; valor: string }) {
         {etiqueta}
       </dt>
       <dd className="mt-1 text-sm text-text">{valor}</dd>
+    </div>
+  );
+}
+
+/** Detalle de un reporte de viáticos: solo los gastos y a qué reporte pertenecen. */
+async function DetalleViatico({
+  reporte,
+  esAdmin,
+  t,
+}: {
+  reporte: NonNullable<Awaited<ReturnType<typeof obtenerReporte>>>;
+  esAdmin: boolean;
+  t: Awaited<ReturnType<typeof getTranslations<"reportDetail">>>;
+}) {
+  const [gastos, enlazado] = await Promise.all([
+    listarViaticos(reporte.id),
+    reporte.linkedReportId
+      ? obtenerReporteServicioParaEnlazar(reporte.linkedReportId)
+      : Promise.resolve(null),
+  ]);
+  const total = gastos.reduce((suma, g) => suma + (g.amount ?? 0), 0);
+
+  return (
+    <div className="mx-auto max-w-3xl space-y-5">
+      <div className="flex items-center justify-between gap-3">
+        <Link
+          href={esAdmin ? "/admin/reportes" : "/reportes"}
+          className="inline-block text-sm font-medium text-muted transition hover:text-text"
+        >
+          {t("volver", {
+            destino: esAdmin ? t("todosLosReportes") : t("misReportes"),
+          })}
+        </Link>
+
+        <a
+          href={`/api/reportes/${reporte.id}/pdf`}
+          className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-text transition hover:bg-surface-muted"
+        >
+          {t("descargarReporte")}
+        </a>
+      </div>
+
+      <div className="rounded-2xl border border-border bg-surface p-5 sm:p-6">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <h2 className="text-lg font-semibold text-text">
+                {t("viaticosTitulo")}
+              </h2>
+              {esAdmin ? (
+                <span className="rounded-full bg-brand-soft px-2 py-0.5 text-xs font-medium text-brand">
+                  {reporte.companyName}
+                </span>
+              ) : null}
+            </div>
+            {enlazado ? (
+              <Link
+                href={`/reportes/${enlazado.id}`}
+                className="mt-0.5 inline-block text-sm text-brand hover:underline"
+              >
+                {t("justificaA", { proyecto: enlazado.projectName })}
+              </Link>
+            ) : (
+              <p className="mt-0.5 text-sm text-muted">{t("reporteOriginalEliminado")}</p>
+            )}
+          </div>
+          <EstadoBadge status={reporte.status} />
+        </div>
+
+        <dl className="mt-6 grid gap-5 sm:grid-cols-2">
+          <Dato etiqueta={t("creadoPor")} valor={reporte.authorName} />
+          <Dato etiqueta={t("creadoEl")} valor={formatInstante(reporte.createdAt)} />
+          <Dato etiqueta={t("totalGastos")} valor={formatearMonto(total)} />
+        </dl>
+      </div>
+
+      <div className="rounded-2xl border border-border bg-surface p-5 sm:p-6">
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <h3 className="text-sm font-semibold text-text">{t("gastos")}</h3>
+          <span className="text-xs text-muted">{gastos.length}</span>
+        </div>
+
+        <div className="space-y-4">
+          <ViaticoList viaticos={gastos} onEliminar={eliminarViaticoAction} />
+          <ViaticoUploader action={agregarViaticoAction.bind(null, reporte.id)} />
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-3">
+        <EstadoToggle
+          action={cambiarEstadoAction.bind(null, reporte.id)}
+          status={reporte.status}
+          sinAdjuntos={false}
+        />
+
+        <div className="ml-auto">
+          {reporte.status === "en_proceso" ? (
+            <EliminarReporte action={eliminarReporteAction.bind(null, reporte.id)} />
+          ) : (
+            <p className="text-xs text-muted">{t("volverEnProceso")}</p>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
@@ -58,11 +167,27 @@ export default async function DetalleReportePage({ params }: Params) {
     notFound();
   }
 
-  const adjuntos = await listarAdjuntos(reporte.id);
-  const viaticos = await listarViaticos(reporte.id);
+  const esAdmin = user.role === "admin";
+  const t = await getTranslations("reportDetail");
+
+  // Un reporte de viáticos es una pantalla distinta: casi ningún campo del
+  // reporte de servicio le aplica (ni orden, ni firma, ni adjuntos de
+  // evidencia), así que tiene su propio detalle en vez de esconder secciones
+  // de este.
+  if (reporte.type === "viaticos") {
+    return (
+      <AppShell user={user}>
+        <DetalleViatico reporte={reporte} esAdmin={esAdmin} t={t} />
+      </AppShell>
+    );
+  }
+
+  const [adjuntos, viaticosEnlazados] = await Promise.all([
+    listarAdjuntos(reporte.id),
+    listarViaticosEnlazadosA(reporte.id),
+  ]);
   const sinAdjuntos = adjuntos.length === 0;
   const editado = reporte.updatedBy !== null;
-  const esAdmin = user.role === "admin";
 
   return (
     <AppShell user={user}>
@@ -74,14 +199,16 @@ export default async function DetalleReportePage({ params }: Params) {
             href={esAdmin ? "/admin/reportes" : "/reportes"}
             className="inline-block text-sm font-medium text-muted transition hover:text-text"
           >
-            ← Volver a {esAdmin ? "todos los reportes" : "mis reportes"}
+            {t("volver", {
+              destino: esAdmin ? t("todosLosReportes") : t("misReportes"),
+            })}
           </Link>
 
           <a
             href={`/api/reportes/${reporte.id}/pdf`}
             className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-text transition hover:bg-surface-muted"
           >
-            Descargar reporte
+            {t("descargarReporte")}
           </a>
         </div>
 
@@ -120,23 +247,27 @@ export default async function DetalleReportePage({ params }: Params) {
 
           <dl className="mt-6 grid gap-5 sm:grid-cols-2">
             <Dato
-              etiqueta="No. orden de compra"
-              valor={reporte.purchaseOrderNo ?? "Sin asignar"}
+              etiqueta={t("cotizacion")}
+              valor={reporte.quoteNumber ?? t("sinAsignar")}
             />
             <Dato
-              etiqueta="Fecha del trabajo"
+              etiqueta={t("ordenCompra")}
+              valor={reporte.purchaseOrderNo ?? t("sinAsignar")}
+            />
+            <Dato
+              etiqueta={t("fechaTrabajo")}
               valor={formatFechaLarga(reporte.workDate)}
             />
-            <Dato etiqueta="Creado por" valor={reporte.authorName} />
+            <Dato etiqueta={t("creadoPor")} valor={reporte.authorName} />
             <Dato
-              etiqueta="Creado el"
+              etiqueta={t("creadoEl")}
               valor={formatInstante(reporte.createdAt)}
             />
           </dl>
 
           <div className="mt-6">
             <h3 className="text-xs font-medium uppercase tracking-wide text-muted">
-              Detalles del trabajo
+              {t("detallesTrabajo")}
             </h3>
             {reporte.details ? (
               // whitespace-pre-line conserva los saltos de línea que escribió
@@ -147,15 +278,15 @@ export default async function DetalleReportePage({ params }: Params) {
             ) : (
               // Sin alerta ni badge — el detalle es opcional a propósito, y su
               // ausencia no es un pendiente, solo la falta de una nota.
-              <p className="mt-2 text-sm italic text-muted">Sin detalles.</p>
+              <p className="mt-2 text-sm italic text-muted">{t("sinDetalles")}</p>
             )}
           </div>
 
           {editado ? (
             <p className="mt-6 border-t border-border pt-4 text-xs text-muted">
-              Última edición: {formatInstante(reporte.updatedAt)}
+              {t("ultimaEdicion", { fecha: formatInstante(reporte.updatedAt) })}
               {reporte.updatedBy !== reporte.authorId
-                ? " · modificado por un administrador"
+                ? t("modificadoAdmin")
                 : ""}
             </p>
           ) : null}
@@ -164,10 +295,10 @@ export default async function DetalleReportePage({ params }: Params) {
         <div className="rounded-2xl border border-border bg-surface p-5 sm:p-6">
           <div className="mb-4 flex items-center justify-between gap-3">
             <h3 className="text-sm font-semibold text-text">
-              Archivos adjuntos
+              {t("archivosAdjuntos")}
             </h3>
             <span className="text-xs text-muted">
-              {adjuntos.length} de {MAX_ARCHIVOS_POR_REPORTE}
+              {t("deTotal", { count: adjuntos.length, max: MAX_ARCHIVOS_POR_REPORTE })}
             </span>
           </div>
 
@@ -183,20 +314,37 @@ export default async function DetalleReportePage({ params }: Params) {
           </div>
         </div>
 
-        <div className="rounded-2xl border border-border bg-surface p-5 sm:p-6">
-          <div className="mb-4 flex items-center justify-between gap-3">
-            <h3 className="text-sm font-semibold text-text">Viáticos</h3>
-            <span className="text-xs text-muted">{viaticos.length}</span>
+        {/* Los gastos ya no viven dentro del reporte de servicio: se
+            registran como su propio reporte de viáticos, que enlaza aquí. Esta
+            sección solo enlista los que ya existen — para agregar uno nuevo
+            hay que crear un reporte de viáticos desde "Nuevo reporte". */}
+        {viaticosEnlazados.length > 0 ? (
+          <div className="rounded-2xl border border-border bg-surface p-5 sm:p-6">
+            <h3 className="mb-4 text-sm font-semibold text-text">
+              {t("viaticosEnlazados")}
+            </h3>
+            <ul className="space-y-2">
+              {viaticosEnlazados.map((v) => (
+                <li key={v.id}>
+                  <Link
+                    href={`/reportes/${v.id}`}
+                    className="flex items-center justify-between gap-3 rounded-xl border border-border bg-surface-muted px-3 py-2.5 text-sm transition hover:border-brand"
+                  >
+                    <span className="text-text">
+                      {formatInstante(v.createdAt)}
+                    </span>
+                    <span className="font-medium text-text">
+                      {formatearMonto(v.totalGastos)}
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
           </div>
-
-          <div className="space-y-4">
-            <ViaticoList viaticos={viaticos} onEliminar={eliminarViaticoAction} />
-            <ViaticoUploader action={agregarViaticoAction.bind(null, reporte.id)} />
-          </div>
-        </div>
+        ) : null}
 
         <div className="rounded-2xl border border-border bg-surface p-5 sm:p-6">
-          <h3 className="mb-4 text-sm font-semibold text-text">Firma</h3>
+          <h3 className="mb-4 text-sm font-semibold text-text">{t("firma")}</h3>
           <SignatureBlock
             // Se pasa la ruta autenticada, nunca la del almacenamiento.
             firmaUrl={reporte.signatureUrl ? `/api/firmas/${reporte.id}` : null}
@@ -221,7 +369,7 @@ export default async function DetalleReportePage({ params }: Params) {
             href={`/reportes/${reporte.id}/editar`}
             className="rounded-lg border border-border px-4 py-2.5 text-sm font-medium text-muted transition hover:bg-surface-muted hover:text-text"
           >
-            Editar
+            {t("editar")}
           </Link>
 
           <div className="ml-auto">
@@ -234,7 +382,7 @@ export default async function DetalleReportePage({ params }: Params) {
               // borrarlo hay que devolverlo antes a "en proceso", y eso queda
               // anotado en el historial de edición.
               <p className="text-xs text-muted">
-                Para eliminarlo, vuelve a ponerlo en proceso
+                {t("volverEnProceso")}
               </p>
             )}
           </div>

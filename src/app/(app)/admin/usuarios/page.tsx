@@ -1,3 +1,5 @@
+import { getTranslations } from "next-intl/server";
+
 import { AppShell } from "@/components/app-shell";
 import { CrearUsuarioForm } from "@/components/admin/crear-usuario-form";
 import { UsersTable } from "@/components/admin/users-table";
@@ -13,22 +15,23 @@ import { listarUsuarios, todasLasEmpresas } from "@/lib/queries/users";
 export default async function UsuariosPage() {
   const user = await requireAdmin();
 
-  const [usuarios, empresas] = await Promise.all([
+  const [usuarios, empresas, t] = await Promise.all([
     listarUsuarios(),
     todasLasEmpresas(),
+    getTranslations("usuarios"),
   ]);
 
   return (
     <AppShell user={user}>
       <div className="space-y-6">
         <section>
-          <h2 className="mb-3 text-sm font-semibold text-text">Nuevo usuario</h2>
+          <h2 className="mb-3 text-sm font-semibold text-text">{t("nuevoUsuario")}</h2>
           <CrearUsuarioForm empresas={empresas} />
         </section>
 
         <section>
           <h2 className="mb-3 text-sm font-semibold text-text">
-            Usuarios ({usuarios.length})
+            {t("listado", { count: usuarios.length })}
           </h2>
           <UsersTable
             usuarios={usuarios}

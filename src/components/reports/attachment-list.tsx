@@ -1,6 +1,7 @@
 "use client";
 
 import { useTransition } from "react";
+import { useTranslations } from "next-intl";
 
 import { esImagen, formatearTamano } from "@/lib/archivos";
 import type { AdjuntoEnLista } from "@/lib/queries/attachments";
@@ -23,19 +24,20 @@ function BotonBorrar({
   nombre: string;
 }) {
   const [pendiente, startTransition] = useTransition();
+  const t = useTranslations("adjuntos");
 
   return (
     <button
       type="button"
       disabled={pendiente}
-      aria-label={`Eliminar ${nombre}`}
+      aria-label={t("eliminarAria", { nombre })}
       onClick={() => {
-        if (!window.confirm(`¿Eliminar "${nombre}"?`)) return;
+        if (!window.confirm(t("confirmEliminar", { nombre }))) return;
         startTransition(onBorrar);
       }}
       className="shrink-0 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted transition hover:border-danger/40 hover:text-danger disabled:opacity-50"
     >
-      {pendiente ? "…" : "Eliminar"}
+      {pendiente ? "…" : t("eliminar")}
     </button>
   );
 }
@@ -47,10 +49,12 @@ export function AttachmentList({
   adjuntos: AdjuntoEnLista[];
   onEliminar: (id: string) => void | Promise<void>;
 }) {
+  const t = useTranslations("adjuntos");
+
   if (adjuntos.length === 0) {
     return (
       <p className="text-sm text-muted">
-        Todavía no hay archivos en este reporte.
+        {t("sinArchivos")}
       </p>
     );
   }

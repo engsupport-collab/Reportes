@@ -2,19 +2,21 @@
 
 import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
+import { useTranslations } from "next-intl";
 
 import { crearUsuarioAction, type UsuarioState } from "@/actions/users";
 import type { Empresa } from "@/lib/queries/companies";
 
 function BotonCrear() {
   const { pending } = useFormStatus();
+  const t = useTranslations("crearUsuarioForm");
   return (
     <button
       type="submit"
       disabled={pending}
       className="rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-strong disabled:cursor-not-allowed disabled:opacity-60"
     >
-      {pending ? "Creando…" : "Crear usuario"}
+      {pending ? t("creando") : t("crearUsuario")}
     </button>
   );
 }
@@ -28,6 +30,8 @@ function BotonCrear() {
  * mismo y entregárselas a la persona.
  */
 export function CrearUsuarioForm({ empresas }: { empresas: Empresa[] }) {
+  const t = useTranslations("crearUsuarioForm");
+  const tNav = useTranslations("nav");
   const [state, formAction] = useActionState<UsuarioState, FormData>(
     crearUsuarioAction,
     {},
@@ -38,14 +42,11 @@ export function CrearUsuarioForm({ empresas }: { empresas: Empresa[] }) {
   if (state.credenciales) {
     return (
       <div className="rounded-2xl border border-success/30 bg-success/10 p-5">
-        <p className="text-sm font-semibold text-success">Usuario creado</p>
+        <p className="text-sm font-semibold text-success">{t("usuarioCreado")}</p>
         <p className="mt-2 rounded-lg bg-surface px-3 py-2.5 font-mono text-sm text-text">
           {state.credenciales}
         </p>
-        <p className="mt-2 text-xs text-muted">
-          Esta contraseña no se puede volver a mostrar. Cópiala y entrégasela a
-          la persona ahora.
-        </p>
+        <p className="mt-2 text-xs text-muted">{t("contrasenaUnaVez")}</p>
         <div className="mt-3 flex gap-2">
           <button
             type="button"
@@ -55,13 +56,13 @@ export function CrearUsuarioForm({ empresas }: { empresas: Empresa[] }) {
             }}
             className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-text transition hover:bg-surface-muted"
           >
-            {copiado ? "Copiado" : "Copiar"}
+            {copiado ? t("copiado") : t("copiar")}
           </button>
           <a
             href="/admin/usuarios"
             className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted transition hover:bg-surface-muted hover:text-text"
           >
-            Crear otro usuario
+            {t("crearOtro")}
           </a>
         </div>
       </div>
@@ -73,7 +74,7 @@ export function CrearUsuarioForm({ empresas }: { empresas: Empresa[] }) {
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-1.5">
           <label htmlFor="fullName" className="block text-sm font-medium text-text">
-            Nombre completo
+            {t("nombreCompleto")}
           </label>
           <input
             id="fullName"
@@ -87,7 +88,7 @@ export function CrearUsuarioForm({ empresas }: { empresas: Empresa[] }) {
 
         <div className="space-y-1.5">
           <label htmlFor="username" className="block text-sm font-medium text-text">
-            Usuario
+            {t("usuario")}
           </label>
           <input
             id="username"
@@ -95,7 +96,7 @@ export function CrearUsuarioForm({ empresas }: { empresas: Empresa[] }) {
             required
             maxLength={40}
             pattern="[a-z0-9._-]+"
-            title="Solo minúsculas, números, puntos, guiones y guiones bajos"
+            title={t("ayudaUsuario")}
             className="w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-sm text-text focus:border-brand focus:outline-none"
             placeholder="maria.gomez"
           />
@@ -103,7 +104,7 @@ export function CrearUsuarioForm({ empresas }: { empresas: Empresa[] }) {
       </div>
 
       <fieldset className="space-y-2">
-        <legend className="mb-1 text-sm font-medium text-text">Rol</legend>
+        <legend className="mb-1 text-sm font-medium text-text">{t("rol")}</legend>
         <div className="flex gap-2">
           <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-border px-4 py-2.5 text-sm text-text transition hover:bg-surface-muted has-checked:border-brand has-checked:bg-brand-soft has-checked:font-semibold has-checked:text-brand">
             <input
@@ -114,7 +115,7 @@ export function CrearUsuarioForm({ empresas }: { empresas: Empresa[] }) {
               className="accent-brand"
               onChange={() => setRole("empleado")}
             />
-            Empleado
+            {tNav("empleado")}
           </label>
           <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-border px-4 py-2.5 text-sm text-text transition hover:bg-surface-muted has-checked:border-brand has-checked:bg-brand-soft has-checked:font-semibold has-checked:text-brand">
             <input
@@ -124,7 +125,7 @@ export function CrearUsuarioForm({ empresas }: { empresas: Empresa[] }) {
               className="accent-brand"
               onChange={() => setRole("admin")}
             />
-            Administrador
+            {tNav("administrador")}
           </label>
         </div>
       </fieldset>
@@ -135,7 +136,7 @@ export function CrearUsuarioForm({ empresas }: { empresas: Empresa[] }) {
       {role === "empleado" ? (
         <fieldset className="space-y-2">
           <legend className="mb-1 text-sm font-medium text-text">
-            Empresas a las que tiene acceso
+            {t("empresasAcceso")}
           </legend>
           <div className="flex flex-wrap gap-2">
             {empresas.map((e) => (
@@ -151,7 +152,7 @@ export function CrearUsuarioForm({ empresas }: { empresas: Empresa[] }) {
         </fieldset>
       ) : (
         <p className="rounded-lg bg-surface-muted px-3 py-2.5 text-xs text-muted">
-          Un administrador ve las dos empresas siempre; no hace falta elegir.
+          {t("adminVeTodas")}
         </p>
       )}
 

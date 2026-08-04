@@ -66,23 +66,35 @@ function csvAEtiquetas(csv: string | null): string[] {
  * No se guarda en la base: se calcula. Un campo almacenado se desincronizaría
  * en cuanto alguien subiera o borrara un adjunto, y habría que acordarse de
  * actualizarlo en cada operación. Así siempre dice la verdad.
+ *
+ * Solo aplica a un reporte de servicio: uno de viáticos no tiene "documento
+ * del trabajo" en ese sentido, así que nunca puede estar incompleto por esto.
  */
 const esIncompleto = sql`(
-  ${reports.status} = 'terminado'
+  ${reports.type} = 'servicio'
+  AND ${reports.status} = 'terminado'
   AND (SELECT COUNT(*) FROM ${attachments} WHERE ${attachments.reportId} = ${reports.id}) = 0
 )`;
 
-/** Terminado pero sin firmar. Se señala aparte, con su propia etiqueta. */
+/**
+ * Terminado pero sin firmar. Se señala aparte, con su propia etiqueta. Solo
+ * aplica a un reporte de servicio: uno de viáticos no tiene firma, así que
+ * exigirla lo marcaría como pendiente para siempre.
+ */
 const faltaFirma = sql`(
-  ${reports.status} = 'terminado' AND ${reports.signatureUrl} IS NULL
+  ${reports.type} = 'servicio'
+  AND ${reports.status} = 'terminado' AND ${reports.signatureUrl} IS NULL
 )`;
 
 /**
  * Sin orden de compra. A diferencia de las dos anteriores, no depende del
  * estado: es un dato administrativo que puede faltar en cualquier momento, no
- * una señal de avance del trabajo.
+ * una señal de avance del trabajo. Solo aplica a un reporte de servicio: uno
+ * de viáticos no tiene orden de compra.
  */
-const sinOrden = sql`${reports.purchaseOrderNo} IS NULL`;
+const sinOrden = sql`(
+  ${reports.type} = 'servicio' AND ${reports.purchaseOrderNo} IS NULL
+)`;
 
 export type ReporteEnLista = {
   id: string;
@@ -128,6 +140,11 @@ export const POR_PAGINA = 20;
 
 function construirWhere(filtros: FiltrosReportes) {
   const condiciones = [
+    // Las listas y sus filtros (orden de compra, tipo de servicio, firma) son
+    // propios del reporte de servicio. Un reporte de viáticos no encaja en
+    // esta vista — se llega a él desde el reporte de servicio que justifica,
+    // no desde estas listas.
+    eq(reports.type, "servicio"),
     filtros.companyId ? eq(reports.companyId, filtros.companyId) : undefined,
   ];
 
@@ -361,8 +378,11 @@ export async function obtenerReporte(id: string) {
       companyName: companies.name,
       authorId: reports.authorId,
       authorName: users.fullName,
+      type: reports.type,
+      linkedReportId: reports.linkedReportId,
       projectName: reports.projectName,
       purchaseOrderNo: reports.purchaseOrderNo,
+      quoteNumber: reports.quoteNumber,
       clientName: reports.clientName,
       workDate: reports.workDate,
       details: reports.details,
@@ -393,4 +413,84 @@ export async function obtenerReporte(id: string) {
     attachmentCount: Number(fila.attachmentCount),
     etiquetas: csvAEtiquetas(csv),
   };
+}
+
+export type ReporteParaEnlazar = {
+  id: string;
+  projectName: string;
+  clientName: string;
+  workDate: Date;
+};
+
+/**
+ * Reportes de servicio de una empresa, para el buscador de "a qué reporte
+ * pertenece" al crear uno de viáticos. Sin paginar: son los reportes de una
+ * sola empresa, no la lista completa del sistema.
+ */
+export async function listarReportesServicioParaEnlazar(
+  companyId: string,
+): Promise<ReporteParaEnlazar[]> {
+  return db
+    .select({
+      id: reports.id,
+      projectName: reports.projectName,
+      clientName: reports.clientName,
+      workDate: reports.workDate,
+    })
+    .from(reports)
+    .where(and(eq(reports.companyId, companyId), eq(reports.type, "servicio")))
+    .orderBy(desc(reports.createdAt));
+}
+
+/**
+ * Un reporte de servicio, solo los campos que necesita un reporte de
+ * viáticos para copiarlos al crearse (proyecto y cliente) y para verificar
+ * que pertenece a la empresa correcta antes de enlazarlo.
+ */
+export async function obtenerReporteServicioParaEnlazar(id: string) {
+  const [fila] = await db
+    .select({
+      id: reports.id,
+      companyId: reports.companyId,
+      type: reports.type,
+      projectName: reports.projectName,
+      clientName: reports.clientName,
+    })
+    .from(reports)
+    .where(eq(reports.id, id))
+    .limit(1);
+
+  return fila ?? null;
+}
+
+export type ReporteViaticoEnlazado = {
+  id: string;
+  status: ReportStatus;
+  totalGastos: number;
+  createdAt: Date;
+};
+
+/**
+ * Reportes de viáticos que justifican un reporte de servicio, para mostrarlos
+ * en su detalle. El total se suma aquí (no en el navegador) porque es la
+ * misma cifra que finanzas necesita para verificar el gasto del proyecto.
+ */
+export async function listarViaticosEnlazadosA(
+  reportId: string,
+): Promise<ReporteViaticoEnlazado[]> {
+  const filas = await db
+    .select({
+      id: reports.id,
+      status: reports.status,
+      createdAt: reports.createdAt,
+      totalGastos: sql<number>`(
+        SELECT COALESCE(SUM(amount), 0) FROM report_viaticos
+        WHERE report_viaticos.report_id = ${reports.id}
+      )`,
+    })
+    .from(reports)
+    .where(and(eq(reports.linkedReportId, reportId), eq(reports.type, "viaticos")))
+    .orderBy(desc(reports.createdAt));
+
+  return filas.map((f) => ({ ...f, totalGastos: Number(f.totalGastos) }));
 }

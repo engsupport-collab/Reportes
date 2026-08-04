@@ -121,7 +121,12 @@ export type EstadoDocumental = {
 export async function estadoDocumental(
   companyId?: string,
 ): Promise<EstadoDocumental> {
-  const deLaEmpresa = companyId ? eq(reports.companyId, companyId) : undefined;
+  // Documento, firma y orden de compra son conceptos del reporte de
+  // servicio; uno de viáticos no los tiene y no debe contar aquí.
+  const deLaEmpresa = and(
+    eq(reports.type, "servicio"),
+    companyId ? eq(reports.companyId, companyId) : undefined,
+  );
   const terminado = eq(reports.status, "terminado");
 
   const conAdjunto = sql`EXISTS (SELECT 1 FROM ${attachments} WHERE ${attachments.reportId} = ${reports.id})`;
@@ -155,7 +160,10 @@ export async function estadoDocumental(
 export async function obtenerAnaliticas(
   companyId: string,
 ): Promise<Analiticas> {
-  const deLaEmpresa = eq(reports.companyId, companyId);
+  // Estas analíticas (tipo de servicio, etiquetas, documento, firma, orden)
+  // son todas propias del reporte de servicio; uno de viáticos no encaja en
+  // ninguna de ellas.
+  const deLaEmpresa = and(eq(reports.companyId, companyId), eq(reports.type, "servicio"))!;
 
   const contar = async (condicion: ReturnType<typeof and>): Promise<number> => {
     const [fila] = await db
@@ -249,6 +257,8 @@ export async function obtenerAnaliticas(
   const etiquetaServicio: Record<string, string> = {
     electrico: "Eléctrico",
     mecanico: "Mecánico",
+    programacion: "Programación",
+    soporte: "Soporte",
   };
   const etiquetaTrabajo: Record<string, string> = {
     preventivo: "Mantenimiento preventivo",
