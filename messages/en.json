@@ -402,6 +402,8 @@
     "tituloNueva": "New quote",
     "tituloEditar": "Edit quote",
     "empresa": "Company",
+    "estado": "Status",
+    "estadoAyuda": "Created in progress, ready to work on. Change it only if you're waiting for the client's authorization.",
     "quoteNumber": "Quote number",
     "placeholderQuoteNumber": "Q2026_001",
     "opcional": "(optional)",

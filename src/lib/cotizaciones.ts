@@ -26,6 +26,11 @@ export type EstadoCotizacion = (typeof ESTADOS_COTIZACION)[number];
  * puede haber dado el visto bueno de palabra y el trabajo ya estar en marcha
  * aunque no haya llegado la orden de compra. Dejarla fuera obligaría al
  * técnico a inventarse una cotización que sí existe.
+ *
+ * Ojo con el nombre: se refiere a la autorización del CLIENTE, no a un
+ * permiso interno. Ninguna cotización nace aquí — el estado por defecto es
+ * "en curso" — y que la haya creado un técnico se marca con `revisada`, no
+ * con el estado. Ver el comentario de `quotes.status` en el esquema.
  */
 export const ESTADOS_ACTIVOS = [
   "pendiente_autorizacion",

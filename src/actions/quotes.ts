@@ -66,12 +66,18 @@ export async function crearCotizacionAction(
     return { error: parsed.error.issues[0]?.message ?? t("revisaLosDatos") };
   }
 
+  // El estado lo elige el admin al crear, con "en curso" ya preseleccionado:
+  // si él la registra, es la autoridad y no hay a quién pedirle permiso. Un
+  // valor que no sea de la lista se ignora y cae en el default del esquema.
+  const estado = estadoCotizacionSchema.safeParse(formData.get("status"));
+
   const id = crypto.randomUUID();
 
   await db.insert(quotes).values({
     id,
     companyId: empresa.id,
     createdBy: user.id,
+    ...(estado.success ? { status: estado.data } : {}),
     ...parsed.data,
   });
 

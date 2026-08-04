@@ -136,9 +136,22 @@ export const quotes = sqliteTable(
     projectName: text("project_name").notNull(),
     clientName: text("client_name").notNull(),
 
+    /**
+     * En qué fase está el trabajo — y solo eso. NO codifica quién creó la
+     * cotización ni si está validada: de eso se encarga `revisada`.
+     *
+     * Nace "en curso" venga de donde venga. Si la registró un admin, es la
+     * autoridad y no hay a quién pedirle permiso; si la creó un técnico en
+     * campo, el trabajo ya está ocurriendo y bloquearlo sería devolverlo al
+     * problema que este módulo vino a resolver — queda marcada `revisada:
+     * false` y sigue su curso mientras el admin la valida.
+     *
+     * "Pendiente por autorización" sigue disponible para elegirlo a mano,
+     * para el caso real de estar esperando el visto bueno del cliente.
+     */
     status: text("status", { enum: ESTADOS_COTIZACION })
       .notNull()
-      .default("pendiente_autorizacion"),
+      .default("en_curso"),
 
     // Llega después de que el cliente autoriza. Null mientras tanto — que es
     // justo el caso de la autorización verbal, donde el trabajo ya arrancó.

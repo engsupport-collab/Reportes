@@ -402,6 +402,8 @@
     "tituloNueva": "Nova cotação",
     "tituloEditar": "Editar cotação",
     "empresa": "Empresa",
+    "estado": "Status",
+    "estadoAyuda": "É criada em andamento, pronta para trabalhar. Mude apenas se estiver esperando a autorização do cliente.",
     "quoteNumber": "Número da cotação",
     "placeholderQuoteNumber": "Q2026_001",
     "opcional": "(opcional)",

@@ -6,6 +6,7 @@ import { useFormStatus } from "react-dom";
 import { useTranslations } from "next-intl";
 
 import type { CotizacionState } from "@/actions/quotes";
+import { ESTADOS_COTIZACION } from "@/lib/cotizaciones";
 import type { Moneda } from "@/lib/moneda";
 import type { Empresa } from "@/lib/queries/companies";
 
@@ -69,6 +70,7 @@ export function QuoteForm({
     {},
   );
   const t = useTranslations("cotizacionForm");
+  const tEstados = useTranslations("estadosCotizacion");
 
   // La empresa se sube a estado (a diferencia del resto del formulario, no
   // controlado) solo para saber en qué moneda se está cotizando: LLC factura
@@ -114,6 +116,29 @@ export function QuoteForm({
             <p className="rounded-lg bg-surface-muted px-3 py-2.5 text-sm text-muted">
               {empresaFija}
             </p>
+          </div>
+        ) : null}
+
+        {/* Solo al crear. Al editar, el estado se cambia desde el detalle,
+            que es donde se ve junto a los reportes que ya cuelgan de ella. */}
+        {empresas ? (
+          <div className="space-y-1.5 sm:col-span-2">
+            <label htmlFor="status" className="block text-sm font-medium text-text">
+              {t("estado")}
+            </label>
+            <select
+              id="status"
+              name="status"
+              defaultValue="en_curso"
+              className={CAMPO}
+            >
+              {ESTADOS_COTIZACION.map((estado) => (
+                <option key={estado} value={estado}>
+                  {tEstados(estado)}
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-muted">{t("estadoAyuda")}</p>
           </div>
         ) : null}
 

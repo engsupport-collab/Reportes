@@ -402,6 +402,8 @@
     "tituloNueva": "Nueva cotización",
     "tituloEditar": "Editar cotización",
     "empresa": "Empresa",
+    "estado": "Estado",
+    "estadoAyuda": "Se crea en curso, lista para trabajar. Cámbialo solo si estás esperando la autorización del cliente.",
     "quoteNumber": "Número de cotización",
     "placeholderQuoteNumber": "Q2026_001",
     "opcional": "(opcional)",
