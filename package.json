@@ -19,6 +19,7 @@
     "test:adjuntos": "tsx scripts/test-adjuntos.ts",
     "test:filtros": "tsx --conditions=react-server scripts/test-filtros.ts",
     "test:firma": "tsx scripts/test-firma.ts",
+    "test:numeracion": "tsx --conditions=react-server scripts/test-numeracion.ts",
     "test:usuarios": "tsx scripts/test-usuarios.ts",
     "medir:rendimiento": "tsx --conditions=react-server scripts/medir-rendimiento.ts",
     "medir:latencia": "tsx scripts/medir-latencia-base.ts",

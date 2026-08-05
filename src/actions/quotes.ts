@@ -14,6 +14,7 @@ import { listarEmpresas } from "@/lib/queries/companies";
 import {
   insertarCotizacionConNumeroAutomatico,
   obtenerCotizacion,
+  sincronizarSecuenciaConNumero,
 } from "@/lib/queries/quotes";
 import {
   cotizacionCampoSchema,
@@ -126,6 +127,10 @@ export async function crearCotizacionAction(
       status,
       ...parsed.data,
     });
+    // El admin escribió el número a mano. Si va por delante del contador, se
+    // adelanta el contador: si no, dentro de unas semanas la secuencia
+    // llegaría a ese mismo número y lo entregaría por segunda vez.
+    await sincronizarSecuenciaConNumero(parsed.data.quoteNumber);
   }
 
   revalidarListas();
@@ -174,6 +179,10 @@ export async function actualizarCotizacionAction(
     .update(quotes)
     .set({ ...parsed.data, updatedAt: new Date(), updatedBy: user.id })
     .where(eq(quotes.id, id));
+
+  // Mismo motivo que al crear: editar el número a mano también puede dejarlo
+  // por delante del contador.
+  await sincronizarSecuenciaConNumero(parsed.data.quoteNumber);
 
   revalidarListas(id);
   redirect(`/admin/cotizaciones/${id}`);

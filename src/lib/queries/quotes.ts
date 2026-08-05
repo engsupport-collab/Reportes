@@ -3,7 +3,14 @@ import "server-only";
 import { and, desc, eq, like, or, sql } from "drizzle-orm";
 
 import { db } from "@/db";
-import { clients, companies, quotes, reports, users } from "@/db/schema";
+import {
+  clients,
+  companies,
+  quoteSequences,
+  quotes,
+  reports,
+  users,
+} from "@/db/schema";
 import { ESTADOS_ACTIVOS, type EstadoCotizacion } from "@/lib/cotizaciones";
 import type { Moneda } from "@/lib/moneda";
 
@@ -216,72 +223,98 @@ export type ReporteDeCotizacion = {
 };
 
 /**
- * Prefijo del año en curso para el número de cotización, p. ej. "Q2026_". El
- * consecutivo reinicia solo con que cambie el año, sin ningún paso manual.
+ * Numeración de cotizaciones.
+ *
+ * El número NO se deduce de la tabla `quotes`. Sale de un contador propio
+ * (`quote_sequences`, uno por año) que solo avanza. Ver el comentario de esa
+ * tabla en `src/db/schema.ts` para el porqué: cualquier regla que mire las
+ * filas existentes —`MAX + 1`, `COUNT + 1`, el primer hueco libre— devuelve
+ * un número distinto según lo que haya en la tabla en ese instante, así que
+ * borrar una cotización libera el suyo y dos documentos distintos pueden
+ * acabar llamándose igual.
+ *
+ * Consecuencia buscada: los huecos son permanentes. Si se borra la Q2026_004,
+ * ese número no se vuelve a entregar jamás.
  */
-function prefijoNumeroCotizacion(): string {
-  return `Q${new Date().getFullYear()}_`;
+
+/** Longitud mínima del consecutivo; a partir de 1000 crece solo. */
+const DIGITOS_CONSECUTIVO = 3;
+
+function anioActual(): number {
+  return new Date().getFullYear();
 }
 
 /**
- * Condición "esta cotización lleva número de este año".
- *
- * Deliberadamente NO mira el estado: una cotización cancelada o finalizada
- * ocupa su número igual que una en curso. Si el estado entrara aquí, cerrar
- * la última cotización del año haría que la siguiente reutilizara su número y
- * dos documentos distintos terminarían llamándose igual.
- *
- * El `_` del prefijo va escapado porque en SQL es un comodín de un carácter:
- * sin `ESCAPE`, el patrón "Q2026_%" también casaría con "Q2026X001", y un
- * número ajeno se colaría en el consecutivo del año. Se escapa con "!" y no
- * con la barra invertida de costumbre porque el prefijo lo genera esta misma
- * función (`Q` + año + `_`) y nunca puede contener "!" — así no hace falta
- * escapar también el carácter de escape.
+ * "Q2026_007". El año va dentro del número, así que el consecutivo puede
+ * reiniciar en cada año sin que dos cotizaciones se llamen igual nunca.
  */
-function esDelAnio(prefijo: string) {
-  return sql`${quotes.quoteNumber} LIKE ${`${prefijo.replace(/_/g, "!_")}%`} ESCAPE '!'`;
+export function formatearNumeroCotizacion(anio: number, valor: number): string {
+  return `Q${anio}_${String(valor).padStart(DIGITOS_CONSECUTIVO, "0")}`;
+}
+
+/** Descompone un número con el formato de la casa. Null si no lo tiene. */
+export function leerNumeroCotizacion(
+  numero: string,
+): { anio: number; valor: number } | null {
+  const m = /^Q(\d{4})_(\d+)$/.exec(numero.trim());
+  if (!m) return null;
+  return { anio: Number(m[1]), valor: Number(m[2]) };
 }
 
 /**
- * Siguiente consecutivo libre del año, como número.
+ * Reserva el siguiente número del año dentro de una sola sentencia.
  *
- * Se compara el consecutivo convertido a entero, no la cadena completa: con
- * `MAX` de texto, "Q2026_9" ganaría a "Q2026_010" y el siguiente número
- * saldría repetido. Esta es la única definición de "cuál sigue" — la usan
- * tanto la sugerencia del formulario como la asignación real al guardar, para
- * que no puedan discrepar.
+ * `INSERT ... ON CONFLICT DO UPDATE ... RETURNING` incrementa y devuelve en el
+ * mismo paso. No hay ventana entre leer y escribir, así que dos peticiones
+ * simultáneas no pueden recibir el mismo valor: la segunda espera al bloqueo
+ * de escritura de la primera y sale con el siguiente.
  *
- * `substr(quote_number, N)` usa índice 1: con el prefijo "Q2026_" (6
- * caracteres), el primer dígito del consecutivo empieza en la posición 7.
+ * Recibe el ejecutor (`db` o una transacción) para poder participar de una
+ * transacción mayor — ver `insertarCotizacionConNumeroAutomatico`.
  */
-function siguienteConsecutivo(prefijo: string) {
-  return sql<number>`COALESCE(MAX(CAST(substr(${quotes.quoteNumber}, ${prefijo.length + 1}) AS INTEGER)), 0) + 1`;
+async function reservarConsecutivo(
+  ejecutor: Pick<typeof db, "get">,
+  anio: number,
+): Promise<number> {
+  const fila = await ejecutor.get<{ last_value: number }>(sql`
+    INSERT INTO ${quoteSequences} (year, last_value) VALUES (${anio}, 1)
+    ON CONFLICT(year) DO UPDATE SET last_value = last_value + 1
+    RETURNING last_value
+  `);
+
+  if (!fila) {
+    throw new Error(`No se pudo reservar el número de cotización de ${anio}.`);
+  }
+
+  return Number(fila.last_value);
 }
 
 /**
- * Siguiente número de cotización, SOLO para mostrarlo en el formulario antes
- * de guardar. No es atómico — es una lectura suelta, y puede quedar obsoleta
- * si otro admin crea una cotización mientras el formulario sigue abierto. La
- * asignación real, la que sí tiene que ser segura, ocurre en
- * `insertarCotizacionConNumeroAutomatico`, en el momento de guardar.
+ * Número que el formulario muestra ya escrito, SOLO como sugerencia.
+ *
+ * No reserva nada: si lo reservara, abrir el formulario y cerrarlo sin guardar
+ * quemaría un número. Puede quedar obsoleto si otro admin crea una cotización
+ * mientras el formulario sigue abierto, y por eso el guardado lo descarta y
+ * pide uno de verdad — ver `crearCotizacionAction`.
  */
 export async function siguienteNumeroCotizacionSugerido(): Promise<string> {
-  const prefijo = prefijoNumeroCotizacion();
+  const anio = anioActual();
 
   const [fila] = await db
-    .select({ siguiente: siguienteConsecutivo(prefijo) })
-    .from(quotes)
-    .where(esDelAnio(prefijo));
+    .select({ lastValue: quoteSequences.lastValue })
+    .from(quoteSequences)
+    .where(eq(quoteSequences.year, anio))
+    .limit(1);
 
-  return `${prefijo}${String(Number(fila?.siguiente ?? 1)).padStart(3, "0")}`;
+  return formatearNumeroCotizacion(anio, (fila?.lastValue ?? 0) + 1);
 }
 
 /**
- * Inserta una cotización asignándole el siguiente número del año de forma
- * atómica: el cálculo del consecutivo y la inserción ocurren en una sola
- * sentencia SQL (un `INSERT ... SELECT` con `MAX` sobre la propia tabla), así
- * que dos cotizaciones creadas al mismo tiempo no pueden recibir el mismo
- * número — a diferencia de `siguienteNumeroCotizacionSugerido`, que solo lee.
+ * Inserta una cotización con el siguiente número del año.
+ *
+ * La reserva y la inserción van en una transacción: si la inserción falla, el
+ * contador vuelve atrás y el número no se pierde. Un fallo a medias dejaría un
+ * hueco — no sería incorrecto, pero es evitable.
  */
 export async function insertarCotizacionConNumeroAutomatico(valores: {
   id: string;
@@ -295,29 +328,52 @@ export async function insertarCotizacionConNumeroAutomatico(valores: {
   description: string | null;
   amount: number | null;
   revisada: boolean;
-}): Promise<void> {
-  const prefijo = prefijoNumeroCotizacion();
+}): Promise<string> {
+  const anio = anioActual();
+
+  return db.transaction(async (tx) => {
+    const consecutivo = await reservarConsecutivo(tx, anio);
+    const quoteNumber = formatearNumeroCotizacion(anio, consecutivo);
+
+    await tx.insert(quotes).values({
+      id: valores.id,
+      companyId: valores.companyId,
+      createdBy: valores.createdBy,
+      status: valores.status,
+      quoteNumber,
+      projectName: valores.projectName,
+      clientId: valores.clientId,
+      purchaseOrderNo: valores.purchaseOrderNo,
+      dueDate: valores.dueDate === null ? null : new Date(valores.dueDate),
+      description: valores.description,
+      amount: valores.amount,
+      revisada: valores.revisada,
+    });
+
+    return quoteNumber;
+  });
+}
+
+/**
+ * Adelanta el contador si alguien escribió un número a mano por encima de él.
+ *
+ * El campo de número es editable, así que un admin puede escribir "Q2026_050"
+ * cuando el contador va por el 12. Sin esto, el contador llegaría al 50 dentro
+ * de unas semanas y entregaría un número que ya está en uso — justo lo que la
+ * secuencia existe para impedir. Nunca lo hace retroceder.
+ *
+ * Silencioso ante cualquier otro formato: un número que no sea "Qaaaa_nnn" no
+ * pertenece a esta serie y no la afecta.
+ */
+export async function sincronizarSecuenciaConNumero(
+  numero: string | null,
+): Promise<void> {
+  const leido = numero ? leerNumeroCotizacion(numero) : null;
+  if (!leido) return;
 
   await db.run(sql`
-    INSERT INTO ${quotes} (
-      id, company_id, quote_number, project_name, client_id, status,
-      purchase_order_no, due_date, description, amount, revisada, created_by
-    )
-    SELECT
-      ${valores.id},
-      ${valores.companyId},
-      ${prefijo} || printf('%03d', ${siguienteConsecutivo(prefijo)}),
-      ${valores.projectName},
-      ${valores.clientId},
-      ${valores.status},
-      ${valores.purchaseOrderNo},
-      ${valores.dueDate},
-      ${valores.description},
-      ${valores.amount},
-      ${valores.revisada ? 1 : 0},
-      ${valores.createdBy}
-    FROM ${quotes}
-    WHERE ${esDelAnio(prefijo)}
+    INSERT INTO ${quoteSequences} (year, last_value) VALUES (${leido.anio}, ${leido.valor})
+    ON CONFLICT(year) DO UPDATE SET last_value = MAX(last_value, ${leido.valor})
   `);
 }
 

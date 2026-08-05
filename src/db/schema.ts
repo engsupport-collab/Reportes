@@ -156,6 +156,34 @@ export const clients = sqliteTable(
 );
 
 /**
+ * Contador de números de cotización, uno por año.
+ *
+ * SQLite no tiene secuencias, así que esta tabla es la secuencia: guarda el
+ * último valor entregado de cada año y se incrementa con un `INSERT ... ON
+ * CONFLICT DO UPDATE ... RETURNING`, una sola sentencia que reserva el número
+ * y lo devuelve. Dos peticiones simultáneas se serializan en el bloqueo de
+ * escritura de SQLite, así que es imposible que reciban el mismo valor.
+ *
+ * Es lo que sustituye a mirar la propia tabla `quotes` para decidir el
+ * siguiente número. Cualquier variante de eso —`MAX + 1`, `COUNT + 1`, buscar
+ * el primer hueco— tiene el mismo defecto de fondo: la respuesta depende de
+ * qué filas existan en ese instante, así que borrar una cotización libera su
+ * número y dos documentos distintos pueden acabar llamándose igual. El
+ * contador solo avanza; un número entregado no vuelve nunca, exista o no la
+ * cotización que lo usó.
+ *
+ * Que queden huecos (por una cotización borrada, o por un guardado que falló)
+ * es el comportamiento correcto, no un defecto: es lo mismo que hace una
+ * secuencia de Postgres.
+ */
+export const quoteSequences = sqliteTable("quote_sequences", {
+  /** El año del prefijo, p. ej. 2026 en "Q2026_001". */
+  year: integer("year").primaryKey(),
+  /** Último consecutivo entregado para ese año. Nunca retrocede. */
+  lastValue: integer("last_value").notNull(),
+});
+
+/**
  * Cotizaciones: la fuente oficial de qué trabajos existen.
  *
  * Antes esta información vivía en un Excel y el técnico copiaba a mano el
