@@ -306,7 +306,7 @@
     "placeholderNombre": "Nome e sobrenome",
     "correoQuienFirma": "E-mail de quem assina",
     "placeholderCorreo": "email@empresa.com",
-    "ayudaCorreo": "Fica guardado para enviar o relatório quando você marcá-lo como concluído. Assinar não envia nenhum e-mail.",
+    "ayudaCorreo": "O relatório chega neste e-mail quando você marcá-lo como concluído. Assinar ainda não envia nada.",
     "formaDeFirmar": "Forma de assinar",
     "escribir": "Digitar",
     "dibujar": "Desenhar",
@@ -329,12 +329,7 @@
     "confirmEliminar": "Excluir este relatório? Esta ação não pode ser desfeita.",
     "eliminando": "Excluindo…",
     "eliminar": "Excluir",
-    "correoCliente": "E-mail do cliente",
-    "placeholderCorreoCliente": "email@empresa.com",
-    "correoClienteAyuda": "Ao concluir, o relatório em PDF chega neste e-mail.",
-    "enviarYTerminar": "Enviar e concluir",
-    "enviando": "Enviando…",
-    "cancelar": "Cancelar"
+    "enviando": "Enviando…"
   },
   "analiticasPage": {
     "titulo": "Análises · {empresa}",
@@ -412,8 +407,8 @@
     "firmaDemasiadoGrande": "A assinatura é muito grande.",
     "firmaFormatoInvalido": "O formato da assinatura não é válido.",
     "firmaGuardada": "Assinatura salva.",
-    "ingresaCorreoCliente": "Informe o e-mail do cliente para enviar o relatório",
-    "terminadoSinCorreo": "O relatório ficou concluído, mas o e-mail não saiu. Volte-o para em andamento e marque como concluído de novo para tentar outra vez."
+    "terminadoSinCorreo": "O relatório ficou concluído, mas o e-mail não saiu. Pressione o botão de novo para tentar enviar outra vez.",
+    "firmaAntesDeTerminar": "Assine o relatório antes de concluí-lo: o e-mail do cliente vem da assinatura."
   },
   "estadosCotizacion": {
     "pendiente_autorizacion": "Pendente de autorização",

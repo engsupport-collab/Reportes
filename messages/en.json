@@ -306,7 +306,7 @@
     "placeholderNombre": "First and last name",
     "correoQuienFirma": "Signer's email",
     "placeholderCorreo": "email@company.com",
-    "ayudaCorreo": "Saved so the report can be sent when you mark it as completed. Signing sends no email.",
+    "ayudaCorreo": "The report goes to this address when you mark it as completed. Signing sends nothing yet.",
     "formaDeFirmar": "How to sign",
     "escribir": "Type",
     "dibujar": "Draw",
@@ -329,12 +329,7 @@
     "confirmEliminar": "Delete this report? This action can't be undone.",
     "eliminando": "Deleting…",
     "eliminar": "Delete",
-    "correoCliente": "Client's email",
-    "placeholderCorreoCliente": "email@company.com",
-    "correoClienteAyuda": "When you finish, the PDF report goes to this address.",
-    "enviarYTerminar": "Send and finish",
-    "enviando": "Sending…",
-    "cancelar": "Cancel"
+    "enviando": "Sending…"
   },
   "analiticasPage": {
     "titulo": "Analytics · {empresa}",
@@ -412,8 +407,8 @@
     "firmaDemasiadoGrande": "The signature is too large.",
     "firmaFormatoInvalido": "The signature format isn't valid.",
     "firmaGuardada": "Signature saved.",
-    "ingresaCorreoCliente": "Enter the client's email to send them the report",
-    "terminadoSinCorreo": "The report was marked as completed, but the email didn't go out. Set it back to in progress and mark it completed again to retry."
+    "terminadoSinCorreo": "The report was marked as completed, but the email didn't go out. Press the button again to retry sending it.",
+    "firmaAntesDeTerminar": "Sign the report before finishing it: the client's email comes from the signature."
   },
   "estadosCotizacion": {
     "pendiente_autorizacion": "Pending authorization",

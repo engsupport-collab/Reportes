@@ -19,6 +19,8 @@ import { firmarEnlacePublico } from "./enlace-firma";
  * webhook caído no debe romper el marcado como terminado, que ya quedó
  * guardado.
  */
+const TIEMPO_MAXIMO_MS = 10_000;
+
 export async function enviarReporteAlCliente(datos: {
   reportId: string;
   correo: string;
@@ -42,6 +44,10 @@ export async function enviarReporteAlCliente(datos: {
 
     const respuesta = await fetch(webhookUrl, {
       method: "POST",
+      // Con plazo: un n8n caído no rechaza la conexión, la deja colgada. Sin
+      // este corte, "Marcar como terminado" se quedaría girando hasta que
+      // Vercel matara la función, y el técnico no sabría si cerró o no.
+      signal: AbortSignal.timeout(TIEMPO_MAXIMO_MS),
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         correo: datos.correo,

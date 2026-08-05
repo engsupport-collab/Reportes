@@ -369,7 +369,6 @@ export default async function DetalleReportePage({ params }: Params) {
           {reporte.status === "en_proceso" ? (
             <FinalizarReporte
               action={finalizarReporteAction.bind(null, reporte.id)}
-              correoRegistrado={reporte.signatureEmail}
               sinAdjuntos={sinAdjuntos}
             />
           ) : (

@@ -289,8 +289,10 @@ export type FinalizarState = { error?: string };
  * momento llevaría un reporte a medias. Aquí, en cambio, "terminado" quiere
  * decir terminado.
  *
- * El correo sale del que quedó registrado al firmar. Solo si no hay ninguno
- * —un reporte que se cierra sin firma— se pide en el momento.
+ * El correo no se pide aquí: es el que el cliente escribió al firmar, en
+ * "Correo de quien firma". Volver a pedirlo sería teclear dos veces el mismo
+ * dato y abrir la puerta a que las dos copias no coincidan. Si el reporte no
+ * está firmado no hay a dónde mandarlo, y eso es lo que se dice.
  *
  * El orden importa: primero se marca terminado, y solo después se intenta
  * enviar. Al revés, un webhook caído dejaría al técnico sin poder cerrar el
@@ -299,8 +301,6 @@ export type FinalizarState = { error?: string };
  */
 export async function finalizarReporteAction(
   id: string,
-  _prevState: FinalizarState,
-  formData: FormData,
 ): Promise<FinalizarState> {
   const { user, reporte } = await cargarConPermiso(id);
   const t = await getTranslations("validacion");
@@ -311,11 +311,9 @@ export async function finalizarReporteAction(
     return { error: t("reporteNoExiste") };
   }
 
-  const parsed = correoClienteSchema(t).safeParse(
-    reporte.signatureEmail ?? formData.get("correoCliente") ?? "",
-  );
+  const parsed = correoClienteSchema(t).safeParse(reporte.signatureEmail ?? "");
   if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? t("ingresaCorreoCliente") };
+    return { error: t("firmaAntesDeTerminar") };
   }
 
   await db
@@ -328,8 +326,6 @@ export async function finalizarReporteAction(
     })
     .where(eq(reports.id, id));
 
-  revalidarListas(id);
-
   const enviado = await enviarReporteAlCliente({
     reportId: id,
     correo: parsed.data,
@@ -338,8 +334,16 @@ export async function finalizarReporteAction(
   });
 
   if (!enviado) {
+    // Aquí NO se revalida, y es deliberado. Al revalidar, la pantalla se
+    // vuelve a dibujar con el reporte ya terminado: el botón de finalizar
+    // desaparece y se lleva consigo este mensaje, dejando al técnico sin
+    // saber que el correo no salió. Sin revalidar, la pantalla se queda como
+    // está y el aviso se lee. Volver a pulsar el mismo botón reintenta el
+    // envío — el reporte ya está terminado, así que solo se repite el correo.
     return { error: t("terminadoSinCorreo") };
   }
+
+  revalidarListas(id);
 
   // Terminado y enviado: el técnico ya no tiene nada que hacer en esta
   // pantalla, y lo siguiente casi siempre es el próximo trabajo.
