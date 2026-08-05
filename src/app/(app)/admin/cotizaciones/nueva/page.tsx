@@ -4,6 +4,7 @@ import { crearCotizacionAction } from "@/actions/quotes";
 import { AppShell } from "@/components/app-shell";
 import { QuoteForm } from "@/components/admin/quote-form";
 import { requireAdmin } from "@/lib/auth-guard";
+import { listarClientesActivos } from "@/lib/queries/clients";
 import { siguienteNumeroCotizacionSugerido } from "@/lib/queries/quotes";
 
 export default async function NuevaCotizacionPage() {
@@ -12,6 +13,16 @@ export default async function NuevaCotizacionPage() {
     getTranslations("cotizacionForm"),
     siguienteNumeroCotizacionSugerido(),
   ]);
+
+  // Se traen los clientes de las dos empresas de una vez, no solo los de la
+  // preseleccionada: al cambiar la empresa en el formulario, la lista tiene
+  // que refrescarse en el momento, sin otro viaje al servidor.
+  const clientesPorEmpresa = await Promise.all(
+    user.empresas.map(async (e) => ({
+      companyId: e.id,
+      opciones: await listarClientesActivos(e.id),
+    })),
+  );
 
   return (
     <AppShell user={user}>
@@ -27,6 +38,7 @@ export default async function NuevaCotizacionPage() {
             cancelarHref="/admin/cotizaciones"
             empresas={user.empresas}
             numeroSugerido={numeroSugerido}
+            clientesPorEmpresa={clientesPorEmpresa}
           />
         </div>
       </div>

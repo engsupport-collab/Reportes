@@ -8,12 +8,13 @@ import { useTranslations } from "next-intl";
 import type { CotizacionState } from "@/actions/quotes";
 import { ESTADOS_COTIZACION } from "@/lib/cotizaciones";
 import type { Moneda } from "@/lib/moneda";
+import type { OpcionCliente } from "@/lib/queries/clients";
 import type { Empresa } from "@/lib/queries/companies";
 
 type Valores = {
   quoteNumber: string;
   projectName: string;
-  clientName: string;
+  clientId: string;
   purchaseOrderNo: string;
   dueDate: string;
   description: string;
@@ -52,8 +53,10 @@ export function QuoteForm({
   cancelarHref,
   empresas,
   empresaFija,
+  companyIdFijo,
   monedaFija,
   numeroSugerido,
+  clientesPorEmpresa,
 }: {
   action: (estado: CotizacionState, formData: FormData) => Promise<CotizacionState>;
   valores?: Valores;
@@ -63,6 +66,8 @@ export function QuoteForm({
   empresas?: Empresa[];
   /** Solo al editar: la empresa ya fijada, de solo lectura. */
   empresaFija?: string;
+  /** Solo al editar: el id real de esa empresa fija, para buscar sus clientes. */
+  companyIdFijo?: string;
   /** Solo al editar: la moneda de esa empresa fija. */
   monedaFija?: Moneda;
   /**
@@ -71,6 +76,8 @@ export function QuoteForm({
    * que decide si usarla o generar el número de verdad al guardar.
    */
   numeroSugerido?: string;
+  /** Clientes activos de cada empresa candidata, para el selector. */
+  clientesPorEmpresa: { companyId: string; opciones: OpcionCliente[] }[];
 }) {
   const [state, formAction] = useActionState<CotizacionState, FormData>(
     action,
@@ -80,12 +87,16 @@ export function QuoteForm({
   const tEstados = useTranslations("estadosCotizacion");
 
   // La empresa se sube a estado (a diferencia del resto del formulario, no
-  // controlado) solo para saber en qué moneda se está cotizando: LLC factura
-  // en dólares y SAS en pesos, y escribir la cifra sin saber cuál de las dos
-  // es lo que hace que el monto acabe mal.
-  const [companyId, setCompanyId] = useState(empresas?.[0]?.id ?? "");
+  // controlado): además de la moneda, determina qué clientes se pueden
+  // elegir — cambiar de empresa debe refrescar esa lista, no dejarla pegada
+  // a la anterior.
+  const [companyId, setCompanyId] = useState(
+    companyIdFijo ?? empresas?.[0]?.id ?? "",
+  );
   const moneda =
     monedaFija ?? empresas?.find((e) => e.id === companyId)?.currency ?? "COP";
+  const clientesDisponibles =
+    clientesPorEmpresa.find((e) => e.companyId === companyId)?.opciones ?? [];
 
   return (
     <form action={formAction} className="space-y-5">
@@ -168,21 +179,42 @@ export function QuoteForm({
         </div>
 
         <div className="space-y-1.5">
-          <label
-            htmlFor="clientName"
-            className="block text-sm font-medium text-text"
-          >
+          <label htmlFor="clientId" className="block text-sm font-medium text-text">
             {t("clientName")}
           </label>
-          <input
-            id="clientName"
-            name="clientName"
-            required
-            maxLength={200}
-            defaultValue={valores?.clientName}
-            className={CAMPO}
-            placeholder={t("placeholderClientName")}
-          />
+          {clientesDisponibles.length > 0 ? (
+            // key={companyId}: sin esto, un <select> no controlado no se
+            // entera de que cambiaron sus opciones al cambiar de empresa y se
+            // queda mostrando la selección vieja — mismo fix que ya usa
+            // QuoteSelector en el formulario de reporte.
+            <select
+              key={companyId}
+              id="clientId"
+              name="clientId"
+              required
+              defaultValue={valores?.clientId}
+              className={CAMPO}
+            >
+              <option value="" disabled>
+                {t("eligeCliente")}
+              </option>
+              {clientesDisponibles.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <p className="rounded-lg bg-surface-muted px-3 py-2.5 text-sm text-muted">
+              {t("sinClientesActivos")}{" "}
+              <Link
+                href="/admin/clientes"
+                className="font-medium text-brand hover:underline"
+              >
+                {t("irAClientes")}
+              </Link>
+            </p>
+          )}
         </div>
 
         <div className="space-y-1.5">

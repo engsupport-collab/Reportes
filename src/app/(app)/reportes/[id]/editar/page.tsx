@@ -8,6 +8,7 @@ import { ReportForm } from "@/components/reports/report-form";
 import type { OpcionCotizacionSelector } from "@/components/reports/quote-selector";
 import { puedeAccederAReporte, requireAccesoReportes } from "@/lib/auth-guard";
 import { aValorInput, formatFechaLarga } from "@/lib/fechas";
+import { listarClientesActivos } from "@/lib/queries/clients";
 import { listarCotizacionesActivas, obtenerCotizacion } from "@/lib/queries/quotes";
 import { obtenerReporte } from "@/lib/queries/reports";
 
@@ -50,7 +51,10 @@ export default async function EditarReportePage({ params }: Params) {
     };
   }
 
-  const activas = await listarCotizacionesActivas(reporte.companyId);
+  const [activas, clientesActivos] = await Promise.all([
+    listarCotizacionesActivas(reporte.companyId),
+    listarClientesActivos(reporte.companyId),
+  ]);
   const opciones = activas.map(aOpcion);
 
   // La cotización actual del reporte puede ya no estar activa (el trabajo
@@ -86,6 +90,9 @@ export default async function EditarReportePage({ params }: Params) {
             cancelarHref={`/reportes/${reporte.id}`}
             companyIdFijo={reporte.companyId}
             cotizacionesPorEmpresa={[{ companyId: reporte.companyId, opciones }]}
+            clientesPorEmpresa={[
+              { companyId: reporte.companyId, opciones: clientesActivos },
+            ]}
             valores={{
               quoteId: reporte.quoteId ?? "",
               workDate: aValorInput(reporte.workDate),

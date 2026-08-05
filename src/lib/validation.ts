@@ -230,11 +230,7 @@ export function cotizacionSchema(t: T) {
       .trim()
       .min(1, t("ingresaNombreProyecto"))
       .max(200, t("nombreProyectoLargo")),
-    clientName: z
-      .string()
-      .trim()
-      .min(1, t("ingresaCliente"))
-      .max(200, t("clienteLargo")),
+    clientId: z.string().min(1, t("eligeCliente")),
     purchaseOrderNo: z
       .string()
       .trim()
@@ -285,10 +281,20 @@ export function cotizacionCampoSchema(t: T) {
       .trim()
       .min(1, t("ingresaNombreProyecto"))
       .max(200, t("nombreProyectoLargo")),
-    clientName: z
+    clientId: z.string().min(1, t("eligeCliente")),
+  });
+}
+
+/**
+ * Alta y edición de un cliente, desde `/admin/clientes`. Igual patrón de
+ * fábrica que el resto de esquemas: recibe el traductor, no un objeto fijo.
+ */
+export function clienteSchema(t: T) {
+  return z.object({
+    name: z
       .string()
       .trim()
-      .min(1, t("ingresaCliente"))
+      .min(1, t("ingresaNombreCliente"))
       .max(200, t("clienteLargo")),
   });
 }

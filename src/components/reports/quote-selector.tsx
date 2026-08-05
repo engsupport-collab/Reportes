@@ -4,6 +4,7 @@ import { useRef, useState, useTransition } from "react";
 import { useTranslations } from "next-intl";
 
 import { crearCotizacionCampoAction } from "@/actions/quotes";
+import type { OpcionCliente } from "@/lib/queries/clients";
 
 export type OpcionCotizacionSelector = {
   id: string;
@@ -31,10 +32,13 @@ const NO_ENCUENTRO = "__no_encuentro__";
  */
 function CrearCotizacionCampo({
   companyId,
+  clientesActivos,
   onCreada,
   onCancelar,
 }: {
   companyId: string;
+  /** El técnico solo elige de aquí — nunca escribe ni crea un cliente. */
+  clientesActivos: OpcionCliente[];
   onCreada: (opcion: OpcionCotizacionSelector) => void;
   onCancelar: () => void;
 }) {
@@ -43,16 +47,15 @@ function CrearCotizacionCampo({
   const [error, setError] = useState<string | undefined>();
   const [pendiente, startTransition] = useTransition();
   const proyectoRef = useRef<HTMLInputElement>(null);
-  const clienteRef = useRef<HTMLInputElement>(null);
+  const [clientId, setClientId] = useState("");
 
   function crear() {
     const projectName = proyectoRef.current?.value.trim() ?? "";
-    const clientName = clienteRef.current?.value.trim() ?? "";
 
     const formData = new FormData();
     formData.set("companyId", companyId);
     formData.set("projectName", projectName);
-    formData.set("clientName", clientName);
+    formData.set("clientId", clientId);
 
     startTransition(async () => {
       const resultado = await crearCotizacionCampoAction({}, formData);
@@ -68,6 +71,25 @@ function CrearCotizacionCampo({
         });
       }
     });
+  }
+
+  // Sin clientes activos, el técnico no tiene nada que elegir: no puede
+  // crear ni un cliente ni una cotización, así que se le avisa en vez de
+  // mostrarle un selector vacío o un formulario que va a fallar al guardar.
+  if (clientesActivos.length === 0) {
+    return (
+      <div className="space-y-2 rounded-xl border border-dashed border-border p-4">
+        <p className="text-sm font-medium text-text">{t("titulo")}</p>
+        <p className="text-sm text-muted">{t("sinClientesActivos")}</p>
+        <button
+          type="button"
+          onClick={onCancelar}
+          className="text-sm font-medium text-muted transition hover:text-text"
+        >
+          {t("cancelar")}
+        </button>
+      </div>
+    );
   }
 
   return (
@@ -94,13 +116,22 @@ function CrearCotizacionCampo({
         <label htmlFor="quote-campo-cliente" className="block text-sm font-medium text-text">
           {t("clientName")}
         </label>
-        <input
-          ref={clienteRef}
+        <select
           id="quote-campo-cliente"
-          maxLength={200}
+          value={clientId}
+          onChange={(e) => setClientId(e.target.value)}
           disabled={pendiente}
           className={CAMPO}
-        />
+        >
+          <option value="" disabled>
+            {t("eligeCliente")}
+          </option>
+          {clientesActivos.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}
+            </option>
+          ))}
+        </select>
       </div>
 
       {error ? (
@@ -142,11 +173,14 @@ export function QuoteSelector({
   companyId,
   opcionesIniciales,
   valorInicial,
+  clientesActivos,
 }: {
   /** Empresa activa en el momento — la del empleado, o la que el admin eligió arriba. */
   companyId: string;
   opcionesIniciales: OpcionCotizacionSelector[];
   valorInicial?: string;
+  /** Para la creación mínima desde campo: el técnico solo elige, nunca escribe. */
+  clientesActivos: OpcionCliente[];
 }) {
   const t = useTranslations("quoteSelector");
   const [opciones, setOpciones] = useState(opcionesIniciales);
@@ -227,6 +261,7 @@ export function QuoteSelector({
       {creando || opciones.length === 0 ? (
         <CrearCotizacionCampo
           companyId={companyId}
+          clientesActivos={clientesActivos}
           onCreada={(opcion) => {
             setOpciones((prev) => [...prev, opcion]);
             setSeleccion(opcion.id);

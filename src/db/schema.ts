@@ -112,6 +112,50 @@ export const userCompanies = sqliteTable(
 );
 
 /**
+ * Catálogo de clientes, por empresa.
+ *
+ * Antes `quotes.clientName` era texto libre, y el mismo cliente terminaba
+ * escrito de formas distintas — el mismo problema que ya resolvió el catálogo
+ * de cotizaciones para `projectName`. Un cliente pertenece a una sola empresa
+ * (LLC o SAS): son dos entidades legales en países distintos, y es muy poco
+ * probable que compartan cliente — igual que ya están separadas las
+ * cotizaciones, los reportes y los accesos de usuario.
+ *
+ * Sin restricción de unicidad en `name`: el selector ya evita los duplicados
+ * accidentales por escritura libre (que era el problema real), y forzar
+ * unicidad en la base castigaría variantes legítimas del mismo nombre legal
+ * (con o sin sufijo societario, mayúsculas). Mismo criterio que
+ * `quotes.quoteNumber`.
+ *
+ * `isActive` y no borrado real: un cliente desactivado sale del selector de
+ * cotizaciones nuevas, pero las cotizaciones que ya lo usan lo siguen
+ * mostrando — igual que `companies.isActive`.
+ */
+export const clients = sqliteTable(
+  "clients",
+  {
+    id: text("id").primaryKey(),
+    companyId: text("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "restrict" }),
+    name: text("name").notNull(),
+    isActive: integer("is_active", { mode: "boolean" }).notNull().default(true),
+    createdBy: text("created_by")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
+      .notNull()
+      .default(sql`(unixepoch() * 1000)`),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" })
+      .notNull()
+      .default(sql`(unixepoch() * 1000)`),
+  },
+  (table) => [
+    index("clients_company_active_idx").on(table.companyId, table.isActive),
+  ],
+);
+
+/**
  * Cotizaciones: la fuente oficial de qué trabajos existen.
  *
  * Antes esta información vivía en un Excel y el técnico copiaba a mano el
@@ -134,7 +178,18 @@ export const quotes = sqliteTable(
 
     quoteNumber: text("quote_number"),
     projectName: text("project_name").notNull(),
-    clientName: text("client_name").notNull(),
+    /**
+     * Referencia al catálogo, NO una copia del nombre — a diferencia de como
+     * un reporte copia sus datos de la cotización. Una cotización es un
+     * documento de trabajo interno, no una constancia firmada por el
+     * cliente: si el admin corrige el nombre en el catálogo, tiene sentido
+     * que se vea reflejado aquí. Mismo criterio que ya rige `companyId` en
+     * esta misma tabla, que tampoco copia el nombre de la empresa.
+     *
+     */
+    clientId: text("client_id")
+      .notNull()
+      .references(() => clients.id, { onDelete: "restrict" }),
 
     /**
      * En qué fase está el trabajo — y solo eso. NO codifica quién creó la
@@ -188,6 +243,7 @@ export const quotes = sqliteTable(
     index("quotes_company_status_idx").on(table.companyId, table.status),
     index("quotes_company_revisada_idx").on(table.companyId, table.revisada),
     index("quotes_project_idx").on(table.projectName),
+    index("quotes_client_idx").on(table.clientId),
   ],
 );
 
@@ -448,6 +504,8 @@ export type Company = typeof companies.$inferSelect;
 export type UserCompany = typeof userCompanies.$inferSelect;
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
+export type Client = typeof clients.$inferSelect;
+export type NewClient = typeof clients.$inferInsert;
 export type Quote = typeof quotes.$inferSelect;
 export type NewQuote = typeof quotes.$inferInsert;
 export type Report = typeof reports.$inferSelect;

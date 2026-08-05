@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useTranslations } from "next-intl";
 
 import type { ReporteState } from "@/actions/reports";
+import type { OpcionCliente } from "@/lib/queries/clients";
 import type { Empresa } from "@/lib/queries/companies";
 import { ReportForm } from "./report-form";
 import type { OpcionCotizacionSelector } from "./quote-selector";
@@ -28,6 +29,7 @@ export function NuevoReporteSelector({
   companyIdFijo,
   valoresServicio,
   cotizacionesPorEmpresa,
+  clientesPorEmpresa,
   reportesPorEmpresa,
 }: {
   accionServicio: (estado: ReporteState, formData: FormData) => Promise<ReporteState>;
@@ -44,6 +46,8 @@ export function NuevoReporteSelector({
     details: string;
   };
   cotizacionesPorEmpresa: { companyId: string; opciones: OpcionCotizacionSelector[] }[];
+  /** Solo para el tipo servicio: la creación mínima desde campo los necesita. */
+  clientesPorEmpresa: { companyId: string; opciones: OpcionCliente[] }[];
   reportesPorEmpresa: { companyId: string; opciones: OpcionReporteEnlazable[] }[];
 }) {
   const [tipo, setTipo] = useState<Tipo>("servicio");
@@ -88,6 +92,7 @@ export function NuevoReporteSelector({
             companyIdFijo={companyIdFijo}
             valores={valoresServicio}
             cotizacionesPorEmpresa={cotizacionesPorEmpresa}
+            clientesPorEmpresa={clientesPorEmpresa}
           />
         ) : (
           <ViaticoReportForm

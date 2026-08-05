@@ -6,6 +6,7 @@ import type { OpcionCotizacionSelector } from "@/components/reports/quote-select
 import { crearReporteAction, crearReporteViaticoAction } from "@/actions/reports";
 import { requireAccesoReportes } from "@/lib/auth-guard";
 import { formatFechaLarga, aValorInput } from "@/lib/fechas";
+import { listarClientesActivos } from "@/lib/queries/clients";
 import { listarCotizacionesActivas } from "@/lib/queries/quotes";
 import { listarReportesServicioParaEnlazar } from "@/lib/queries/reports";
 
@@ -49,35 +50,42 @@ export default async function NuevoReportePage({ searchParams }: Params) {
       ? companyIdParam
       : undefined;
 
-  const [cotizacionesPorEmpresa, reportesPorEmpresa] = await Promise.all([
-    Promise.all(
-      empresas.map(async (e) => ({
-        companyId: e.id,
-        opciones: (await listarCotizacionesActivas(e.id)).map(
-          (c): OpcionCotizacionSelector => ({
-            id: c.id,
-            label: c.quoteNumber
-              ? `${c.quoteNumber} — ${c.projectName} — ${c.clientName}`
-              : `${c.projectName} — ${c.clientName}`,
-            clientName: c.clientName,
-            purchaseOrderLabel: c.purchaseOrderNo ?? tSelector("sinAsignar"),
-            dueDateLabel: c.dueDate
-              ? formatFechaLarga(c.dueDate)
-              : tSelector("sinFecha"),
-          }),
-        ),
-      })),
-    ),
-    Promise.all(
-      empresas.map(async (e) => ({
-        companyId: e.id,
-        opciones: (await listarReportesServicioParaEnlazar(e.id)).map((r) => ({
-          id: r.id,
-          label: `${r.projectName} — ${r.clientName} (${formatFechaLarga(r.workDate)})`,
+  const [cotizacionesPorEmpresa, clientesPorEmpresa, reportesPorEmpresa] =
+    await Promise.all([
+      Promise.all(
+        empresas.map(async (e) => ({
+          companyId: e.id,
+          opciones: (await listarCotizacionesActivas(e.id)).map(
+            (c): OpcionCotizacionSelector => ({
+              id: c.id,
+              label: c.quoteNumber
+                ? `${c.quoteNumber} — ${c.projectName} — ${c.clientName}`
+                : `${c.projectName} — ${c.clientName}`,
+              clientName: c.clientName,
+              purchaseOrderLabel: c.purchaseOrderNo ?? tSelector("sinAsignar"),
+              dueDateLabel: c.dueDate
+                ? formatFechaLarga(c.dueDate)
+                : tSelector("sinFecha"),
+            }),
+          ),
         })),
-      })),
-    ),
-  ]);
+      ),
+      Promise.all(
+        empresas.map(async (e) => ({
+          companyId: e.id,
+          opciones: await listarClientesActivos(e.id),
+        })),
+      ),
+      Promise.all(
+        empresas.map(async (e) => ({
+          companyId: e.id,
+          opciones: (await listarReportesServicioParaEnlazar(e.id)).map((r) => ({
+            id: r.id,
+            label: `${r.projectName} — ${r.clientName} (${formatFechaLarga(r.workDate)})`,
+          })),
+        })),
+      ),
+    ]);
 
   return (
     <AppShell user={user}>
@@ -96,6 +104,7 @@ export default async function NuevoReportePage({ searchParams }: Params) {
             user.role === "admin" ? companyIdInicial : user.empresaActiva.id
           }
           cotizacionesPorEmpresa={cotizacionesPorEmpresa}
+          clientesPorEmpresa={clientesPorEmpresa}
           reportesPorEmpresa={reportesPorEmpresa}
           // Se propone la fecha de hoy: el reporte se escribe casi siempre el
           // mismo día del trabajo, y así es un campo menos que llenar.

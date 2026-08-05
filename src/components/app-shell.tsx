@@ -46,6 +46,7 @@ async function navPara(user: CurrentUser): Promise<NavItem[]> {
       },
       { href: "/reportes/nuevo", label: t("nuevoReporte"), icono: "nuevo" },
       { href: "/admin/usuarios", label: t("usuarios"), icono: "usuarios" },
+      { href: "/admin/clientes", label: t("clientes"), icono: "clientes" },
     ];
   }
   return [

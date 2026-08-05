@@ -70,6 +70,16 @@ export function IconUsuarios(props: IconProps) {
   );
 }
 
+export function IconClientes(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <rect x="4" y="3" width="16" height="18" rx="1.5" />
+      <path d="M9 21v-4h6v4" />
+      <path d="M8 7h1M8 11h1M15 7h1M15 11h1" />
+    </Svg>
+  );
+}
+
 export function IconCotizaciones(props: IconProps) {
   return (
     <Svg {...props}>

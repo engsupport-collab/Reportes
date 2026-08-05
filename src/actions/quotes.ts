@@ -9,6 +9,7 @@ import { db } from "@/db";
 import { quotes, reports } from "@/db/schema";
 import { requireAccesoReportes, requireAdmin } from "@/lib/auth-guard";
 import { esEstadoActivo } from "@/lib/cotizaciones";
+import { obtenerClienteActivoDeEmpresa } from "@/lib/queries/clients";
 import { listarEmpresas } from "@/lib/queries/companies";
 import {
   insertarCotizacionConNumeroAutomatico,
@@ -59,7 +60,7 @@ export async function crearCotizacionAction(
   const parsed = cotizacionSchema(t).safeParse({
     quoteNumber: formData.get("quoteNumber"),
     projectName: formData.get("projectName"),
-    clientName: formData.get("clientName"),
+    clientId: formData.get("clientId"),
     purchaseOrderNo: formData.get("purchaseOrderNo"),
     dueDate: formData.get("dueDate"),
     description: formData.get("description"),
@@ -68,6 +69,14 @@ export async function crearCotizacionAction(
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? t("revisaLosDatos") };
   }
+
+  // Un id de cliente manipulado en el formulario no debe poder colar una
+  // cotización con el cliente de otra empresa, o uno ya desactivado.
+  const cliente = await obtenerClienteActivoDeEmpresa(
+    parsed.data.clientId,
+    empresa.id,
+  );
+  if (!cliente) return { error: t("eligeCliente") };
 
   // El estado lo elige el admin al crear, con "en curso" ya preseleccionado:
   // si él la registra, es la autoridad y no hay a quién pedirle permiso. Un
@@ -98,7 +107,7 @@ export async function crearCotizacionAction(
       createdBy: user.id,
       status,
       projectName: parsed.data.projectName,
-      clientName: parsed.data.clientName,
+      clientId: parsed.data.clientId,
       purchaseOrderNo: parsed.data.purchaseOrderNo,
       dueDate: parsed.data.dueDate ? parsed.data.dueDate.getTime() : null,
       description: parsed.data.description,
@@ -138,7 +147,7 @@ export async function actualizarCotizacionAction(
   const parsed = cotizacionSchema(t).safeParse({
     quoteNumber: formData.get("quoteNumber"),
     projectName: formData.get("projectName"),
-    clientName: formData.get("clientName"),
+    clientId: formData.get("clientId"),
     purchaseOrderNo: formData.get("purchaseOrderNo"),
     dueDate: formData.get("dueDate"),
     description: formData.get("description"),
@@ -147,6 +156,15 @@ export async function actualizarCotizacionAction(
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? t("revisaLosDatos") };
   }
+
+  // La empresa de la cotización no se puede cambiar aquí (ver el comentario
+  // de la función), así que el cliente elegido tiene que ser de esa misma
+  // empresa, fija — no de la que venga en el formulario.
+  const cliente = await obtenerClienteActivoDeEmpresa(
+    parsed.data.clientId,
+    cotizacion.companyId,
+  );
+  if (!cliente) return { error: t("eligeCliente") };
 
   await db
     .update(quotes)
@@ -236,7 +254,7 @@ export async function crearCotizacionCampoAction(
 
   const parsed = cotizacionCampoSchema(t).safeParse({
     projectName: formData.get("projectName"),
-    clientName: formData.get("clientName"),
+    clientId: formData.get("clientId"),
   });
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? t("revisaLosDatos") };
@@ -253,6 +271,15 @@ export async function crearCotizacionCampoAction(
     companyId = user.empresaActiva.id;
   }
 
+  // El técnico solo elige de lo que ya existe — nunca escribe un nombre.
+  // La misma comprobación de siempre: un id manipulado no debe poder colar
+  // el cliente de otra empresa.
+  const cliente = await obtenerClienteActivoDeEmpresa(
+    parsed.data.clientId,
+    companyId,
+  );
+  if (!cliente) return { error: t("eligeCliente") };
+
   const id = crypto.randomUUID();
 
   // Aquí no hay número visible que sugerir — a diferencia del alta del
@@ -264,7 +291,7 @@ export async function crearCotizacionCampoAction(
     createdBy: user.id,
     status: "en_curso",
     projectName: parsed.data.projectName,
-    clientName: parsed.data.clientName,
+    clientId: cliente.id,
     purchaseOrderNo: null,
     dueDate: null,
     description: null,
@@ -275,7 +302,9 @@ export async function crearCotizacionCampoAction(
   revalidatePath("/reportes/nuevo");
   revalidatePath("/admin/cotizaciones");
 
-  return { creada: { id, ...parsed.data } };
+  return {
+    creada: { id, projectName: parsed.data.projectName, clientName: cliente.name },
+  };
 }
 
 /**

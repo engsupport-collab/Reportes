@@ -7,6 +7,7 @@ import { useTranslations } from "next-intl";
 
 import type { ReporteState } from "@/actions/reports";
 import { ETIQUETAS_TRABAJO, TIPOS_SERVICIO } from "@/lib/etiquetas";
+import type { OpcionCliente } from "@/lib/queries/clients";
 import type { Empresa } from "@/lib/queries/companies";
 import { QuoteSelector, type OpcionCotizacionSelector } from "./quote-selector";
 
@@ -56,6 +57,7 @@ export function ReportForm({
   empresas,
   companyIdFijo,
   cotizacionesPorEmpresa,
+  clientesPorEmpresa,
 }: {
   action: (estado: ReporteState, formData: FormData) => Promise<ReporteState>;
   valores?: Valores;
@@ -75,6 +77,8 @@ export function ReportForm({
   companyIdFijo?: string;
   /** Cotizaciones activas, por empresa, para el selector. */
   cotizacionesPorEmpresa: { companyId: string; opciones: OpcionCotizacionSelector[] }[];
+  /** Clientes activos, por empresa, para la creación mínima desde campo. */
+  clientesPorEmpresa: { companyId: string; opciones: OpcionCliente[] }[];
 }) {
   const [state, formAction] = useActionState<ReporteState, FormData>(
     action,
@@ -95,6 +99,8 @@ export function ReportForm({
   const opciones =
     cotizacionesPorEmpresa.find((e) => e.companyId === companyId)?.opciones ??
     [];
+  const clientesActivos =
+    clientesPorEmpresa.find((e) => e.companyId === companyId)?.opciones ?? [];
 
   return (
     <form action={formAction} className="space-y-5">
@@ -136,6 +142,7 @@ export function ReportForm({
           companyId={companyId}
           opcionesIniciales={opciones}
           valorInicial={valores?.quoteId}
+          clientesActivos={clientesActivos}
         />
 
         <div className="space-y-1.5">

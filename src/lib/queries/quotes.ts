@@ -3,7 +3,7 @@ import "server-only";
 import { and, desc, eq, like, or, sql } from "drizzle-orm";
 
 import { db } from "@/db";
-import { companies, quotes, reports, users } from "@/db/schema";
+import { clients, companies, quotes, reports, users } from "@/db/schema";
 import { ESTADOS_ACTIVOS, type EstadoCotizacion } from "@/lib/cotizaciones";
 import type { Moneda } from "@/lib/moneda";
 
@@ -39,11 +39,12 @@ export async function listarCotizacionesActivas(
       id: quotes.id,
       quoteNumber: quotes.quoteNumber,
       projectName: quotes.projectName,
-      clientName: quotes.clientName,
+      clientName: clients.name,
       purchaseOrderNo: quotes.purchaseOrderNo,
       dueDate: quotes.dueDate,
     })
     .from(quotes)
+    .innerJoin(clients, eq(clients.id, quotes.clientId))
     .where(
       and(
         eq(quotes.companyId, companyId),
@@ -60,6 +61,7 @@ export type CotizacionEnLista = {
   currency: Moneda;
   quoteNumber: string | null;
   projectName: string;
+  clientId: string;
   clientName: string;
   status: EstadoCotizacion;
   purchaseOrderNo: string | null;
@@ -90,7 +92,7 @@ function construirWhere(filtros: FiltrosCotizaciones) {
       or(
         like(quotes.quoteNumber, patron),
         like(quotes.projectName, patron),
-        like(quotes.clientName, patron),
+        like(clients.name, patron),
       )!,
     );
   }
@@ -117,7 +119,8 @@ export async function listarCotizaciones(filtros: FiltrosCotizaciones): Promise<
         currency: companies.currency,
         quoteNumber: quotes.quoteNumber,
         projectName: quotes.projectName,
-        clientName: quotes.clientName,
+        clientId: quotes.clientId,
+        clientName: clients.name,
         status: quotes.status,
         purchaseOrderNo: quotes.purchaseOrderNo,
         dueDate: quotes.dueDate,
@@ -126,14 +129,19 @@ export async function listarCotizaciones(filtros: FiltrosCotizaciones): Promise<
       })
       .from(quotes)
       .innerJoin(companies, eq(companies.id, quotes.companyId))
+      .innerJoin(clients, eq(clients.id, quotes.clientId))
       .where(where)
       .orderBy(desc(quotes.createdAt))
       .limit(POR_PAGINA)
       .offset((pagina - 1) * POR_PAGINA),
 
+    // El conteo necesita el mismo join que arriba: `where` puede traer una
+    // condición de búsqueda sobre `clients.name`, y sin el join esa tabla no
+    // estaría disponible en esta consulta.
     db
       .select({ total: sql<number>`COUNT(*)` })
       .from(quotes)
+      .innerJoin(clients, eq(clients.id, quotes.clientId))
       .where(where),
   ]);
 
@@ -173,7 +181,8 @@ export async function obtenerCotizacion(
       currency: companies.currency,
       quoteNumber: quotes.quoteNumber,
       projectName: quotes.projectName,
-      clientName: quotes.clientName,
+      clientId: quotes.clientId,
+      clientName: clients.name,
       status: quotes.status,
       purchaseOrderNo: quotes.purchaseOrderNo,
       dueDate: quotes.dueDate,
@@ -186,6 +195,7 @@ export async function obtenerCotizacion(
     })
     .from(quotes)
     .innerJoin(companies, eq(companies.id, quotes.companyId))
+    .innerJoin(clients, eq(clients.id, quotes.clientId))
     .innerJoin(users, eq(users.id, quotes.createdBy))
     .where(eq(quotes.id, id))
     .limit(1);
@@ -247,7 +257,7 @@ export async function insertarCotizacionConNumeroAutomatico(valores: {
   createdBy: string;
   status: EstadoCotizacion;
   projectName: string;
-  clientName: string;
+  clientId: string;
   purchaseOrderNo: string | null;
   dueDate: number | null;
   description: string | null;
@@ -259,7 +269,7 @@ export async function insertarCotizacionConNumeroAutomatico(valores: {
 
   await db.run(sql`
     INSERT INTO ${quotes} (
-      id, company_id, quote_number, project_name, client_name, status,
+      id, company_id, quote_number, project_name, client_id, status,
       purchase_order_no, due_date, description, amount, revisada, created_by
     )
     SELECT
@@ -267,7 +277,7 @@ export async function insertarCotizacionConNumeroAutomatico(valores: {
       ${valores.companyId},
       ${prefijo} || printf('%03d', COALESCE(MAX(CAST(substr(quote_number, ${inicioConsecutivo}) AS INTEGER)), 0) + 1),
       ${valores.projectName},
-      ${valores.clientName},
+      ${valores.clientId},
       ${valores.status},
       ${valores.purchaseOrderNo},
       ${valores.dueDate},
