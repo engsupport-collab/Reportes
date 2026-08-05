@@ -24,14 +24,19 @@ async function navPara(user: CurrentUser): Promise<NavItem[]> {
   const t = await getTranslations("nav");
 
   if (user.role === "admin") {
+    // El orden sigue el recorrido real del trabajo, no las categorías: se
+    // cotiza, se reporta contra esa cotización, y los catálogos y consultas
+    // (clientes, reportes, analíticas, usuarios) van después.
     return [
       { href: "/admin", label: t("panel"), icono: "panel" },
-      { href: "/admin/reportes", label: t("reportes"), icono: "reportes" },
       {
         href: "/admin/cotizaciones",
         label: t("cotizaciones"),
         icono: "cotizaciones",
       },
+      { href: "/reportes/nuevo", label: t("nuevoReporte"), icono: "nuevo" },
+      { href: "/admin/clientes", label: t("clientes"), icono: "clientes" },
+      { href: "/admin/reportes", label: t("reportes"), icono: "reportes" },
       {
         // Las opciones salen de las empresas reales del sistema: si mañana hay
         // una tercera, aparece sola sin tocar este archivo. El nombre de cada
@@ -44,9 +49,7 @@ async function navPara(user: CurrentUser): Promise<NavItem[]> {
           label: e.name,
         })),
       },
-      { href: "/reportes/nuevo", label: t("nuevoReporte"), icono: "nuevo" },
       { href: "/admin/usuarios", label: t("usuarios"), icono: "usuarios" },
-      { href: "/admin/clientes", label: t("clientes"), icono: "clientes" },
     ];
   }
   return [

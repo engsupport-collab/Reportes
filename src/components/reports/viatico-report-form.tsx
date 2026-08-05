@@ -39,6 +39,7 @@ export function ViaticoReportForm({
   cancelarHref,
   empresas,
   companyIdFijo,
+  empresaFija,
   cotizacionesPorEmpresa,
 }: {
   action: (estado: ReporteState, formData: FormData) => Promise<ReporteState>;
@@ -47,6 +48,8 @@ export function ViaticoReportForm({
   empresas?: Empresa[];
   /** Para un empleado, o al editar: la empresa ya fijada. */
   companyIdFijo?: string;
+  /** Al crear desde una cotización: la empresa la hereda de ella y no se elige. */
+  empresaFija?: Empresa;
   /** Cotizaciones activas disponibles, por empresa — la misma lista que usa el formulario de servicio. */
   cotizacionesPorEmpresa: { companyId: string; opciones: OpcionCotizacionSelector[] }[];
 }) {
@@ -56,7 +59,7 @@ export function ViaticoReportForm({
   );
   const t = useTranslations("viaticoReportForm");
   const [companyId, setCompanyId] = useState(
-    companyIdFijo ?? cotizacionesPorEmpresa[0]?.companyId ?? "",
+    empresaFija?.id ?? companyIdFijo ?? cotizacionesPorEmpresa[0]?.companyId ?? "",
   );
 
   const opciones =
@@ -89,6 +92,17 @@ export function ViaticoReportForm({
             ))}
           </div>
         </fieldset>
+      ) : empresaFija ? (
+        <div className="space-y-1.5">
+          <span className="block text-sm font-medium text-text">
+            {t("empresa")}
+          </span>
+          <p className="rounded-lg bg-surface-muted px-3 py-2.5 text-sm text-muted">
+            {empresaFija.name}
+          </p>
+          <input type="hidden" name="companyId" value={empresaFija.id} readOnly />
+          <p className="text-xs text-muted">{t("empresaDeCotizacion")}</p>
+        </div>
       ) : null}
 
       <div className="space-y-1.5">

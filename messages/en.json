@@ -181,7 +181,8 @@
     "etiquetasAyuda": "— check all that apply",
     "detallesTrabajo": "Job details",
     "placeholderDetalles": "Describe what was done, materials used, observations…",
-    "cancelar": "Cancel"
+    "cancelar": "Cancel",
+    "empresaDeCotizacion": "Comes from the quote and can't be changed: report and quote are the same job."
   },
   "nuevoReportePage": {
     "titulo": "New report",
@@ -199,7 +200,8 @@
     "cotizacion": "Quote",
     "elige": "Choose a quote…",
     "sinCotizacionesActivas": "This company has no active quotes.",
-    "ayuda": "Expenses you add later fall under this quote, independent of the service report."
+    "ayuda": "Expenses you add later fall under this quote, independent of the service report.",
+    "empresaDeCotizacion": "Comes from the quote and can't be changed: report and quote are the same job."
   },
   "editarReportePage": {
     "volver": "← Back to report",
@@ -304,7 +306,7 @@
     "placeholderNombre": "First and last name",
     "correoQuienFirma": "Signer's email",
     "placeholderCorreo": "email@company.com",
-    "ayudaCorreo": "Receives a copy of the report, with the attached photos, through a secure link.",
+    "ayudaCorreo": "Saved so the report can be sent when you mark it as completed. Signing sends no email.",
     "formaDeFirmar": "How to sign",
     "escribir": "Type",
     "dibujar": "Draw",
@@ -326,7 +328,13 @@
     "volverEnProceso": "Set back to in progress",
     "confirmEliminar": "Delete this report? This action can't be undone.",
     "eliminando": "Deleting…",
-    "eliminar": "Delete"
+    "eliminar": "Delete",
+    "correoCliente": "Client's email",
+    "placeholderCorreoCliente": "email@company.com",
+    "correoClienteAyuda": "When you finish, the PDF report goes to this address.",
+    "enviarYTerminar": "Send and finish",
+    "enviando": "Sending…",
+    "cancelar": "Cancel"
   },
   "analiticasPage": {
     "titulo": "Analytics · {empresa}",
@@ -403,7 +411,9 @@
     "firmaNoLlego": "The signature didn't come through. Try again.",
     "firmaDemasiadoGrande": "The signature is too large.",
     "firmaFormatoInvalido": "The signature format isn't valid.",
-    "firmaGuardada": "Signature saved."
+    "firmaGuardada": "Signature saved.",
+    "ingresaCorreoCliente": "Enter the client's email to send them the report",
+    "terminadoSinCorreo": "The report was marked as completed, but the email didn't go out. Set it back to in progress and mark it completed again to retry."
   },
   "estadosCotizacion": {
     "pendiente_autorizacion": "Pending authorization",

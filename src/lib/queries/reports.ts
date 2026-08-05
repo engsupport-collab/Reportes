@@ -399,6 +399,9 @@ export async function obtenerReporte(id: string) {
       completedAt: reports.completedAt,
       signatureUrl: reports.signatureUrl,
       signatureName: reports.signatureName,
+      // Es a dónde se manda el reporte al marcarlo terminado. Si ya está
+      // aquí —porque el cliente firmó— no se vuelve a pedir.
+      signatureEmail: reports.signatureEmail,
       signedAt: reports.signedAt,
       createdAt: reports.createdAt,
       updatedAt: reports.updatedAt,

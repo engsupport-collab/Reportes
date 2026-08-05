@@ -27,6 +27,7 @@ export function NuevoReporteSelector({
   cancelarHref,
   empresas,
   companyIdFijo,
+  empresaFija,
   valoresServicio,
   cotizacionesPorEmpresa,
   clientesPorEmpresa,
@@ -37,6 +38,12 @@ export function NuevoReporteSelector({
   empresas?: Empresa[];
   /** Para un empleado: su empresa activa, ya fija. */
   companyIdFijo?: string;
+  /**
+   * Al llegar desde el botón "Crear reporte" de una cotización: la empresa la
+   * hereda de ella y no se puede cambiar — los dos documentos son el mismo
+   * trabajo. Vale para los dos tipos de reporte.
+   */
+  empresaFija?: Empresa;
   valoresServicio: {
     quoteId: string;
     workDate: string;
@@ -89,6 +96,7 @@ export function NuevoReporteSelector({
             cancelarHref={cancelarHref}
             empresas={empresas}
             companyIdFijo={companyIdFijo}
+            empresaFija={empresaFija}
             valores={valoresServicio}
             cotizacionesPorEmpresa={cotizacionesPorEmpresa}
             clientesPorEmpresa={clientesPorEmpresa}
@@ -99,6 +107,7 @@ export function NuevoReporteSelector({
             cancelarHref={cancelarHref}
             empresas={empresas}
             companyIdFijo={companyIdFijo}
+            empresaFija={empresaFija}
             cotizacionesPorEmpresa={cotizacionesPorEmpresa}
           />
         )}

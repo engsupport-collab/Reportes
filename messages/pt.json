@@ -181,7 +181,8 @@
     "etiquetasAyuda": "— marque todas as que se aplicam",
     "detallesTrabajo": "Detalhes do trabalho",
     "placeholderDetalles": "Descreva o que foi feito, materiais usados, observações…",
-    "cancelar": "Cancelar"
+    "cancelar": "Cancelar",
+    "empresaDeCotizacion": "Vem da cotação e não pode ser alterada: o relatório e a cotação são o mesmo trabalho."
   },
   "nuevoReportePage": {
     "titulo": "Novo relatório",
@@ -199,7 +200,8 @@
     "cotizacion": "Cotação",
     "elige": "Escolha uma cotação…",
     "sinCotizacionesActivas": "Esta empresa não tem cotações ativas.",
-    "ayuda": "As despesas que você adicionar depois ficam sob esta cotação, independentes do relatório de serviço."
+    "ayuda": "As despesas que você adicionar depois ficam sob esta cotação, independentes do relatório de serviço.",
+    "empresaDeCotizacion": "Vem da cotação e não pode ser alterada: o relatório e a cotação são o mesmo trabalho."
   },
   "editarReportePage": {
     "volver": "← Voltar ao relatório",
@@ -304,7 +306,7 @@
     "placeholderNombre": "Nome e sobrenome",
     "correoQuienFirma": "E-mail de quem assina",
     "placeholderCorreo": "email@empresa.com",
-    "ayudaCorreo": "Recebe uma cópia do relatório, com as fotos anexadas, por um link seguro.",
+    "ayudaCorreo": "Fica guardado para enviar o relatório quando você marcá-lo como concluído. Assinar não envia nenhum e-mail.",
     "formaDeFirmar": "Forma de assinar",
     "escribir": "Digitar",
     "dibujar": "Desenhar",
@@ -326,7 +328,13 @@
     "volverEnProceso": "Voltar para em andamento",
     "confirmEliminar": "Excluir este relatório? Esta ação não pode ser desfeita.",
     "eliminando": "Excluindo…",
-    "eliminar": "Excluir"
+    "eliminar": "Excluir",
+    "correoCliente": "E-mail do cliente",
+    "placeholderCorreoCliente": "email@empresa.com",
+    "correoClienteAyuda": "Ao concluir, o relatório em PDF chega neste e-mail.",
+    "enviarYTerminar": "Enviar e concluir",
+    "enviando": "Enviando…",
+    "cancelar": "Cancelar"
   },
   "analiticasPage": {
     "titulo": "Análises · {empresa}",
@@ -403,7 +411,9 @@
     "firmaNoLlego": "A assinatura não chegou. Tente novamente.",
     "firmaDemasiadoGrande": "A assinatura é muito grande.",
     "firmaFormatoInvalido": "O formato da assinatura não é válido.",
-    "firmaGuardada": "Assinatura salva."
+    "firmaGuardada": "Assinatura salva.",
+    "ingresaCorreoCliente": "Informe o e-mail do cliente para enviar o relatório",
+    "terminadoSinCorreo": "O relatório ficou concluído, mas o e-mail não saiu. Volte-o para em andamento e marque como concluído de novo para tentar outra vez."
   },
   "estadosCotizacion": {
     "pendiente_autorizacion": "Pendente de autorização",

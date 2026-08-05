@@ -8,7 +8,6 @@ import { db } from "@/db";
 import { reports } from "@/db/schema";
 import { contenidoCoincide } from "@/lib/archivos-firma";
 import { puedeAccederAReporte, requireAccesoReportes } from "@/lib/auth-guard";
-import { firmarEnlacePublico } from "@/lib/enlace-firma";
 import { obtenerReporte } from "@/lib/queries/reports";
 import { borrarArchivo, guardarArchivo } from "@/lib/storage";
 import { firmaSchema } from "@/lib/validation";
@@ -19,62 +18,15 @@ export type FirmaState = { error?: string; ok?: string };
 const MAX_FIRMA_BYTES = 1024 * 1024;
 
 /**
- * Avisa a n8n de que el reporte quedó firmado, para que mande el correo con
- * el enlace al PDF.
+ * Guarda la firma del cliente, y nada más.
  *
- * Nunca lanza: si falta configuración (`APP_URL` o `N8N_WEBHOOK_URL`) o el
- * webhook no responde, la firma ya quedó guardada — el correo es un aviso
- * adicional, no la acción que importa. El aviso se pierde en silencio, salvo
- * por la anotación en el registro del servidor.
+ * En concreto: NO manda ningún correo. El cliente firma cuando está delante,
+ * pero el reporte puede seguir creciendo un rato más —faltan fotos, falta la
+ * orden de compra— y mandarlo en ese momento sería mandarlo a medias. El envío
+ * ocurre en un solo sitio, al marcar el reporte como terminado
+ * (`finalizarReporteAction`). El correo que se captura aquí es justamente el
+ * que se usará entonces, para no tener que volver a pedirlo.
  */
-async function avisarFirmaPorCorreo(datos: {
-  reportId: string;
-  correo: string;
-  nombreFirmante: string;
-  proyecto: string;
-}): Promise<void> {
-  const appUrl = process.env.APP_URL;
-  const webhookUrl = process.env.N8N_WEBHOOK_URL;
-
-  if (!appUrl || !webhookUrl) {
-    console.warn(
-      "No se avisó por correo de la firma del reporte %s: falta APP_URL o N8N_WEBHOOK_URL.",
-      datos.reportId,
-    );
-    return;
-  }
-
-  try {
-    const token = await firmarEnlacePublico(datos.reportId);
-    const enlace = new URL(`/api/reportes/publico/${token}`, appUrl).toString();
-
-    const respuesta = await fetch(webhookUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        correo: datos.correo,
-        nombreFirmante: datos.nombreFirmante,
-        proyecto: datos.proyecto,
-        enlacePdf: enlace,
-      }),
-    });
-
-    if (!respuesta.ok) {
-      console.warn(
-        "El webhook de n8n respondió %d al avisar de la firma del reporte %s.",
-        respuesta.status,
-        datos.reportId,
-      );
-    }
-  } catch (error) {
-    console.warn(
-      "No se pudo avisar por correo de la firma del reporte %s:",
-      datos.reportId,
-      error,
-    );
-  }
-}
-
 export async function firmarReporteAction(
   reportId: string,
   _prevState: FirmaState,
@@ -143,13 +95,6 @@ export async function firmarReporteAction(
 
   revalidatePath("/reportes");
   revalidatePath(`/reportes/${reportId}`);
-
-  await avisarFirmaPorCorreo({
-    reportId,
-    correo: parsed.data.signatureEmail,
-    nombreFirmante: parsed.data.signatureName,
-    proyecto: reporte.projectName,
-  });
 
   return { ok: t("firmaGuardada") };
 }

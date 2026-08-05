@@ -6,7 +6,11 @@ import {
   eliminarAdjuntoAction,
   subirAdjuntosAction,
 } from "@/actions/attachments";
-import { cambiarEstadoAction, eliminarReporteAction } from "@/actions/reports";
+import {
+  cambiarEstadoAction,
+  eliminarReporteAction,
+  finalizarReporteAction,
+} from "@/actions/reports";
 import { borrarFirmaAction, firmarReporteAction } from "@/actions/signature";
 import {
   agregarViaticoAction,
@@ -23,6 +27,7 @@ import {
 import {
   EliminarReporte,
   EstadoToggle,
+  FinalizarReporte,
 } from "@/components/reports/report-actions";
 import { SignatureBlock } from "@/components/reports/signature-block";
 import { ViaticoList } from "@/components/reports/viatico-list";
@@ -307,6 +312,19 @@ export default async function DetalleReportePage({ params }: Params) {
           ) : null}
         </div>
 
+        {/* Editar va justo aquí, encima de los adjuntos: es el orden real del
+            trabajo — se corrige lo que quedó mal escrito y recién entonces se
+            empiezan a subir los documentos. Al final de la pantalla quedaba
+            después de todo lo que venía a corregir. */}
+        <div className="flex justify-end">
+          <Link
+            href={`/reportes/${reporte.id}/editar`}
+            className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-muted transition hover:bg-surface-muted hover:text-text"
+          >
+            {t("editar")}
+          </Link>
+        </div>
+
         <div className="rounded-2xl border border-border bg-surface p-5 sm:p-6">
           <div className="mb-4 flex items-center justify-between gap-3">
             <h3 className="text-sm font-semibold text-text">
@@ -344,19 +362,23 @@ export default async function DetalleReportePage({ params }: Params) {
           />
         </div>
 
-        <div className="flex flex-wrap items-center gap-3">
-          <EstadoToggle
-            action={cambiarEstadoAction.bind(null, reporte.id)}
-            status={reporte.status}
-            sinAdjuntos={sinAdjuntos}
-          />
-
-          <Link
-            href={`/reportes/${reporte.id}/editar`}
-            className="rounded-lg border border-border px-4 py-2.5 text-sm font-medium text-muted transition hover:bg-surface-muted hover:text-text"
-          >
-            {t("editar")}
-          </Link>
+        <div className="flex flex-wrap items-start gap-3">
+          {/* Cerrar el reporte y mandárselo al cliente son el mismo gesto, y
+              por eso el mismo botón: ver FinalizarReporte. Volver a ponerlo en
+              proceso no manda nada, así que sigue siendo el toggle de siempre. */}
+          {reporte.status === "en_proceso" ? (
+            <FinalizarReporte
+              action={finalizarReporteAction.bind(null, reporte.id)}
+              correoRegistrado={reporte.signatureEmail}
+              sinAdjuntos={sinAdjuntos}
+            />
+          ) : (
+            <EstadoToggle
+              action={cambiarEstadoAction.bind(null, reporte.id)}
+              status={reporte.status}
+              sinAdjuntos={sinAdjuntos}
+            />
+          )}
 
           <div className="ml-auto">
             {reporte.status === "en_proceso" ? (

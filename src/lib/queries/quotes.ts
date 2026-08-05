@@ -224,6 +224,41 @@ function prefijoNumeroCotizacion(): string {
 }
 
 /**
+ * Condición "esta cotización lleva número de este año".
+ *
+ * Deliberadamente NO mira el estado: una cotización cancelada o finalizada
+ * ocupa su número igual que una en curso. Si el estado entrara aquí, cerrar
+ * la última cotización del año haría que la siguiente reutilizara su número y
+ * dos documentos distintos terminarían llamándose igual.
+ *
+ * El `_` del prefijo va escapado porque en SQL es un comodín de un carácter:
+ * sin `ESCAPE`, el patrón "Q2026_%" también casaría con "Q2026X001", y un
+ * número ajeno se colaría en el consecutivo del año. Se escapa con "!" y no
+ * con la barra invertida de costumbre porque el prefijo lo genera esta misma
+ * función (`Q` + año + `_`) y nunca puede contener "!" — así no hace falta
+ * escapar también el carácter de escape.
+ */
+function esDelAnio(prefijo: string) {
+  return sql`${quotes.quoteNumber} LIKE ${`${prefijo.replace(/_/g, "!_")}%`} ESCAPE '!'`;
+}
+
+/**
+ * Siguiente consecutivo libre del año, como número.
+ *
+ * Se compara el consecutivo convertido a entero, no la cadena completa: con
+ * `MAX` de texto, "Q2026_9" ganaría a "Q2026_010" y el siguiente número
+ * saldría repetido. Esta es la única definición de "cuál sigue" — la usan
+ * tanto la sugerencia del formulario como la asignación real al guardar, para
+ * que no puedan discrepar.
+ *
+ * `substr(quote_number, N)` usa índice 1: con el prefijo "Q2026_" (6
+ * caracteres), el primer dígito del consecutivo empieza en la posición 7.
+ */
+function siguienteConsecutivo(prefijo: string) {
+  return sql<number>`COALESCE(MAX(CAST(substr(${quotes.quoteNumber}, ${prefijo.length + 1}) AS INTEGER)), 0) + 1`;
+}
+
+/**
  * Siguiente número de cotización, SOLO para mostrarlo en el formulario antes
  * de guardar. No es atómico — es una lectura suelta, y puede quedar obsoleta
  * si otro admin crea una cotización mientras el formulario sigue abierto. La
@@ -234,14 +269,11 @@ export async function siguienteNumeroCotizacionSugerido(): Promise<string> {
   const prefijo = prefijoNumeroCotizacion();
 
   const [fila] = await db
-    .select({ maximo: sql<string | null>`MAX(${quotes.quoteNumber})` })
+    .select({ siguiente: siguienteConsecutivo(prefijo) })
     .from(quotes)
-    .where(like(quotes.quoteNumber, `${prefijo}%`));
+    .where(esDelAnio(prefijo));
 
-  const ultimo = fila?.maximo ? Number(fila.maximo.slice(prefijo.length)) : 0;
-  const siguiente = (Number.isFinite(ultimo) ? ultimo : 0) + 1;
-
-  return `${prefijo}${String(siguiente).padStart(3, "0")}`;
+  return `${prefijo}${String(Number(fila?.siguiente ?? 1)).padStart(3, "0")}`;
 }
 
 /**
@@ -250,9 +282,6 @@ export async function siguienteNumeroCotizacionSugerido(): Promise<string> {
  * sentencia SQL (un `INSERT ... SELECT` con `MAX` sobre la propia tabla), así
  * que dos cotizaciones creadas al mismo tiempo no pueden recibir el mismo
  * número — a diferencia de `siguienteNumeroCotizacionSugerido`, que solo lee.
- *
- * `substr(quote_number, N)` usa índice 1: con el prefijo "Q2026_" (6
- * caracteres), el primer dígito del consecutivo empieza en la posición 7.
  */
 export async function insertarCotizacionConNumeroAutomatico(valores: {
   id: string;
@@ -268,7 +297,6 @@ export async function insertarCotizacionConNumeroAutomatico(valores: {
   revisada: boolean;
 }): Promise<void> {
   const prefijo = prefijoNumeroCotizacion();
-  const inicioConsecutivo = prefijo.length + 1;
 
   await db.run(sql`
     INSERT INTO ${quotes} (
@@ -278,7 +306,7 @@ export async function insertarCotizacionConNumeroAutomatico(valores: {
     SELECT
       ${valores.id},
       ${valores.companyId},
-      ${prefijo} || printf('%03d', COALESCE(MAX(CAST(substr(quote_number, ${inicioConsecutivo}) AS INTEGER)), 0) + 1),
+      ${prefijo} || printf('%03d', ${siguienteConsecutivo(prefijo)}),
       ${valores.projectName},
       ${valores.clientId},
       ${valores.status},
@@ -289,7 +317,7 @@ export async function insertarCotizacionConNumeroAutomatico(valores: {
       ${valores.revisada ? 1 : 0},
       ${valores.createdBy}
     FROM ${quotes}
-    WHERE quote_number LIKE ${`${prefijo}%`}
+    WHERE ${esDelAnio(prefijo)}
   `);
 }
 

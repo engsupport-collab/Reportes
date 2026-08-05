@@ -176,6 +176,22 @@ export function gastoViaticoSchema(t: T) {
  * un enlace seguro con una copia del reporte, así que sin correo no hay a
  * dónde mandarlo.
  */
+/**
+ * Correo al que se manda el reporte al marcarlo terminado.
+ *
+ * Solo se pide cuando el reporte no está firmado: si el cliente firmó, su
+ * correo ya quedó registrado en ese momento y volver a pedirlo sería trabajo
+ * de más y una oportunidad de escribirlo mal.
+ */
+export function correoClienteSchema(t: T) {
+  return z
+    .string()
+    .trim()
+    .min(1, t("ingresaCorreoCliente"))
+    .max(200, t("correoLargo"))
+    .pipe(z.email(t("correoInvalido")));
+}
+
 export function firmaSchema(t: T) {
   return z.object({
     signatureName: z

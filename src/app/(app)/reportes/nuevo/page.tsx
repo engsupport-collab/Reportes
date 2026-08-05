@@ -43,11 +43,14 @@ export default async function NuevoReportePage({ searchParams }: Params) {
 
   // Solo tiene sentido para el admin: un empleado ya está fijo en su propia
   // empresa, así que un companyId distinto en la URL no le sirve de nada.
-  const companyIdInicial =
-    user.role === "admin" &&
-    companyIdParam &&
-    empresas.some((e) => e.id === companyIdParam)
-      ? companyIdParam
+  //
+  // Cuando llega, el reporte se está creando desde una cotización concreta y
+  // la empresa deja de ser una decisión: la hereda de ella y no se puede
+  // cambiar. Cotización y reporte documentan el mismo trabajo, así que uno en
+  // LLC y el otro en SAS sería una contradicción, no una opción.
+  const empresaHeredada =
+    user.role === "admin" && companyIdParam
+      ? empresas.find((e) => e.id === companyIdParam)
       : undefined;
 
   const [cotizacionesPorEmpresa, clientesPorEmpresa] = await Promise.all([
@@ -89,9 +92,15 @@ export default async function NuevoReportePage({ searchParams }: Params) {
           accionServicio={crearReporteAction}
           accionViatico={crearReporteViaticoAction}
           cancelarHref={user.role === "admin" ? "/admin/reportes" : "/reportes"}
-          empresas={user.role === "admin" ? user.empresas : undefined}
+          // Con la empresa heredada de una cotización no se ofrece el
+          // interruptor: `empresaFija` la muestra de solo lectura y la manda en
+          // un campo oculto.
+          empresas={
+            user.role === "admin" && !empresaHeredada ? user.empresas : undefined
+          }
+          empresaFija={empresaHeredada}
           companyIdFijo={
-            user.role === "admin" ? companyIdInicial : user.empresaActiva.id
+            user.role === "admin" ? empresaHeredada?.id : user.empresaActiva.id
           }
           cotizacionesPorEmpresa={cotizacionesPorEmpresa}
           clientesPorEmpresa={clientesPorEmpresa}
@@ -101,7 +110,10 @@ export default async function NuevoReportePage({ searchParams }: Params) {
             // Solo se preselecciona si la empresa también quedó fijada: un
             // quoteId de otra empresa que la elegida por defecto no
             // aparecería en su lista y quedaría un id colgado sin efecto.
-            quoteId: companyIdInicial ? (quoteIdParam ?? "") : "",
+            // Para un empleado la empresa siempre está fijada, así que su
+            // quoteId de la URL sí vale.
+            quoteId:
+              user.role !== "admin" || empresaHeredada ? (quoteIdParam ?? "") : "",
             workDate: aValorInput(new Date()),
             serviceType: "",
             etiquetas: [],

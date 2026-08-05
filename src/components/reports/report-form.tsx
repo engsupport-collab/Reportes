@@ -56,6 +56,7 @@ export function ReportForm({
   cancelarHref,
   empresas,
   companyIdFijo,
+  empresaFija,
   cotizacionesPorEmpresa,
   clientesPorEmpresa,
 }: {
@@ -75,6 +76,13 @@ export function ReportForm({
   empresas?: Empresa[];
   /** Para un empleado, o al editar: la empresa ya fijada. */
   companyIdFijo?: string;
+  /**
+   * Al crear el reporte desde una cotización: la empresa la hereda de ella y
+   * deja de ser una decisión. Se muestra de solo lectura y viaja en un campo
+   * oculto, porque el reporte y la cotización documentan el mismo trabajo y no
+   * pueden acabar en empresas distintas.
+   */
+  empresaFija?: Empresa;
   /** Cotizaciones activas, por empresa, para el selector. */
   cotizacionesPorEmpresa: { companyId: string; opciones: OpcionCotizacionSelector[] }[];
   /** Clientes activos, por empresa, para la creación mínima desde campo. */
@@ -93,7 +101,7 @@ export function ReportForm({
   // formulario, no controlado) porque el selector de cotización necesita
   // saber cuál está elegida para filtrar su propia lista.
   const [companyId, setCompanyId] = useState(
-    companyIdFijo ?? empresas?.[0]?.id ?? "",
+    empresaFija?.id ?? companyIdFijo ?? empresas?.[0]?.id ?? "",
   );
 
   const opciones =
@@ -132,6 +140,17 @@ export function ReportForm({
               ))}
             </div>
           </fieldset>
+        ) : empresaFija ? (
+          <div className="space-y-1.5 sm:col-span-2">
+            <span className="block text-sm font-medium text-text">
+              {t("empresa")}
+            </span>
+            <p className="rounded-lg bg-surface-muted px-3 py-2.5 text-sm text-muted">
+              {empresaFija.name}
+            </p>
+            <input type="hidden" name="companyId" value={empresaFija.id} readOnly />
+            <p className="text-xs text-muted">{t("empresaDeCotizacion")}</p>
+          </div>
         ) : null}
 
         {/* `key`: al cambiar de empresa el selector tiene que arrancar de

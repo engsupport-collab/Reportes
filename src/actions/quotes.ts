@@ -35,6 +35,10 @@ export type CotizacionState = {
 function revalidarListas(id?: string) {
   revalidatePath("/admin/cotizaciones");
   revalidatePath("/reportes/nuevo");
+  // El alta también: su campo de número llega con el siguiente consecutivo ya
+  // escrito, y si esa pantalla se sirviera de caché propondría un número que
+  // la cotización recién creada acaba de ocupar.
+  revalidatePath("/admin/cotizaciones/nueva");
   if (id) revalidatePath(`/admin/cotizaciones/${id}`);
 }
 

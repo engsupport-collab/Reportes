@@ -181,7 +181,8 @@
     "etiquetasAyuda": "— marca todas las que apliquen",
     "detallesTrabajo": "Detalles del trabajo",
     "placeholderDetalles": "Describe qué se hizo, materiales usados, observaciones…",
-    "cancelar": "Cancelar"
+    "cancelar": "Cancelar",
+    "empresaDeCotizacion": "Viene de la cotización y no se puede cambiar: el reporte y la cotización son el mismo trabajo."
   },
   "nuevoReportePage": {
     "titulo": "Nuevo reporte",
@@ -199,7 +200,8 @@
     "cotizacion": "Cotización",
     "elige": "Elige una cotización…",
     "sinCotizacionesActivas": "No hay cotizaciones activas en esta empresa.",
-    "ayuda": "Los gastos que agregues después quedan bajo esta cotización, independientes del reporte de servicio."
+    "ayuda": "Los gastos que agregues después quedan bajo esta cotización, independientes del reporte de servicio.",
+    "empresaDeCotizacion": "Viene de la cotización y no se puede cambiar: el reporte y la cotización son el mismo trabajo."
   },
   "editarReportePage": {
     "volver": "← Volver al reporte",
@@ -304,7 +306,7 @@
     "placeholderNombre": "Nombre y apellido",
     "correoQuienFirma": "Correo de quien firma",
     "placeholderCorreo": "correo@empresa.com",
-    "ayudaCorreo": "Recibe una copia del reporte, con las fotos adjuntas, por un enlace seguro.",
+    "ayudaCorreo": "Se guarda para enviarle el reporte cuando lo marques como terminado. Firmar no manda ningún correo.",
     "formaDeFirmar": "Forma de firmar",
     "escribir": "Escribir",
     "dibujar": "Dibujar",
@@ -326,7 +328,13 @@
     "volverEnProceso": "Volver a en proceso",
     "confirmEliminar": "¿Eliminar este reporte? Esta acción no se puede deshacer.",
     "eliminando": "Eliminando…",
-    "eliminar": "Eliminar"
+    "eliminar": "Eliminar",
+    "correoCliente": "Correo del cliente",
+    "placeholderCorreoCliente": "correo@empresa.com",
+    "correoClienteAyuda": "Al terminar, el reporte en PDF le llega a este correo.",
+    "enviarYTerminar": "Enviar y terminar",
+    "enviando": "Enviando…",
+    "cancelar": "Cancelar"
   },
   "analiticasPage": {
     "titulo": "Analíticas · {empresa}",
@@ -403,7 +411,9 @@
     "firmaNoLlego": "No llegó la firma. Intenta de nuevo.",
     "firmaDemasiadoGrande": "La firma es demasiado grande.",
     "firmaFormatoInvalido": "El formato de la firma no es válido.",
-    "firmaGuardada": "Firma guardada."
+    "firmaGuardada": "Firma guardada.",
+    "ingresaCorreoCliente": "Ingresa el correo del cliente para enviarle el reporte",
+    "terminadoSinCorreo": "El reporte quedó terminado, pero el correo no salió. Vuelve a ponerlo en proceso y márcalo terminado otra vez para reintentar."
   },
   "estadosCotizacion": {
     "pendiente_autorizacion": "Pendiente por autorización",

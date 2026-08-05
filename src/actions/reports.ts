@@ -9,10 +9,12 @@ import { db } from "@/db";
 import { reportTags, reports } from "@/db/schema";
 import { obtenerCotizacionActivaDeEmpresa } from "@/actions/quotes";
 import { puedeAccederAReporte, requireAccesoReportes } from "@/lib/auth-guard";
+import { enviarReporteAlCliente } from "@/lib/correo-reporte";
 import { listarEmpresas } from "@/lib/queries/companies";
 import { obtenerCotizacion } from "@/lib/queries/quotes";
 import { obtenerReporte } from "@/lib/queries/reports";
 import {
+  correoClienteSchema,
   estadoReporteSchema,
   leerEtiquetas,
   reporteSchema,
@@ -276,6 +278,74 @@ export async function actualizarReporteAction(
   redirect(`/reportes/${id}`);
 }
 
+export type FinalizarState = { error?: string };
+
+/**
+ * Marca un reporte de servicio como terminado y se lo manda al cliente.
+ *
+ * Es el ÚNICO punto del sistema desde el que sale el reporte hacia el cliente.
+ * Firmar ya no envía nada: el cliente firma delante del técnico, pero después
+ * todavía pueden faltar fotos o la orden de compra, y un correo enviado en ese
+ * momento llevaría un reporte a medias. Aquí, en cambio, "terminado" quiere
+ * decir terminado.
+ *
+ * El correo sale del que quedó registrado al firmar. Solo si no hay ninguno
+ * —un reporte que se cierra sin firma— se pide en el momento.
+ *
+ * El orden importa: primero se marca terminado, y solo después se intenta
+ * enviar. Al revés, un webhook caído dejaría al técnico sin poder cerrar el
+ * trabajo. Si el envío falla, el reporte queda terminado igual y se le dice
+ * qué pasó, en vez de fingir que salió.
+ */
+export async function finalizarReporteAction(
+  id: string,
+  _prevState: FinalizarState,
+  formData: FormData,
+): Promise<FinalizarState> {
+  const { user, reporte } = await cargarConPermiso(id);
+  const t = await getTranslations("validacion");
+
+  // Un reporte de viáticos es información interna y no se manda a nadie: su
+  // detalle usa `cambiarEstadoAction`, no esta acción.
+  if (!reporte || reporte.type !== "servicio") {
+    return { error: t("reporteNoExiste") };
+  }
+
+  const parsed = correoClienteSchema(t).safeParse(
+    reporte.signatureEmail ?? formData.get("correoCliente") ?? "",
+  );
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? t("ingresaCorreoCliente") };
+  }
+
+  await db
+    .update(reports)
+    .set({
+      status: "terminado",
+      completedAt: new Date(),
+      updatedAt: new Date(),
+      updatedBy: user.id,
+    })
+    .where(eq(reports.id, id));
+
+  revalidarListas(id);
+
+  const enviado = await enviarReporteAlCliente({
+    reportId: id,
+    correo: parsed.data,
+    nombreFirmante: reporte.signatureName ?? reporte.clientName,
+    proyecto: reporte.projectName,
+  });
+
+  if (!enviado) {
+    return { error: t("terminadoSinCorreo") };
+  }
+
+  // Terminado y enviado: el técnico ya no tiene nada que hacer en esta
+  // pantalla, y lo siguiente casi siempre es el próximo trabajo.
+  redirect("/reportes/nuevo");
+}
+
 export async function cambiarEstadoAction(id: string, formData: FormData) {
   const { user, reporte } = await cargarConPermiso(id);
   if (!reporte) return;
@@ -284,6 +354,12 @@ export async function cambiarEstadoAction(id: string, formData: FormData) {
   if (!parsed.success) return;
 
   const nuevoEstado = parsed.data;
+
+  // Cerrar un reporte de servicio pasa siempre por `finalizarReporteAction`,
+  // que es donde se resuelve el correo y se envía. Sin esta puerta cerrada,
+  // una petición armada a mano podría dejarlo terminado sin que el cliente
+  // reciba nada, y "terminado" dejaría de significar "enviado".
+  if (nuevoEstado === "terminado" && reporte.type === "servicio") return;
 
   await db
     .update(reports)

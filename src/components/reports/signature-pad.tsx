@@ -40,11 +40,12 @@ export function SignaturePad({
   const t = useTranslations("firma");
 
   /**
-   * "Escribir" es lo primero que se ofrece a propósito: dibujar con el dedo no
-   * funciona en algunos celulares (ver PLAN.md), y escribir el nombre sí
-   * funciona en todos. Quien prefiera dibujar tiene la pestaña al lado.
+   * Se arranca en "Dibujar": es lo que el cliente espera al firmar, y una
+   * firma de puño y letra es la que respalda el reporte. "Escribir" queda a un
+   * clic para el caso en que dibujar no funcione — en algunos celulares falla
+   * con el dedo (ver PLAN.md) — y para quien simplemente lo prefiera.
    */
-  const [modo, setModo] = useState<Modo>("escribir");
+  const [modo, setModo] = useState<Modo>("dibujar");
   const [nombre, setNombre] = useState(nombrePorDefecto);
   const [estilo, setEstilo] = useState<EstiloFirma>(ESTILOS_FIRMA[0]!);
   const vistaPreviaRef = useRef<HTMLDivElement>(null);
@@ -334,9 +335,9 @@ export function SignaturePad({
         <p className="text-xs text-muted">{t("ayudaCorreo")}</p>
       </div>
 
-      {/* Dos formas de firmar. Escribir va primero porque funciona en
-          cualquier dispositivo; dibujar con el dedo falla en algunos
-          celulares (ver PLAN.md). */}
+      {/* Dos formas de firmar. Dibujar va primero y viene seleccionada: es la
+          firma de puño y letra. Escribir es la salida cuando dibujar con el
+          dedo falla, cosa que pasa en algunos celulares (ver PLAN.md). */}
       <div
         role="tablist"
         aria-label={t("formaDeFirmar")}
@@ -344,8 +345,8 @@ export function SignaturePad({
       >
         {(
           [
-            ["escribir", t("escribir")],
             ["dibujar", t("dibujar")],
+            ["escribir", t("escribir")],
           ] as const
         ).map(([id, texto]) => (
           <button
