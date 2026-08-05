@@ -1,12 +1,13 @@
 /**
- * Esqueleto de carga de esta sección.
+ * Esqueleto de carga de esta rama.
  *
- * Tiene que existir en CADA segmento, no basta con uno arriba: React no vuelve
- * a mostrar el fallback de una frontera de Suspense que ya está montada —
- * durante una transición conserva el contenido anterior. La frontera de
- * `(app)` ya está montada mientras navegas dentro del grupo, así que su
- * esqueleto no se vería nunca. El segmento al que entras nace nuevo, y ahí sí
- * aparece.
+ * Cubre todo lo que cuelga de `reportes`: la vista del empleado, el detalle
+ * de un reporte y su edición. También es el que actúa al saltar desde el
+ * panel del admin a Nuevo reporte, porque ahí el segmento `reportes` nace
+ * nuevo.
+ *
+ * La regla de dónde hace falta un loading.tsx, con la lista completa y el
+ * porqué, está en `src/app/(app)/loading.tsx`.
  *
  * El contenido es el mismo para todas: ver `EsqueletoSeccion`.
  */

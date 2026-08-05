@@ -1,12 +1,16 @@
 /**
- * Esqueleto de carga de esta sección.
+ * Esqueleto de carga de esta rama.
  *
- * Tiene que existir en CADA segmento, no basta con uno arriba: React no vuelve
- * a mostrar el fallback de una frontera de Suspense que ya está montada —
- * durante una transición conserva el contenido anterior. La frontera de
- * `(app)` ya está montada mientras navegas dentro del grupo, así que su
- * esqueleto no se vería nunca. El segmento al que entras nace nuevo, y ahí sí
- * aparece.
+ * Cubre las navegaciones entre secciones del panel: Panel, Cotizaciones,
+ * Clientes, Reportes, Usuarios y Analíticas. Todas son hijos directos de
+ * `admin`, así que este es el nivel donde el segmento cambia.
+ *
+ * No basta con el de `(app)`: allí el hijo sigue siendo `admin` y la frontera
+ * no se remonta. Medido: sin este archivo, esas navegaciones tardan ~470 ms en
+ * dar señal; con él, ~108 ms.
+ *
+ * La regla de dónde hace falta un loading.tsx, con la lista completa y el
+ * porqué, está en `src/app/(app)/loading.tsx`.
  *
  * El contenido es el mismo para todas: ver `EsqueletoSeccion`.
  */
