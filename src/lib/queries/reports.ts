@@ -196,6 +196,7 @@ function construirWhere(filtros: FiltrosReportes) {
         like(reports.projectName, patron),
         like(reports.clientName, patron),
         like(reports.purchaseOrderNo, patron),
+        like(reports.quoteNumber, patron),
       )!,
     );
   }
