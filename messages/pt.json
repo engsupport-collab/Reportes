@@ -408,7 +408,8 @@
     "firmaFormatoInvalido": "O formato da assinatura não é válido.",
     "firmaGuardada": "Assinatura salva.",
     "terminadoSinCorreo": "O relatório ficou concluído, mas o e-mail não saiu. Pressione o botão de novo para tentar enviar outra vez.",
-    "firmaAntesDeTerminar": "Assine o relatório antes de concluí-lo: o e-mail do cliente vem da assinatura."
+    "firmaAntesDeTerminar": "Assine o relatório antes de concluí-lo: o e-mail do cliente vem da assinatura.",
+    "numeroCotizacionEnUso": "Esse número de cotação já está em uso. Escolha outro."
   },
   "estadosCotizacion": {
     "pendiente_autorizacion": "Pendente de autorização",

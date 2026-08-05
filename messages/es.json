@@ -408,7 +408,8 @@
     "firmaFormatoInvalido": "El formato de la firma no es válido.",
     "firmaGuardada": "Firma guardada.",
     "terminadoSinCorreo": "El reporte quedó terminado, pero el correo no salió. Vuelve a pulsar el botón para reintentar el envío.",
-    "firmaAntesDeTerminar": "Firma el reporte antes de terminarlo: el correo del cliente se toma de la firma."
+    "firmaAntesDeTerminar": "Firma el reporte antes de terminarlo: el correo del cliente se toma de la firma.",
+    "numeroCotizacionEnUso": "Ese número de cotización ya está en uso. Elige otro."
   },
   "estadosCotizacion": {
     "pendiente_autorizacion": "Pendiente por autorización",

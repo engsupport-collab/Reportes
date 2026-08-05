@@ -12,6 +12,7 @@ import { esEstadoActivo } from "@/lib/cotizaciones";
 import { obtenerClienteActivoDeEmpresa } from "@/lib/queries/clients";
 import { listarEmpresas } from "@/lib/queries/companies";
 import {
+  esNumeroCotizacionDuplicado,
   insertarCotizacionConNumeroAutomatico,
   obtenerCotizacion,
   sincronizarSecuenciaConNumero,
@@ -105,32 +106,45 @@ export async function crearCotizacionAction(
   const usarNumeroAutomatico =
     quoteNumberSugerido.length > 0 && quoteNumberEnviado === quoteNumberSugerido;
 
-  if (usarNumeroAutomatico) {
-    await insertarCotizacionConNumeroAutomatico({
-      id,
-      companyId: empresa.id,
-      createdBy: user.id,
-      status,
-      projectName: parsed.data.projectName,
-      clientId: parsed.data.clientId,
-      purchaseOrderNo: parsed.data.purchaseOrderNo,
-      dueDate: parsed.data.dueDate ? parsed.data.dueDate.getTime() : null,
-      description: parsed.data.description,
-      amount: parsed.data.amount,
-      revisada: true,
-    });
-  } else {
-    await db.insert(quotes).values({
-      id,
-      companyId: empresa.id,
-      createdBy: user.id,
-      status,
-      ...parsed.data,
-    });
-    // El admin escribió el número a mano. Si va por delante del contador, se
-    // adelanta el contador: si no, dentro de unas semanas la secuencia
-    // llegaría a ese mismo número y lo entregaría por segunda vez.
-    await sincronizarSecuenciaConNumero(parsed.data.quoteNumber);
+  // El try envuelve solo la escritura: `redirect` funciona lanzando, y si
+  // quedara dentro se confundiría con un fallo de la base.
+  try {
+    if (usarNumeroAutomatico) {
+      await insertarCotizacionConNumeroAutomatico({
+        id,
+        companyId: empresa.id,
+        createdBy: user.id,
+        status,
+        projectName: parsed.data.projectName,
+        clientId: parsed.data.clientId,
+        purchaseOrderNo: parsed.data.purchaseOrderNo,
+        dueDate: parsed.data.dueDate ? parsed.data.dueDate.getTime() : null,
+        description: parsed.data.description,
+        amount: parsed.data.amount,
+        revisada: true,
+      });
+    } else {
+      await db.insert(quotes).values({
+        id,
+        companyId: empresa.id,
+        createdBy: user.id,
+        status,
+        ...parsed.data,
+      });
+      // El admin escribió el número a mano. Si va por delante del contador, se
+      // adelanta el contador: si no, dentro de unas semanas la secuencia
+      // llegaría a ese mismo número y lo entregaría por segunda vez.
+      await sincronizarSecuenciaConNumero(parsed.data.quoteNumber);
+    }
+  } catch (error) {
+    // Dos admins escribiendo el mismo número a la vez pasan los dos por la
+    // validación —cada uno mira un instante en el que el otro no ha guardado—
+    // y es el índice único quien los separa. Aquí ese rechazo se convierte en
+    // algo que se puede leer y corregir, en vez de una pantalla de error.
+    if (esNumeroCotizacionDuplicado(error)) {
+      return { error: t("numeroCotizacionEnUso") };
+    }
+    throw error;
   }
 
   revalidarListas();
@@ -175,14 +189,21 @@ export async function actualizarCotizacionAction(
   );
   if (!cliente) return { error: t("eligeCliente") };
 
-  await db
-    .update(quotes)
-    .set({ ...parsed.data, updatedAt: new Date(), updatedBy: user.id })
-    .where(eq(quotes.id, id));
+  try {
+    await db
+      .update(quotes)
+      .set({ ...parsed.data, updatedAt: new Date(), updatedBy: user.id })
+      .where(eq(quotes.id, id));
 
-  // Mismo motivo que al crear: editar el número a mano también puede dejarlo
-  // por delante del contador.
-  await sincronizarSecuenciaConNumero(parsed.data.quoteNumber);
+    // Mismo motivo que al crear: editar el número a mano también puede dejarlo
+    // por delante del contador.
+    await sincronizarSecuenciaConNumero(parsed.data.quoteNumber);
+  } catch (error) {
+    if (esNumeroCotizacionDuplicado(error)) {
+      return { error: t("numeroCotizacionEnUso") };
+    }
+    throw error;
+  }
 
   revalidarListas(id);
   redirect(`/admin/cotizaciones/${id}`);

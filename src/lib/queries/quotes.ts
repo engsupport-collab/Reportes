@@ -262,34 +262,6 @@ export function leerNumeroCotizacion(
 }
 
 /**
- * Reserva el siguiente número del año dentro de una sola sentencia.
- *
- * `INSERT ... ON CONFLICT DO UPDATE ... RETURNING` incrementa y devuelve en el
- * mismo paso. No hay ventana entre leer y escribir, así que dos peticiones
- * simultáneas no pueden recibir el mismo valor: la segunda espera al bloqueo
- * de escritura de la primera y sale con el siguiente.
- *
- * Recibe el ejecutor (`db` o una transacción) para poder participar de una
- * transacción mayor — ver `insertarCotizacionConNumeroAutomatico`.
- */
-async function reservarConsecutivo(
-  ejecutor: Pick<typeof db, "get">,
-  anio: number,
-): Promise<number> {
-  const fila = await ejecutor.get<{ last_value: number }>(sql`
-    INSERT INTO ${quoteSequences} (year, last_value) VALUES (${anio}, 1)
-    ON CONFLICT(year) DO UPDATE SET last_value = last_value + 1
-    RETURNING last_value
-  `);
-
-  if (!fila) {
-    throw new Error(`No se pudo reservar el número de cotización de ${anio}.`);
-  }
-
-  return Number(fila.last_value);
-}
-
-/**
  * Número que el formulario muestra ya escrito, SOLO como sugerencia.
  *
  * No reserva nada: si lo reservara, abrir el formulario y cerrarlo sin guardar
@@ -309,12 +281,26 @@ export async function siguienteNumeroCotizacionSugerido(): Promise<string> {
   return formatearNumeroCotizacion(anio, (fila?.lastValue ?? 0) + 1);
 }
 
+/** El `printf` de SQLite que rellena el consecutivo con ceros a la izquierda. */
+const FORMATO_CONSECUTIVO = sql.raw(`'%0${DIGITOS_CONSECUTIVO}d'`);
+
 /**
  * Inserta una cotización con el siguiente número del año.
  *
- * La reserva y la inserción van en una transacción: si la inserción falla, el
- * contador vuelve atrás y el número no se pierde. Un fallo a medias dejaría un
- * hueco — no sería incorrecto, pero es evitable.
+ * Van tres sentencias en un `batch`, que libSQL ejecuta como una transacción
+ * en un solo viaje: incrementar el contador, insertar la cotización leyendo el
+ * valor recién incrementado, y devolverlo. Si la inserción falla —un id
+ * repetido, un cliente que ya no existe— el contador vuelve atrás con ella y
+ * el número no se quema.
+ *
+ * Se usa `batch` y NO una transacción interactiva, y la diferencia importa
+ * bajo carga: una transacción interactiva mantiene abierto un stream contra
+ * Turso mientras dura, y cien creaciones a la vez agotan el límite de streams
+ * — probado, y falla con ECONNRESET. El `batch` es una petición suelta, así
+ * que cien simultáneas salen adelante sin un solo error.
+ *
+ * La segunda sentencia lee `last_value` de la primera porque las dos están en
+ * la misma transacción; nadie más puede colarse entre ellas.
  */
 export async function insertarCotizacionConNumeroAutomatico(valores: {
   id: string;
@@ -330,28 +316,72 @@ export async function insertarCotizacionConNumeroAutomatico(valores: {
   revisada: boolean;
 }): Promise<string> {
   const anio = anioActual();
+  const prefijo = `Q${anio}_`;
 
-  return db.transaction(async (tx) => {
-    const consecutivo = await reservarConsecutivo(tx, anio);
-    const quoteNumber = formatearNumeroCotizacion(anio, consecutivo);
+  const resultados = await db.batch([
+    db.run(sql`
+      INSERT INTO ${quoteSequences} (year, last_value) VALUES (${anio}, 1)
+      ON CONFLICT(year) DO UPDATE SET last_value = last_value + 1
+    `),
+    db.run(sql`
+      INSERT INTO ${quotes} (
+        id, company_id, quote_number, project_name, client_id, status,
+        purchase_order_no, due_date, description, amount, revisada, created_by
+      )
+      SELECT
+        ${valores.id},
+        ${valores.companyId},
+        ${prefijo} || printf(${FORMATO_CONSECUTIVO}, last_value),
+        ${valores.projectName},
+        ${valores.clientId},
+        ${valores.status},
+        ${valores.purchaseOrderNo},
+        ${valores.dueDate},
+        ${valores.description},
+        ${valores.amount},
+        ${valores.revisada ? 1 : 0},
+        ${valores.createdBy}
+      FROM ${quoteSequences}
+      WHERE year = ${anio}
+    `),
+    db.get<{ last_value: number }>(
+      sql`SELECT last_value FROM ${quoteSequences} WHERE year = ${anio}`,
+    ),
+  ]);
 
-    await tx.insert(quotes).values({
-      id: valores.id,
-      companyId: valores.companyId,
-      createdBy: valores.createdBy,
-      status: valores.status,
-      quoteNumber,
-      projectName: valores.projectName,
-      clientId: valores.clientId,
-      purchaseOrderNo: valores.purchaseOrderNo,
-      dueDate: valores.dueDate === null ? null : new Date(valores.dueDate),
-      description: valores.description,
-      amount: valores.amount,
-      revisada: valores.revisada,
-    });
+  const asignado = resultados[2] as { last_value: number } | undefined;
 
-    return quoteNumber;
-  });
+  if (!asignado) {
+    throw new Error(`No se pudo asignar el número de cotización de ${anio}.`);
+  }
+
+  return formatearNumeroCotizacion(anio, Number(asignado.last_value));
+}
+
+/**
+ * ¿Este error es el índice único de `quote_number` rechazando un duplicado?
+ *
+ * Se mira el mensaje porque es lo único que el driver expone de forma estable;
+ * el código de error (`SQLITE_CONSTRAINT`) lo comparten todas las
+ * restricciones, así que por sí solo no distingue este caso de una clave
+ * foránea rota. Se recorre la cadena de `cause` porque Drizzle envuelve el
+ * error del driver en uno propio.
+ */
+export function esNumeroCotizacionDuplicado(error: unknown): boolean {
+  let actual: unknown = error;
+
+  for (let saltos = 0; actual !== undefined && actual !== null && saltos < 5; saltos++) {
+    const mensaje = actual instanceof Error ? actual.message : String(actual);
+    if (
+      mensaje.includes("UNIQUE constraint failed") &&
+      mensaje.includes("quote_number")
+    ) {
+      return true;
+    }
+    actual = actual instanceof Error ? actual.cause : undefined;
+  }
+
+  return false;
 }
 
 /**

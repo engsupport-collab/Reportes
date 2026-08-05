@@ -6,6 +6,7 @@ import {
   primaryKey,
   sqliteTable,
   text,
+  uniqueIndex,
 } from "drizzle-orm/sqlite-core";
 
 import { ESTADOS_COTIZACION } from "@/lib/cotizaciones";
@@ -191,10 +192,23 @@ export const quoteSequences = sqliteTable("quote_sequences", {
  * proyecto aparecía escrito de tres formas. Ahora el reporte se crea eligiendo
  * una cotización de esta tabla.
  *
- * `quoteNumber` admite null y NO es único, las dos cosas a propósito: una
- * cotización creada en campo todavía no tiene número asignado, y en el control
- * que lleva el cliente hay números repetidos de forma legítima (una misma
- * cotización con varias entregas mensuales comparte número).
+ * `quoteNumber` es ÚNICO en la base, no solo en el código: la unicidad de un
+ * número de cotización es una regla del negocio, y el único sitio donde se
+ * puede garantizar de verdad es aquí. Dos administradores escribiendo el mismo
+ * número a la vez pasan las dos validaciones de la aplicación —cada una mira
+ * un instante en el que el otro todavía no ha guardado— y solo el índice los
+ * separa.
+ *
+ * Sigue admitiendo null, y eso convive con el índice: en SQLite un índice
+ * único deja pasar tantos nulos como haga falta. Es lo que necesitan las
+ * cotizaciones antiguas que se crearon antes de que existiera la numeración
+ * automática.
+ *
+ * Nota para una carga masiva desde el Excel del cliente: ese control lleva
+ * números repetidos a propósito (una cotización con varias entregas mensuales
+ * comparte número), así que una importación tal cual chocaría contra este
+ * índice. Si llega ese momento, esas entregas son filas de otra tabla que
+ * cuelga de la cotización, no cotizaciones distintas con el mismo nombre.
  */
 export const quotes = sqliteTable(
   "quotes",
@@ -268,6 +282,7 @@ export const quotes = sqliteTable(
   (table) => [
     // El selector del técnico filtra siempre por empresa y estado; el panel del
     // admin agrega el filtro de "sin revisar".
+    uniqueIndex("quotes_quote_number_unique").on(table.quoteNumber),
     index("quotes_company_status_idx").on(table.companyId, table.status),
     index("quotes_company_revisada_idx").on(table.companyId, table.revisada),
     index("quotes_project_idx").on(table.projectName),

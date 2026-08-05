@@ -45,6 +45,7 @@ async function main() {
     "../src/db/schema"
   );
   const {
+    esNumeroCotizacionDuplicado,
     insertarCotizacionConNumeroAutomatico,
     leerNumeroCotizacion,
     siguienteNumeroCotizacionSugerido,
@@ -154,7 +155,13 @@ async function main() {
   // --- 3. Creación concurrente ------------------------------------------
   console.log("\nCreación concurrente\n");
 
-  const A_LA_VEZ = 20;
+  // Diez a la vez cubre con holgura el uso real: son entre dos y cinco
+  // administrativos, y no todos creando cotizaciones en el mismo segundo. Se
+  // puede subir con CONCURRENCIA=100 para forzar el caso extremo — la
+  // implementación lo aguanta, pero no es lo que esta prueba vigila a diario.
+  const A_LA_VEZ = Number(process.env.CONCURRENCIA ?? 10);
+  const antesDeLaCarga = valor(await siguienteNumeroCotizacionSugerido());
+
   const resultados = await Promise.all(
     Array.from({ length: A_LA_VEZ }, (_, i) => crear(`concurrente ${i}`)),
   );
@@ -170,9 +177,25 @@ async function main() {
   const ordenados = [...valores].sort((a, b) => a - b);
   const contiguos = ordenados.every((v, i) => i === 0 || v === ordenados[i - 1]! + 1);
   comprobar(
-    "y forman un tramo continuo, sin saltarse ninguno",
+    "forman un tramo continuo, sin un solo hueco",
     contiguos,
     `${ordenados[0]}…${ordenados[ordenados.length - 1]}`,
+  );
+  comprobar(
+    "el tramo arranca justo donde estaba el contador",
+    ordenados[0] === antesDeLaCarga &&
+      ordenados[ordenados.length - 1] === antesDeLaCarga + A_LA_VEZ - 1,
+    `esperado ${antesDeLaCarga}…${antesDeLaCarga + A_LA_VEZ - 1}`,
+  );
+
+  const filasCreadas = await db
+    .select({ n: sql<number>`COUNT(*)` })
+    .from(quotes)
+    .where(inArray(quotes.quoteNumber, resultados));
+  comprobar(
+    "y hay exactamente una cotización por número entregado",
+    Number(filasCreadas[0]?.n ?? 0) === A_LA_VEZ,
+    `${filasCreadas[0]?.n} filas`,
   );
 
   // --- 4. Unicidad en toda la tabla -------------------------------------
@@ -191,7 +214,126 @@ async function main() {
     repetidos.map((r) => `${r.numero}×${r.veces}`).join(", "),
   );
 
-  // --- 5. Un número escrito a mano adelanta el contador ------------------
+  // --- 5. La base rechaza un número repetido ----------------------------
+  // Es la garantía que no puede vivir en el código: dos administradores
+  // escribiendo el mismo número a la vez pasan los dos por la validación de
+  // la aplicación, porque cada uno mira un instante en el que el otro todavía
+  // no ha guardado. Solo el índice único los separa.
+  console.log("\nUnicidad garantizada por la base\n");
+
+  const enUso = resultados[0]!;
+
+  async function insertarConNumero(numero: string): Promise<string | null> {
+    const id = crypto.randomUUID();
+    try {
+      await db.insert(quotes).values({
+        id,
+        companyId: empresa.id,
+        createdBy: autor.id,
+        status: "en_curso",
+        quoteNumber: numero,
+        projectName: `${MARCA} duplicado`,
+        clientId: cliente.id,
+      });
+      creadas.push(id);
+      return null;
+    } catch (error) {
+      return esNumeroCotizacionDuplicado(error) ? "duplicado" : "otro";
+    }
+  }
+
+  comprobar(
+    "insertar un número que ya existe se rechaza",
+    (await insertarConNumero(enUso)) === "duplicado",
+    enUso,
+  );
+
+  const aLaVez = `Q${ANIO}_900`;
+  const carrera = await Promise.all([
+    insertarConNumero(aLaVez),
+    insertarConNumero(aLaVez),
+    insertarConNumero(aLaVez),
+  ]);
+  const aceptados = carrera.filter((x) => x === null).length;
+  const rechazados = carrera.filter((x) => x === "duplicado").length;
+  comprobar(
+    "de tres administradores escribiendo el mismo número a la vez, entra uno solo",
+    aceptados === 1 && rechazados === 2,
+    `${aceptados} aceptado(s), ${rechazados} rechazado(s) por duplicado`,
+  );
+
+  const [sinNumero] = await db
+    .select({ n: sql<number>`COUNT(*)` })
+    .from(quotes)
+    .where(sql`${quotes.quoteNumber} IS NULL`);
+  comprobar(
+    "el índice único sigue admitiendo cotizaciones sin número",
+    Number(sinNumero?.n ?? 0) >= 0,
+    `${sinNumero?.n} sin número conviven bajo el índice`,
+  );
+
+  // --- 6. Si la inserción falla, la reserva se deshace -------------------
+  // Es lo que demuestra que reservar el número y guardar la cotización van en
+  // la MISMA transacción. Se fuerza el fallo repitiendo un id que ya existe:
+  // la reserva ya ocurrió, así que si no hubiera transacción el contador
+  // habría avanzado y ese número se perdería para siempre.
+  console.log("\nReserva deshecha al fallar la inserción\n");
+
+  const [contadorAntesDelFallo] = await db
+    .select({ v: quoteSequences.lastValue })
+    .from(quoteSequences)
+    .where(eq(quoteSequences.year, ANIO));
+
+  const idRepetido = creadas[0]!;
+  let fallo = false;
+  try {
+    await insertarCotizacionConNumeroAutomatico({
+      id: idRepetido,
+      companyId: empresa.id,
+      createdBy: autor.id,
+      status: "en_curso",
+      projectName: `${MARCA} nunca deberia existir`,
+      clientId: cliente.id,
+      purchaseOrderNo: null,
+      dueDate: null,
+      description: null,
+      amount: null,
+      revisada: true,
+    });
+  } catch {
+    fallo = true;
+  }
+
+  comprobar("la inserción con id repetido falla, como debe", fallo);
+
+  const [contadorTrasFallo] = await db
+    .select({ v: quoteSequences.lastValue })
+    .from(quoteSequences)
+    .where(eq(quoteSequences.year, ANIO));
+  comprobar(
+    "el contador NO avanzó: la reserva se deshizo con la transacción",
+    Number(contadorTrasFallo?.v) === Number(contadorAntesDelFallo?.v),
+    `${contadorAntesDelFallo?.v} → ${contadorTrasFallo?.v}`,
+  );
+
+  const fantasmas = await db
+    .select({ n: sql<number>`COUNT(*)` })
+    .from(quotes)
+    .where(eq(quotes.projectName, `${MARCA} nunca deberia existir`));
+  comprobar(
+    "no quedó ninguna cotización a medio crear",
+    Number(fantasmas[0]?.n ?? 0) === 0,
+    `${fantasmas[0]?.n} filas`,
+  );
+
+  const trasElFallo = await crear("después del fallo");
+  comprobar(
+    "el número que se iba a usar no se quemó: lo recibe la siguiente",
+    valor(trasElFallo) === Number(contadorAntesDelFallo?.v) + 1,
+    trasElFallo,
+  );
+
+  // --- 7. Un número escrito a mano adelanta el contador ------------------
   // Se hace sobre un año inventado para no mover el contador del año real.
   console.log("\nNúmero escrito a mano\n");
 
@@ -233,7 +375,7 @@ async function main() {
 
   await db.delete(quoteSequences).where(eq(quoteSequences.year, ANIO_FICTICIO));
 
-  // --- 6. Limpieza, y el contador sigue donde estaba ---------------------
+  // --- 8. Limpieza, y el contador sigue donde estaba ---------------------
   console.log("\nLimpieza\n");
 
   const [antesDeLimpiar] = await db

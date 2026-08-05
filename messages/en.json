@@ -408,7 +408,8 @@
     "firmaFormatoInvalido": "The signature format isn't valid.",
     "firmaGuardada": "Signature saved.",
     "terminadoSinCorreo": "The report was marked as completed, but the email didn't go out. Press the button again to retry sending it.",
-    "firmaAntesDeTerminar": "Sign the report before finishing it: the client's email comes from the signature."
+    "firmaAntesDeTerminar": "Sign the report before finishing it: the client's email comes from the signature.",
+    "numeroCotizacionEnUso": "That quote number is already taken. Choose another one."
   },
   "estadosCotizacion": {
     "pendiente_autorizacion": "Pending authorization",
