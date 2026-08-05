@@ -38,10 +38,11 @@ export default async function DetalleCotizacionPage({ params }: Params) {
   const cotizacion = await obtenerCotizacion(id);
   if (!cotizacion) notFound();
 
-  const [reportes, t, tForm] = await Promise.all([
+  const [reportes, t, tForm, tTipo] = await Promise.all([
     listarReportesDeCotizacion(id),
     getTranslations("cotizacionDetail"),
     getTranslations("cotizacionForm"),
+    getTranslations("nuevoReportePage"),
   ]);
 
   const firmados = reportes.filter((r) => r.tieneFirma).length;
@@ -150,14 +151,34 @@ export default async function DetalleCotizacionPage({ params }: Params) {
                     href={`/reportes/${r.id}`}
                     className="flex items-center justify-between gap-3 rounded-xl border border-border bg-surface-muted px-3 py-2.5 text-sm transition hover:border-brand"
                   >
-                    <span className="min-w-0 truncate text-text">
-                      {r.authorName} · {formatInstante(r.createdAt)}
+                    <span className="flex min-w-0 items-center gap-2">
+                      {/* Servicio y viáticos son hermanos independientes bajo
+                          esta cotización — la insignia es lo que distingue,
+                          en esta única lista, cuál es cuál. */}
+                      <span
+                        className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${
+                          r.type === "viaticos"
+                            ? "bg-warning-soft text-warning"
+                            : "bg-brand-soft text-brand"
+                        }`}
+                      >
+                        {r.type === "viaticos" ? tTipo("tipoViaticos") : tTipo("tipoServicio")}
+                      </span>
+                      <span className="min-w-0 truncate text-text">
+                        {r.authorName} · {formatInstante(r.createdAt)}
+                      </span>
                     </span>
-                    <span
-                      className={`shrink-0 text-xs font-medium ${r.tieneFirma ? "text-success" : "text-muted"}`}
-                    >
-                      {r.tieneFirma ? t("firmado") : t("sinFirmar")}
-                    </span>
+                    {r.type === "viaticos" ? (
+                      <span className="shrink-0 text-xs font-medium text-text">
+                        {formatearMonto(r.totalGastos, cotizacion.currency)}
+                      </span>
+                    ) : (
+                      <span
+                        className={`shrink-0 text-xs font-medium ${r.tieneFirma ? "text-success" : "text-muted"}`}
+                      >
+                        {r.tieneFirma ? t("firmado") : t("sinFirmar")}
+                      </span>
+                    )}
                   </Link>
                 </li>
               ))}

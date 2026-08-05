@@ -3,10 +3,7 @@ import { NextResponse } from "next/server";
 import { getCurrentUser, puedeAccederAReporte } from "@/lib/auth-guard";
 import { generarReportePdf, generarReporteViaticoPdf } from "@/lib/pdf";
 import { listarAdjuntosParaPdf } from "@/lib/queries/attachments";
-import {
-  obtenerReporte,
-  obtenerReporteServicioParaEnlazar,
-} from "@/lib/queries/reports";
+import { obtenerReporte } from "@/lib/queries/reports";
 import { listarViaticosParaPdf } from "@/lib/queries/viaticos";
 
 /**
@@ -33,17 +30,8 @@ export async function GET(
   const pdf =
     reporte.type === "viaticos"
       ? await (async () => {
-          const [gastos, enlazado] = await Promise.all([
-            listarViaticosParaPdf(id),
-            reporte.linkedReportId
-              ? obtenerReporteServicioParaEnlazar(reporte.linkedReportId)
-              : Promise.resolve(null),
-          ]);
-          return generarReporteViaticoPdf(
-            reporte,
-            gastos,
-            enlazado?.projectName ?? null,
-          );
+          const gastos = await listarViaticosParaPdf(id);
+          return generarReporteViaticoPdf(reporte, gastos);
         })()
       : await (async () => {
           const adjuntos = await listarAdjuntosParaPdf(id);

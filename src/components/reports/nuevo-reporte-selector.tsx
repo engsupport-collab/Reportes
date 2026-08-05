@@ -8,7 +8,7 @@ import type { OpcionCliente } from "@/lib/queries/clients";
 import type { Empresa } from "@/lib/queries/companies";
 import { ReportForm } from "./report-form";
 import type { OpcionCotizacionSelector } from "./quote-selector";
-import { ViaticoReportForm, type OpcionReporteEnlazable } from "./viatico-report-form";
+import { ViaticoReportForm } from "./viatico-report-form";
 
 type Tipo = "servicio" | "viaticos";
 
@@ -30,7 +30,6 @@ export function NuevoReporteSelector({
   valoresServicio,
   cotizacionesPorEmpresa,
   clientesPorEmpresa,
-  reportesPorEmpresa,
 }: {
   accionServicio: (estado: ReporteState, formData: FormData) => Promise<ReporteState>;
   accionViatico: (estado: ReporteState, formData: FormData) => Promise<ReporteState>;
@@ -45,10 +44,10 @@ export function NuevoReporteSelector({
     etiquetas: string[];
     details: string;
   };
+  /** Cotizaciones activas por empresa — las usan los dos tipos de reporte. */
   cotizacionesPorEmpresa: { companyId: string; opciones: OpcionCotizacionSelector[] }[];
   /** Solo para el tipo servicio: la creación mínima desde campo los necesita. */
   clientesPorEmpresa: { companyId: string; opciones: OpcionCliente[] }[];
-  reportesPorEmpresa: { companyId: string; opciones: OpcionReporteEnlazable[] }[];
 }) {
   const [tipo, setTipo] = useState<Tipo>("servicio");
   const t = useTranslations("nuevoReportePage");
@@ -99,7 +98,8 @@ export function NuevoReporteSelector({
             action={accionViatico}
             cancelarHref={cancelarHref}
             empresas={empresas}
-            reportesPorEmpresa={reportesPorEmpresa}
+            companyIdFijo={companyIdFijo}
+            cotizacionesPorEmpresa={cotizacionesPorEmpresa}
           />
         )}
       </div>

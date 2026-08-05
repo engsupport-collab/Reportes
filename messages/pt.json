@@ -196,10 +196,10 @@
     "crear": "Criar relatório",
     "cancelar": "Cancelar",
     "empresa": "Empresa",
-    "reporteEnlazado": "Relatório de serviço",
-    "elige": "Escolha um relatório…",
-    "sinReportesParaEnlazar": "Ainda não há relatórios de serviço nesta empresa. Crie um primeiro.",
-    "ayuda": "A despesa fica registrada como justificativa deste relatório."
+    "cotizacion": "Cotação",
+    "elige": "Escolha uma cotação…",
+    "sinCotizacionesActivas": "Esta empresa não tem cotações ativas.",
+    "ayuda": "As despesas que você adicionar depois ficam sob esta cotação, independentes do relatório de serviço."
   },
   "editarReportePage": {
     "volver": "← Voltar ao relatório",

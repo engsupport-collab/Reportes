@@ -205,9 +205,12 @@ export async function obtenerCotizacion(
 
 export type ReporteDeCotizacion = {
   id: string;
+  type: "servicio" | "viaticos";
   projectName: string;
   status: "en_proceso" | "terminado";
   tieneFirma: boolean;
+  /** Solo tiene sentido para uno de viáticos; 0 en uno de servicio. */
+  totalGastos: number;
   authorName: string;
   createdAt: Date;
 };
@@ -298,20 +301,32 @@ export async function insertarCotizacionConNumeroAutomatico(valores: {
 export async function listarReportesDeCotizacion(
   quoteId: string,
 ): Promise<ReporteDeCotizacion[]> {
-  return db
+  const filas = await db
     .select({
       id: reports.id,
+      type: reports.type,
       projectName: reports.projectName,
       status: reports.status,
       tieneFirma: sql<number>`(${reports.signatureUrl} IS NOT NULL)`,
+      // `${reports.id}` sin calificar quedaría como "id" a secas, que dentro
+      // del subselect resolvería contra report_viaticos.id (su propia
+      // clave) y no contra el reports.id de fuera — las dos tablas tienen
+      // columna "id". Se escribe calificado a mano para no repetir ese bug.
+      totalGastos: sql<number>`(
+        SELECT COALESCE(SUM(amount), 0) FROM report_viaticos
+        WHERE report_viaticos.report_id = reports.id
+      )`,
       authorName: users.fullName,
       createdAt: reports.createdAt,
     })
     .from(reports)
     .innerJoin(users, eq(users.id, reports.authorId))
     .where(eq(reports.quoteId, quoteId))
-    .orderBy(desc(reports.createdAt))
-    .then((filas) =>
-      filas.map((f) => ({ ...f, tieneFirma: Boolean(f.tieneFirma) })),
-    );
+    .orderBy(desc(reports.createdAt));
+
+  return filas.map((f) => ({
+    ...f,
+    tieneFirma: Boolean(f.tieneFirma),
+    totalGastos: Number(f.totalGastos),
+  }));
 }

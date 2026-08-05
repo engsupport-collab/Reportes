@@ -196,10 +196,10 @@
     "crear": "Create report",
     "cancelar": "Cancel",
     "empresa": "Company",
-    "reporteEnlazado": "Service report",
-    "elige": "Choose a report…",
-    "sinReportesParaEnlazar": "There are no service reports in this company yet. Create one first.",
-    "ayuda": "The expense is recorded as justification for this report."
+    "cotizacion": "Quote",
+    "elige": "Choose a quote…",
+    "sinCotizacionesActivas": "This company has no active quotes.",
+    "ayuda": "Expenses you add later fall under this quote, independent of the service report."
   },
   "editarReportePage": {
     "volver": "← Back to report",

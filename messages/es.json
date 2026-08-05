@@ -196,10 +196,10 @@
     "crear": "Crear reporte",
     "cancelar": "Cancelar",
     "empresa": "Empresa",
-    "reporteEnlazado": "Reporte de servicio",
-    "elige": "Elige un reporte…",
-    "sinReportesParaEnlazar": "Todavía no hay reportes de servicio en esta empresa. Crea uno primero.",
-    "ayuda": "El gasto queda registrado como justificación de este reporte."
+    "cotizacion": "Cotización",
+    "elige": "Elige una cotización…",
+    "sinCotizacionesActivas": "No hay cotizaciones activas en esta empresa.",
+    "ayuda": "Los gastos que agregues después quedan bajo esta cotización, independientes del reporte de servicio."
   },
   "editarReportePage": {
     "volver": "← Volver al reporte",

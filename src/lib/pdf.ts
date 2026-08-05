@@ -362,15 +362,18 @@ type GastoViatico = Adjunto & {
 };
 
 /**
- * PDF de un reporte de viáticos: la ficha con el total y a qué reporte
- * justifica, seguida de cada gasto con su foto de respaldo fusionada — igual
+ * PDF de un reporte de viáticos: la ficha con el total y a qué proyecto
+ * pertenece, seguida de cada gasto con su foto de respaldo fusionada — igual
  * que el PDF de un reporte de servicio, pero sin firma, adjuntos genéricos, ni
  * los campos que no le aplican (orden de compra, tipo de servicio, etiquetas).
+ *
+ * Este PDF es exclusivamente interno: nunca se envía al cliente, ni por
+ * correo ni por el enlace público de firma — solo el de servicio se comparte
+ * fuera del sistema.
  */
 export async function generarReporteViaticoPdf(
   reporte: ReporteCompleto,
   gastos: GastoViatico[],
-  proyectoEnlazado: string | null,
 ): Promise<Uint8Array> {
   const doc = await PDFDocument.create();
   const font = await doc.embedFont(StandardFonts.Helvetica);
@@ -410,7 +413,7 @@ export async function generarReporteViaticoPdf(
     columna1,
     y,
     "JUSTIFICA A",
-    proyectoEnlazado ?? "Reporte eliminado",
+    reporte.projectName,
   );
   y = agregarLista(
     portada,

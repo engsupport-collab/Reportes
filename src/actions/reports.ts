@@ -11,10 +11,7 @@ import { obtenerCotizacionActivaDeEmpresa } from "@/actions/quotes";
 import { puedeAccederAReporte, requireAccesoReportes } from "@/lib/auth-guard";
 import { listarEmpresas } from "@/lib/queries/companies";
 import { obtenerCotizacion } from "@/lib/queries/quotes";
-import {
-  obtenerReporte,
-  obtenerReporteServicioParaEnlazar,
-} from "@/lib/queries/reports";
+import { obtenerReporte } from "@/lib/queries/reports";
 import {
   estadoReporteSchema,
   leerEtiquetas,
@@ -147,11 +144,17 @@ export async function crearReporteAction(
 }
 
 /**
- * Crea un reporte de viáticos. A diferencia del de servicio, no pide sus
- * propios proyecto y cliente: los copia del reporte de servicio que justifica
- * al momento de crearse, así que no se le pregunta algo que ya está escrito
- * ahí. `workDate` queda en la fecha de creación — el dato que sí importa por
- * gasto es su propia fecha, capturada en cada línea, no en el reporte.
+ * Crea un reporte de viáticos. A diferencia del de servicio, solo pide a qué
+ * cotización pertenece — no pide fecha de trabajo, tipo de servicio ni
+ * etiquetas, que no le aplican. El resto (proyecto, cliente, orden de
+ * compra, número de cotización) se copia de la cotización al momento de
+ * crearse, igual que un reporte de servicio. `workDate` queda en la fecha de
+ * creación — el dato que sí importa por gasto es su propia fecha, capturada
+ * en cada línea, no en el reporte.
+ *
+ * Es hermano del reporte de servicio bajo la misma cotización, no algo que
+ * cuelgue de él: los dos existen independientes, y por diseño ningún dato de
+ * viáticos llega al PDF ni a la pantalla del reporte de servicio.
  */
 export async function crearReporteViaticoAction(
   _prevState: ReporteState,
@@ -161,21 +164,12 @@ export async function crearReporteViaticoAction(
   const t = await getTranslations("validacion");
 
   const parsed = reporteViaticoSchema(t).safeParse({
-    linkedReportId: formData.get("linkedReportId"),
+    quoteId: formData.get("quoteId"),
   });
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? t("revisaLosDatos") };
   }
 
-  const enlazado = await obtenerReporteServicioParaEnlazar(
-    parsed.data.linkedReportId,
-  );
-
-  // El reporte enlazado tiene que existir, ser de servicio, y de la empresa
-  // en la que el usuario está creando este reporte de viáticos. Un empleado
-  // no puede enlazar un reporte de la otra empresa; el admin, tampoco puede
-  // mezclarlas — el enlace se valida contra la misma empresa que se asigna
-  // abajo.
   let companyId: string;
   if (user.role === "admin") {
     const enviado = formData.get("companyId");
@@ -189,12 +183,12 @@ export async function crearReporteViaticoAction(
     companyId = user.empresaActiva.id;
   }
 
-  if (
-    !enlazado ||
-    enlazado.type !== "servicio" ||
-    enlazado.companyId !== companyId
-  ) {
-    return { error: t("eligeReporteAEnlazar") };
+  const cotizacion = await obtenerCotizacionActivaDeEmpresa(
+    parsed.data.quoteId,
+    companyId,
+  );
+  if (!cotizacion) {
+    return { error: t("eligeCotizacion") };
   }
 
   const id = crypto.randomUUID();
@@ -204,14 +198,17 @@ export async function crearReporteViaticoAction(
     companyId,
     authorId: user.id,
     type: "viaticos",
-    linkedReportId: enlazado.id,
-    projectName: enlazado.projectName,
-    clientName: enlazado.clientName,
+    quoteId: cotizacion.id,
+    projectName: cotizacion.projectName,
+    clientName: cotizacion.clientName,
+    purchaseOrderNo: cotizacion.purchaseOrderNo,
+    quoteNumber: cotizacion.quoteNumber,
     workDate: new Date(),
     status: "en_proceso",
   });
 
   revalidarListas();
+  revalidatePath(`/admin/cotizaciones/${cotizacion.id}`);
   redirect(`/reportes/${id}`);
 }
 

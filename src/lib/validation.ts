@@ -120,13 +120,14 @@ export function reporteSchema(t: T) {
 export type ReporteInput = z.infer<ReturnType<typeof reporteSchema>>;
 
 /**
- * Reporte de viáticos: solo pide a qué reporte de servicio justifica. El
- * resto —proyecto, cliente— se copia de ese reporte al crearlo, así que no se
- * le vuelve a preguntar algo que ya está escrito ahí.
+ * Reporte de viáticos: solo pide a qué cotización pertenece. El resto
+ * —proyecto, cliente, orden de compra, número de cotización— se copia de ahí
+ * al crearlo, igual que un reporte de servicio, así que no se le vuelve a
+ * preguntar algo que ya está escrito.
  */
 export function reporteViaticoSchema(t: T) {
   return z.object({
-    linkedReportId: z.string().trim().min(1, t("eligeReporteAEnlazar")),
+    quoteId: z.string().trim().min(1, t("eligeCotizacion")),
   });
 }
 

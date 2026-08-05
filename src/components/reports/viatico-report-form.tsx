@@ -7,8 +7,7 @@ import { useTranslations } from "next-intl";
 
 import type { ReporteState } from "@/actions/reports";
 import type { Empresa } from "@/lib/queries/companies";
-
-export type OpcionReporteEnlazable = { id: string; label: string };
+import type { OpcionCotizacionSelector } from "./quote-selector";
 
 function Crear() {
   const { pending } = useFormStatus();
@@ -28,23 +27,28 @@ function Crear() {
 /**
  * Formulario de un reporte de viáticos.
  *
- * A diferencia del de servicio, no pide proyecto ni cliente: solo a qué
- * reporte de servicio pertenece el gasto. El resto se copia de ese reporte al
- * crearse. Los gastos en sí (concepto, monto, fecha, foto) se agregan después,
- * uno por uno, desde el detalle — igual que hoy se agregan los adjuntos.
+ * Igual que uno de servicio, solo pide a qué cotización pertenece — no pide
+ * proyecto ni cliente, que se copian de ahí al crearse. Es hermano del
+ * reporte de servicio bajo la misma cotización, no algo que dependa de él:
+ * por eso elige una cotización, no un reporte de servicio ya creado. Los
+ * gastos en sí (concepto, monto, fecha, foto) se agregan después, uno por
+ * uno, desde el detalle — igual que hoy se agregan los adjuntos.
  */
 export function ViaticoReportForm({
   action,
   cancelarHref,
   empresas,
-  reportesPorEmpresa,
+  companyIdFijo,
+  cotizacionesPorEmpresa,
 }: {
   action: (estado: ReporteState, formData: FormData) => Promise<ReporteState>;
   cancelarHref: string;
   /** Solo para el admin: elige antes para cuál empresa es este reporte. */
   empresas?: Empresa[];
-  /** Reportes de servicio disponibles para enlazar, por empresa. */
-  reportesPorEmpresa: { companyId: string; opciones: OpcionReporteEnlazable[] }[];
+  /** Para un empleado, o al editar: la empresa ya fijada. */
+  companyIdFijo?: string;
+  /** Cotizaciones activas disponibles, por empresa — la misma lista que usa el formulario de servicio. */
+  cotizacionesPorEmpresa: { companyId: string; opciones: OpcionCotizacionSelector[] }[];
 }) {
   const [state, formAction] = useActionState<ReporteState, FormData>(
     action,
@@ -52,11 +56,11 @@ export function ViaticoReportForm({
   );
   const t = useTranslations("viaticoReportForm");
   const [companyId, setCompanyId] = useState(
-    reportesPorEmpresa[0]?.companyId ?? "",
+    companyIdFijo ?? cotizacionesPorEmpresa[0]?.companyId ?? "",
   );
 
   const opciones =
-    reportesPorEmpresa.find((e) => e.companyId === companyId)?.opciones ?? [];
+    cotizacionesPorEmpresa.find((e) => e.companyId === companyId)?.opciones ?? [];
 
   return (
     <form action={formAction} className="space-y-5">
@@ -88,20 +92,21 @@ export function ViaticoReportForm({
       ) : null}
 
       <div className="space-y-1.5">
-        <label
-          htmlFor="linkedReportId"
-          className="block text-sm font-medium text-text"
-        >
-          {t("reporteEnlazado")}
+        <label htmlFor="quoteId" className="block text-sm font-medium text-text">
+          {t("cotizacion")}
         </label>
         {opciones.length === 0 ? (
           <p className="rounded-lg bg-surface-muted px-3 py-2.5 text-sm text-muted">
-            {t("sinReportesParaEnlazar")}
+            {t("sinCotizacionesActivas")}
           </p>
         ) : (
+          // key={companyId}: al cambiar de empresa la lista de opciones
+          // cambia, y sin esto un <select> no controlado se queda mostrando
+          // la selección de la empresa anterior.
           <select
-            id="linkedReportId"
-            name="linkedReportId"
+            key={companyId}
+            id="quoteId"
+            name="quoteId"
             required
             defaultValue=""
             className="w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-sm text-text focus:border-brand focus:outline-none"

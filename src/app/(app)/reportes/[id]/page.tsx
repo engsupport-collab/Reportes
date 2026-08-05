@@ -32,11 +32,7 @@ import { puedeAccederAReporte, requireAccesoReportes } from "@/lib/auth-guard";
 import { formatFechaLarga, formatInstante } from "@/lib/fechas";
 import { formatearMonto } from "@/lib/moneda";
 import { listarAdjuntos } from "@/lib/queries/attachments";
-import {
-  listarViaticosEnlazadosA,
-  obtenerReporte,
-  obtenerReporteServicioParaEnlazar,
-} from "@/lib/queries/reports";
+import { obtenerReporte } from "@/lib/queries/reports";
 import { listarViaticos } from "@/lib/queries/viaticos";
 
 type Params = { params: Promise<{ id: string }> };
@@ -62,12 +58,7 @@ async function DetalleViatico({
   esAdmin: boolean;
   t: Awaited<ReturnType<typeof getTranslations<"reportDetail">>>;
 }) {
-  const [gastos, enlazado] = await Promise.all([
-    listarViaticos(reporte.id),
-    reporte.linkedReportId
-      ? obtenerReporteServicioParaEnlazar(reporte.linkedReportId)
-      : Promise.resolve(null),
-  ]);
+  const gastos = await listarViaticos(reporte.id);
   const total = gastos.reduce((suma, g) => suma + (g.amount ?? 0), 0);
 
   return (
@@ -103,15 +94,20 @@ async function DetalleViatico({
                 </span>
               ) : null}
             </div>
-            {enlazado ? (
+            {/* El enlace a la cotización de origen solo tiene sentido para el
+                admin: es la única vista que existe de ella — mismo criterio
+                que en el detalle de un reporte de servicio. */}
+            {esAdmin && reporte.quoteId ? (
               <Link
-                href={`/reportes/${enlazado.id}`}
+                href={`/admin/cotizaciones/${reporte.quoteId}`}
                 className="mt-0.5 inline-block text-sm text-brand hover:underline"
               >
-                {t("justificaA", { proyecto: enlazado.projectName })}
+                {t("justificaA", { proyecto: reporte.projectName })}
               </Link>
             ) : (
-              <p className="mt-0.5 text-sm text-muted">{t("reporteOriginalEliminado")}</p>
+              <p className="mt-0.5 text-sm text-muted">
+                {t("justificaA", { proyecto: reporte.projectName })}
+              </p>
             )}
           </div>
           <EstadoBadge status={reporte.status} />
@@ -189,10 +185,7 @@ export default async function DetalleReportePage({ params }: Params) {
     );
   }
 
-  const [adjuntos, viaticosEnlazados] = await Promise.all([
-    listarAdjuntos(reporte.id),
-    listarViaticosEnlazadosA(reporte.id),
-  ]);
+  const adjuntos = await listarAdjuntos(reporte.id);
   const sinAdjuntos = adjuntos.length === 0;
   const editado = reporte.updatedBy !== null;
 
@@ -335,35 +328,6 @@ export default async function DetalleReportePage({ params }: Params) {
             />
           </div>
         </div>
-
-        {/* Los gastos ya no viven dentro del reporte de servicio: se
-            registran como su propio reporte de viáticos, que enlaza aquí. Esta
-            sección solo enlista los que ya existen — para agregar uno nuevo
-            hay que crear un reporte de viáticos desde "Nuevo reporte". */}
-        {viaticosEnlazados.length > 0 ? (
-          <div className="rounded-2xl border border-border bg-surface p-5 sm:p-6">
-            <h3 className="mb-4 text-sm font-semibold text-text">
-              {t("viaticosEnlazados")}
-            </h3>
-            <ul className="space-y-2">
-              {viaticosEnlazados.map((v) => (
-                <li key={v.id}>
-                  <Link
-                    href={`/reportes/${v.id}`}
-                    className="flex items-center justify-between gap-3 rounded-xl border border-border bg-surface-muted px-3 py-2.5 text-sm transition hover:border-brand"
-                  >
-                    <span className="text-text">
-                      {formatInstante(v.createdAt)}
-                    </span>
-                    <span className="font-medium text-text">
-                      {formatearMonto(v.totalGastos, reporte.currency)}
-                    </span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-        ) : null}
 
         <div className="rounded-2xl border border-border bg-surface p-5 sm:p-6">
           <h3 className="mb-4 text-sm font-semibold text-text">{t("firma")}</h3>

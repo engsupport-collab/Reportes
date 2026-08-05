@@ -387,7 +387,6 @@ export async function obtenerReporte(id: string) {
       authorId: reports.authorId,
       authorName: users.fullName,
       type: reports.type,
-      linkedReportId: reports.linkedReportId,
       quoteId: reports.quoteId,
       projectName: reports.projectName,
       purchaseOrderNo: reports.purchaseOrderNo,
@@ -424,88 +423,3 @@ export async function obtenerReporte(id: string) {
   };
 }
 
-export type ReporteParaEnlazar = {
-  id: string;
-  projectName: string;
-  clientName: string;
-  workDate: Date;
-};
-
-/**
- * Reportes de servicio de una empresa, para el buscador de "a qué reporte
- * pertenece" al crear uno de viáticos. Sin paginar: son los reportes de una
- * sola empresa, no la lista completa del sistema.
- */
-export async function listarReportesServicioParaEnlazar(
-  companyId: string,
-): Promise<ReporteParaEnlazar[]> {
-  return db
-    .select({
-      id: reports.id,
-      projectName: reports.projectName,
-      clientName: reports.clientName,
-      workDate: reports.workDate,
-    })
-    .from(reports)
-    .where(and(eq(reports.companyId, companyId), eq(reports.type, "servicio")))
-    .orderBy(desc(reports.createdAt));
-}
-
-/**
- * Un reporte de servicio, solo los campos que necesita un reporte de
- * viáticos para copiarlos al crearse (proyecto y cliente) y para verificar
- * que pertenece a la empresa correcta antes de enlazarlo.
- */
-export async function obtenerReporteServicioParaEnlazar(id: string) {
-  const [fila] = await db
-    .select({
-      id: reports.id,
-      companyId: reports.companyId,
-      type: reports.type,
-      projectName: reports.projectName,
-      clientName: reports.clientName,
-    })
-    .from(reports)
-    .where(eq(reports.id, id))
-    .limit(1);
-
-  return fila ?? null;
-}
-
-export type ReporteViaticoEnlazado = {
-  id: string;
-  status: ReportStatus;
-  totalGastos: number;
-  createdAt: Date;
-};
-
-/**
- * Reportes de viáticos que justifican un reporte de servicio, para mostrarlos
- * en su detalle. El total se suma aquí (no en el navegador) porque es la
- * misma cifra que finanzas necesita para verificar el gasto del proyecto.
- */
-export async function listarViaticosEnlazadosA(
-  reportId: string,
-): Promise<ReporteViaticoEnlazado[]> {
-  const filas = await db
-    .select({
-      id: reports.id,
-      status: reports.status,
-      createdAt: reports.createdAt,
-      // `${reports.id}` sin calificar quedaba como "id" a secas: dentro del
-      // subselect eso resuelve contra report_viaticos.id (su propia clave),
-      // no contra el reports.id de fuera — las dos tablas tienen una columna
-      // "id", así que SQLite la toma del alcance más cercano. El total daba
-      // siempre 0 porque comparaba el id de cada gasto con su propio
-      // report_id. Con la tabla calificada a mano no hay ambigüedad posible.
-      totalGastos: sql<number>`(
-        SELECT COALESCE(SUM(amount), 0) FROM report_viaticos
-        WHERE report_viaticos.report_id = reports.id
-      )`,
-    })
-    .from(reports)
-    .where(and(eq(reports.linkedReportId, reportId), eq(reports.type, "viaticos")))
-    .orderBy(desc(reports.createdAt));
-
-  return filas.map((f) => ({ ...f, totalGastos: Number(f.totalGastos) }));
-}

@@ -285,10 +285,13 @@ export const reports = sqliteTable(
       .notNull()
       .default("servicio"),
     /**
-     * A qué reporte de servicio justifica este reporte de viáticos. Solo se
-     * usa cuando `type` es "viaticos" — un reporte de servicio no lo llena.
-     * `onDelete: "set null"` y no `cascade`: borrar el reporte de servicio no
-     * debe borrar de paso el registro de gastos que ya se hicieron.
+     * @deprecated Legado de cuando un reporte de viáticos colgaba del reporte
+     * de servicio que justificaba, en vez de colgar directamente de la
+     * cotización. Ahora los dos son hermanos independientes bajo el mismo
+     * `quoteId` — la información interna de viáticos no debe depender de (ni
+     * viajar junto con) el reporte que sí llega al cliente. Se deja la
+     * columna sin usar en vez de reconstruir la tabla para quitarla: no
+     * estorba, y todas las filas existentes ya se migraron a `quoteId`.
      */
     linkedReportId: text("linked_report_id").references(
       (): AnySQLiteColumn => reports.id,
