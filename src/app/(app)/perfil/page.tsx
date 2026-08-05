@@ -2,7 +2,6 @@ import { notFound } from "next/navigation";
 import { getLocale, getTranslations } from "next-intl/server";
 
 import { cambiarMiContrasenaAction } from "@/actions/perfil";
-import { AppShell } from "@/components/app-shell";
 import { CambiarPassword } from "@/components/perfil/cambiar-password";
 import { requireUser } from "@/lib/auth-guard";
 import { formatFechaLarga } from "@/lib/fechas";
@@ -44,7 +43,7 @@ export default async function PerfilPage() {
   const esAdmin = user.role === "admin";
 
   return (
-    <AppShell user={user} saludo={false}>
+    <>
       <div className="space-y-5">
         <div className="relative overflow-hidden rounded-2xl border border-border bg-surface">
           <div className="h-24 bg-gradient-to-r from-brand to-brand-strong" />
@@ -100,6 +99,6 @@ export default async function PerfilPage() {
           <CambiarPassword action={cambiarMiContrasenaAction} />
         </div>
       </div>
-    </AppShell>
+    </>
   );
 }

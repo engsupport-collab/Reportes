@@ -3,6 +3,7 @@ import "server-only";
 import { eq } from "drizzle-orm";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { cache } from "react";
 
 import { db } from "@/db";
 import { users } from "@/db/schema";
@@ -111,14 +112,20 @@ export async function setIdiomaCookie(locale: Idioma) {
 /**
  * Usuario de la sesión actual, o null.
  *
- * Consulta la base en cada llamada, a propósito. El token ya trae el rol y la
- * empresa, así que podríamos ahorrarnos las consultas — pero entonces un
+ * Consulta la base UNA VEZ POR PETICIÓN, a propósito. El token ya trae el rol y
+ * la empresa, así que podríamos ahorrarnos las consultas — pero entonces un
  * empleado desactivado, o al que le quitaron el acceso a una empresa, seguiría
  * entrando hasta que su token expirara, hasta 8 horas después. Para el admin
  * hay una razón más: si mañana deja de ser admin, tiene que perder la vista de
  * "todo" en la siguiente petición, no en la siguiente sesión.
+ *
+ * El `cache()` de React es lo que hace compatible "una vez por petición" con
+ * que ahora haya dos consumidores: el layout, que monta el marco, y la propia
+ * página, que comprueba sus permisos. Sin él, cada pantalla haría el doble de
+ * consultas de las que hacía antes. La memoria dura lo que dura la petición,
+ * así que no debilita nada de lo anterior: la siguiente vuelve a preguntar.
  */
-export async function getCurrentUser(): Promise<CurrentUser | null> {
+export const getCurrentUser = cache(async function obtenerUsuarioActual(): Promise<CurrentUser | null> {
   const cookieStore = await cookies();
   const session = await verifySession(cookieStore.get(SESSION_COOKIE)?.value);
 
@@ -171,7 +178,7 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
     empresaActiva,
     locale: user.locale,
   };
-}
+});
 
 /** Exige sesión válida. Redirige a /login si no la hay. */
 export async function requireUser(): Promise<CurrentUser> {

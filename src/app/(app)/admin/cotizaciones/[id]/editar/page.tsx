@@ -3,8 +3,8 @@ import { notFound } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 
 import { actualizarCotizacionAction } from "@/actions/quotes";
-import { AppShell } from "@/components/app-shell";
 import { QuoteForm } from "@/components/admin/quote-form";
+import { Saludo } from "@/components/saludo";
 import { requireAdmin } from "@/lib/auth-guard";
 import { aValorInput } from "@/lib/fechas";
 import { listarClientesActivos } from "@/lib/queries/clients";
@@ -36,7 +36,9 @@ export default async function EditarCotizacionPage({ params }: Params) {
     : [{ id: cotizacion.clientId, name: cotizacion.clientName }, ...clientesActivos];
 
   return (
-    <AppShell user={user}>
+    <>
+      <Saludo nombreCompleto={user.fullName} />
+
       <div className="mx-auto max-w-3xl">
         <Link
           href={`/admin/cotizaciones/${id}`}
@@ -72,6 +74,6 @@ export default async function EditarCotizacionPage({ params }: Params) {
           />
         </div>
       </div>
-    </AppShell>
+    </>
   );
 }

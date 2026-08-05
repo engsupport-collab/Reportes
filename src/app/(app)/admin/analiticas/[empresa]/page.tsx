@@ -2,7 +2,6 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 
-import { AppShell } from "@/components/app-shell";
 import { Barras } from "@/components/admin/barras";
 import { GraficaMeses } from "@/components/admin/grafica-meses";
 import { requireAdmin } from "@/lib/auth-guard";
@@ -109,7 +108,7 @@ export default async function AnaliticasPage({ params }: Params) {
     }));
 
   return (
-    <AppShell user={user} saludo={false}>
+    <>
       <div className="space-y-6">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-text">
@@ -179,6 +178,6 @@ export default async function AnaliticasPage({ params }: Params) {
           </div>
         </Tarjeta>
       </div>
-    </AppShell>
+    </>
   );
 }

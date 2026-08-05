@@ -1,12 +1,12 @@
 import Link from "next/link";
 import { getLocale, getTranslations } from "next-intl/server";
 
-import { AppShell } from "@/components/app-shell";
 import { BarrasVerticales } from "@/components/admin/barras-verticales";
 import { GraficaMeses } from "@/components/admin/grafica-meses";
 import { StatTile } from "@/components/admin/stat-tile";
 import { FiltroEmpresa } from "@/components/reports/filtros";
 import { ReportList } from "@/components/reports/report-list";
+import { Saludo } from "@/components/saludo";
 import { requireAdmin } from "@/lib/auth-guard";
 import { inicioDeMes, nombreDeMes } from "@/lib/fechas";
 import { type Idioma, REGION } from "@/lib/idiomas";
@@ -77,7 +77,9 @@ export default async function AdminPage({ searchParams }: Params) {
     : t("lasDosEmpresas");
 
   return (
-    <AppShell user={user}>
+    <>
+      <Saludo nombreCompleto={user.fullName} />
+
       <FiltroEmpresa
         empresas={user.empresas}
         empresaId={empresaFiltro}
@@ -232,6 +234,6 @@ export default async function AdminPage({ searchParams }: Params) {
         </div>
 
       </div>
-    </AppShell>
+    </>
   );
 }

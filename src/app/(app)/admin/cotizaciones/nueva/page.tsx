@@ -1,8 +1,8 @@
 import { getTranslations } from "next-intl/server";
 
 import { crearCotizacionAction } from "@/actions/quotes";
-import { AppShell } from "@/components/app-shell";
 import { QuoteForm } from "@/components/admin/quote-form";
+import { Saludo } from "@/components/saludo";
 import { requireAdmin } from "@/lib/auth-guard";
 import { listarClientesActivos } from "@/lib/queries/clients";
 import { siguienteNumeroCotizacionSugerido } from "@/lib/queries/quotes";
@@ -25,7 +25,9 @@ export default async function NuevaCotizacionPage() {
   );
 
   return (
-    <AppShell user={user}>
+    <>
+      <Saludo nombreCompleto={user.fullName} />
+
       <div className="mx-auto max-w-3xl">
         <div className="mb-5">
           <h2 className="text-lg font-semibold text-text">{t("tituloNueva")}</h2>
@@ -42,6 +44,6 @@ export default async function NuevaCotizacionPage() {
           />
         </div>
       </div>
-    </AppShell>
+    </>
   );
 }

@@ -2,7 +2,7 @@ import { getTranslations } from "next-intl/server";
 
 import { ClientsTable } from "@/components/admin/clients-table";
 import { CrearClienteForm } from "@/components/admin/crear-cliente-form";
-import { AppShell } from "@/components/app-shell";
+import { Saludo } from "@/components/saludo";
 import { requireAdmin } from "@/lib/auth-guard";
 import { listarClientes } from "@/lib/queries/clients";
 import { listarEmpresas } from "@/lib/queries/companies";
@@ -26,7 +26,9 @@ export default async function ClientesPage() {
   ]);
 
   return (
-    <AppShell user={user}>
+    <>
+      <Saludo nombreCompleto={user.fullName} />
+
       <div className="space-y-6">
         <section>
           <h2 className="mb-3 text-sm font-semibold text-text">
@@ -42,6 +44,6 @@ export default async function ClientesPage() {
           <ClientsTable clientes={clientes} />
         </section>
       </div>
-    </AppShell>
+    </>
   );
 }

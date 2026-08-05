@@ -1,13 +1,13 @@
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 
-import { AppShell } from "@/components/app-shell";
 import { QuoteList } from "@/components/admin/quote-list";
 import {
   FilterPanel,
   type CampoFiltro,
 } from "@/components/reports/filter-panel";
 import { Paginacion } from "@/components/reports/report-list";
+import { Saludo } from "@/components/saludo";
 import { requireAdmin } from "@/lib/auth-guard";
 import { ESTADOS_COTIZACION, esEstadoCotizacion } from "@/lib/cotizaciones";
 import { listarCotizaciones } from "@/lib/queries/quotes";
@@ -117,7 +117,9 @@ export default async function AdminCotizacionesPage({ searchParams }: Params) {
   ];
 
   return (
-    <AppShell user={user}>
+    <>
+      <Saludo nombreCompleto={user.fullName} />
+
       <div className="space-y-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <FilterPanel basePath="/admin/cotizaciones" q={params.q} campos={campos} />
@@ -153,6 +155,6 @@ export default async function AdminCotizacionesPage({ searchParams }: Params) {
           hrefPara={(p) => construirHref({ pagina: p })}
         />
       </div>
-    </AppShell>
+    </>
   );
 }

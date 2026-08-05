@@ -2,12 +2,12 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 
-import { AppShell } from "@/components/app-shell";
 import {
   FilterPanel,
   type CampoFiltro,
 } from "@/components/reports/filter-panel";
 import { Paginacion, ReportList } from "@/components/reports/report-list";
+import { Saludo } from "@/components/saludo";
 import { requireAccesoReportes } from "@/lib/auth-guard";
 import {
   ETIQUETAS_TRABAJO,
@@ -172,7 +172,9 @@ export default async function ReportesPage({ searchParams }: Params) {
   ];
 
   return (
-    <AppShell user={user}>
+    <>
+      <Saludo nombreCompleto={user.fullName} />
+
       <div className="space-y-5">
         {/* Aviso de faltantes: el empleado ve sus propios pendientes sin tener
             que buscarlos, que es justo lo que hace que se queden sin subir. */}
@@ -240,6 +242,6 @@ export default async function ReportesPage({ searchParams }: Params) {
           hrefPara={(p) => construirHref({ pagina: p })}
         />
       </div>
-    </AppShell>
+    </>
   );
 }

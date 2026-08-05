@@ -1,9 +1,9 @@
 import { getTranslations } from "next-intl/server";
 
-import { AppShell } from "@/components/app-shell";
 import { NuevoReporteSelector } from "@/components/reports/nuevo-reporte-selector";
 import type { OpcionCotizacionSelector } from "@/components/reports/quote-selector";
 import { crearReporteAction, crearReporteViaticoAction } from "@/actions/reports";
+import { Saludo } from "@/components/saludo";
 import { requireAccesoReportes } from "@/lib/auth-guard";
 import { formatFechaLarga, aValorInput } from "@/lib/fechas";
 import { listarClientesActivos } from "@/lib/queries/clients";
@@ -81,7 +81,9 @@ export default async function NuevoReportePage({ searchParams }: Params) {
   ]);
 
   return (
-    <AppShell user={user}>
+    <>
+      <Saludo nombreCompleto={user.fullName} />
+
       <div className="mx-auto max-w-3xl">
         <div className="mb-5">
           <h2 className="text-lg font-semibold text-text">{t("titulo")}</h2>
@@ -121,6 +123,6 @@ export default async function NuevoReportePage({ searchParams }: Params) {
           }}
         />
       </div>
-    </AppShell>
+    </>
   );
 }

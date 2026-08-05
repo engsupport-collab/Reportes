@@ -3,9 +3,9 @@ import { notFound } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 
 import { actualizarReporteAction } from "@/actions/reports";
-import { AppShell } from "@/components/app-shell";
 import { ReportForm } from "@/components/reports/report-form";
 import type { OpcionCotizacionSelector } from "@/components/reports/quote-selector";
+import { Saludo } from "@/components/saludo";
 import { puedeAccederAReporte, requireAccesoReportes } from "@/lib/auth-guard";
 import { aValorInput, formatFechaLarga } from "@/lib/fechas";
 import { listarClientesActivos } from "@/lib/queries/clients";
@@ -67,7 +67,9 @@ export default async function EditarReportePage({ params }: Params) {
   }
 
   return (
-    <AppShell user={user}>
+    <>
+      <Saludo nombreCompleto={user.fullName} />
+
       <div className="mx-auto max-w-3xl">
         <Link
           href={`/reportes/${reporte.id}`}
@@ -103,6 +105,6 @@ export default async function EditarReportePage({ params }: Params) {
           />
         </div>
       </div>
-    </AppShell>
+    </>
   );
 }

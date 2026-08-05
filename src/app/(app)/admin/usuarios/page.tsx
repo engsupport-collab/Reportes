@@ -1,8 +1,8 @@
 import { getTranslations } from "next-intl/server";
 
-import { AppShell } from "@/components/app-shell";
 import { CrearUsuarioForm } from "@/components/admin/crear-usuario-form";
 import { UsersTable } from "@/components/admin/users-table";
+import { Saludo } from "@/components/saludo";
 import { requireAdmin } from "@/lib/auth-guard";
 import { listarUsuarios, todasLasEmpresas } from "@/lib/queries/users";
 
@@ -22,7 +22,9 @@ export default async function UsuariosPage() {
   ]);
 
   return (
-    <AppShell user={user}>
+    <>
+      <Saludo nombreCompleto={user.fullName} />
+
       <div className="space-y-6">
         <section>
           <h2 className="mb-3 text-sm font-semibold text-text">{t("nuevoUsuario")}</h2>
@@ -40,6 +42,6 @@ export default async function UsuariosPage() {
           />
         </section>
       </div>
-    </AppShell>
+    </>
   );
 }

@@ -16,7 +16,6 @@ import {
   agregarViaticoAction,
   eliminarViaticoAction,
 } from "@/actions/viaticos";
-import { AppShell } from "@/components/app-shell";
 import { AttachmentList } from "@/components/reports/attachment-list";
 import { AttachmentUploader } from "@/components/reports/attachment-uploader";
 import {
@@ -33,6 +32,7 @@ import { SignatureBlock } from "@/components/reports/signature-block";
 import { ViaticoList } from "@/components/reports/viatico-list";
 import { ViaticoUploader } from "@/components/reports/viatico-uploader";
 import { MAX_ARCHIVOS_POR_REPORTE } from "@/lib/archivos";
+import { Saludo } from "@/components/saludo";
 import { puedeAccederAReporte, requireAccesoReportes } from "@/lib/auth-guard";
 import { formatFechaLarga, formatInstante } from "@/lib/fechas";
 import { formatearMonto } from "@/lib/moneda";
@@ -184,9 +184,11 @@ export default async function DetalleReportePage({ params }: Params) {
   // de este.
   if (reporte.type === "viaticos") {
     return (
-      <AppShell user={user}>
+      <>
+      <Saludo nombreCompleto={user.fullName} />
+
         <DetalleViatico reporte={reporte} esAdmin={esAdmin} t={t} />
-      </AppShell>
+      </>
     );
   }
 
@@ -195,7 +197,9 @@ export default async function DetalleReportePage({ params }: Params) {
   const editado = reporte.updatedBy !== null;
 
   return (
-    <AppShell user={user}>
+    <>
+      <Saludo nombreCompleto={user.fullName} />
+
       <div className="mx-auto max-w-3xl space-y-5">
         {/* El detalle es la misma página para los dos roles; solo cambia a
             dónde vuelve, para no dejar al admin en una lista que no es la suya. */}
@@ -395,6 +399,6 @@ export default async function DetalleReportePage({ params }: Params) {
           </div>
         </div>
       </div>
-    </AppShell>
+    </>
   );
 }

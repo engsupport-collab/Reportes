@@ -1,24 +1,11 @@
-import { getLocale, getTranslations } from "next-intl/server";
+import { getTranslations } from "next-intl/server";
 
 import { logoutAction } from "@/actions/auth";
 import { elegirEmpresaAction } from "@/actions/companies";
 import { ShellChrome } from "@/components/shell-chrome";
 import type { NavItem } from "@/components/side-nav";
 import type { CurrentUser } from "@/lib/auth-guard";
-import { formatFechaEncabezado, horaLocal } from "@/lib/fechas";
-import { type Idioma, REGION } from "@/lib/idiomas";
 import { CompanySwitcher } from "./company-switcher";
-
-async function saludo(): Promise<string> {
-  const t = await getTranslations("saludo");
-  // horaLocal() y no getHours(): este componente se renderiza en el servidor,
-  // que en Vercel corre en UTC. Sin la conversión, el saludo diría "buenas
-  // noches" a las tres de la tarde en Colombia.
-  const hora = horaLocal();
-  if (hora < 12) return t("manana");
-  if (hora < 19) return t("tarde");
-  return t("noche");
-}
 
 async function navPara(user: CurrentUser): Promise<NavItem[]> {
   const t = await getTranslations("nav");
@@ -59,32 +46,28 @@ async function navPara(user: CurrentUser): Promise<NavItem[]> {
 }
 
 /**
- * Marco común de las dos vistas.
+ * Marco común de las dos vistas: rail a la izquierda, barra superior arriba.
  *
- * Recibe el usuario ya resuelto en vez de consultarlo por su cuenta: la página
- * que lo usa tiene que haber llamado antes a requireUser() o requireAdmin(),
- * así la comprobación de acceso ocurre siempre antes de renderizar nada.
+ * Lo monta el layout del grupo `(app)`, NO cada página. Esa es la diferencia
+ * que hace que cambiar de sección se sienta instantáneo: el marco queda por
+ * encima del segmento que cambia, así que React conserva sus nodos y solo
+ * sustituye el contenido. Cuando lo montaba cada página, el rail y la barra
+ * eran parte del segmento de la página y se destruían y reconstruían en cada
+ * clic — medido: 275 nodos, entre el 39% y el 59% del árbol, cada vez.
  *
- * `saludo` acepta ocultarse porque no toda pantalla lo quiere: en el perfil,
- * "Buenas noches, Administrador" justo encima de la ficha del propio usuario
- * dice dos veces lo mismo.
+ * Sigue recibiendo el usuario en vez de consultarlo por su cuenta: quien lo
+ * monta ya lo resolvió. La comprobación de permisos de verdad vive en cada
+ * página, que es donde tiene que estar — un layout no protege lo que cuelga
+ * de él.
  */
 export async function AppShell({
   user,
-  saludo: mostrarSaludo = true,
   children,
 }: {
   user: CurrentUser;
-  saludo?: boolean;
   children: React.ReactNode;
 }) {
-  // En paralelo: son consultas independientes, y una pantalla sin saludo
-  // (como el perfil) no debería esperar por ninguna de las dos.
-  const [nav, saludoTexto, locale] = await Promise.all([
-    navPara(user),
-    mostrarSaludo ? saludo() : Promise.resolve(null),
-    getLocale(),
-  ]);
+  const nav = await navPara(user);
 
   return (
     <ShellChrome
@@ -104,16 +87,6 @@ export async function AppShell({
         ) : null
       }
     >
-      {saludoTexto ? (
-        <div className="mb-6">
-          <h1 className="text-2xl font-semibold tracking-tight text-text">
-            {saludoTexto}, {user.fullName.split(" ")[0]}
-          </h1>
-          <p className="mt-1 text-sm capitalize text-muted">
-            {formatFechaEncabezado(new Date(), REGION[locale as Idioma])}
-          </p>
-        </div>
-      ) : null}
       {children}
     </ShellChrome>
   );

@@ -6,12 +6,12 @@ import {
   cambiarEstadoCotizacionAction,
   marcarCotizacionRevisadaAction,
 } from "@/actions/quotes";
-import { AppShell } from "@/components/app-shell";
 import {
   CambiarEstadoCotizacion,
   MarcarRevisadaBoton,
 } from "@/components/admin/quote-actions";
 import { QuoteStatusBadge } from "@/components/admin/quote-status-badge";
+import { Saludo } from "@/components/saludo";
 import { requireAdmin } from "@/lib/auth-guard";
 import { esEstadoActivo } from "@/lib/cotizaciones";
 import { formatFechaLarga, formatInstante } from "@/lib/fechas";
@@ -48,7 +48,9 @@ export default async function DetalleCotizacionPage({ params }: Params) {
   const firmados = reportes.filter((r) => r.tieneFirma).length;
 
   return (
-    <AppShell user={user}>
+    <>
+      <Saludo nombreCompleto={user.fullName} />
+
       <div className="mx-auto max-w-3xl space-y-5">
         <Link
           href="/admin/cotizaciones"
@@ -186,6 +188,6 @@ export default async function DetalleCotizacionPage({ params }: Params) {
           )}
         </div>
       </div>
-    </AppShell>
+    </>
   );
 }

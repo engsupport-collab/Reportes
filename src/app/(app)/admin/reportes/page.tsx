@@ -1,12 +1,12 @@
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 
-import { AppShell } from "@/components/app-shell";
 import {
   FilterPanel,
   type CampoFiltro,
 } from "@/components/reports/filter-panel";
 import { Paginacion, ReportList } from "@/components/reports/report-list";
+import { Saludo } from "@/components/saludo";
 import { requireAdmin } from "@/lib/auth-guard";
 import { empleadosDeEmpresa } from "@/lib/queries/dashboard";
 import {
@@ -217,7 +217,9 @@ export default async function AdminReportesPage({ searchParams }: Params) {
   ];
 
   return (
-    <AppShell user={user}>
+    <>
+      <Saludo nombreCompleto={user.fullName} />
+
       <div className="space-y-5">
         {/* La búsqueda vive en la barra superior, no aquí: es la misma para
             todo el sistema y tenerla dos veces en pantalla confunde. */}
@@ -250,6 +252,6 @@ export default async function AdminReportesPage({ searchParams }: Params) {
           hrefPara={(p) => construirHref({ pagina: p })}
         />
       </div>
-    </AppShell>
+    </>
   );
 }
