@@ -20,6 +20,15 @@ export type UserRole = (typeof USER_ROLES)[number];
 export const REPORT_STATUSES = ["en_proceso", "terminado"] as const;
 export type ReportStatus = (typeof REPORT_STATUSES)[number];
 
+/**
+ * Catálogo de la bitácora de eventos de un reporte (`report_events`). Hoy
+ * solo se registran estos dos, pero la tabla no está pensada solo para
+ * ellos — es una bitácora de auditoría genérica, y añadir un tercer tipo de
+ * evento el día que haga falta es agregar un valor aquí, no rediseñar nada.
+ */
+export const REPORT_EVENT_TYPES = ["finalizado", "reabierto"] as const;
+export type ReportEventType = (typeof REPORT_EVENT_TYPES)[number];
+
 /** Ruta de inicio según el rol, tras iniciar sesión. */
 export function rutaInicio(role: UserRole): string {
   return role === "admin" ? "/admin" : "/reportes";

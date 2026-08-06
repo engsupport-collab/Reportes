@@ -41,6 +41,7 @@ export function SignatureBlock({
   nombrePorDefecto,
   onFirmar,
   onBorrar,
+  soloLectura = false,
 }: {
   firmaUrl: string | null;
   firmanteNombre: string | null;
@@ -48,6 +49,14 @@ export function SignatureBlock({
   nombrePorDefecto: string;
   onFirmar: (estado: FirmaState, formData: FormData) => Promise<FirmaState>;
   onBorrar: () => void | Promise<void>;
+  /**
+   * El reporte está terminado: se ve la firma, pero ni se reemplaza ni se
+   * borra. Nunca se muestra el pad en este modo, ni siquiera si por algún
+   * motivo no hubiera firma todavía — un reporte terminado sin firma no
+   * debería poder existir (`finalizarReporteAction` la exige), pero esta
+   * pantalla no depende de esa garantía para quedarse de solo lectura.
+   */
+  soloLectura?: boolean;
 }) {
   const t = useTranslations("firma");
 
@@ -59,7 +68,7 @@ export function SignatureBlock({
             <p className="text-sm font-medium text-text">{firmanteNombre}</p>
             <p className="text-xs text-muted">{t("firmadoEl", { fecha: firmadoEl ?? "" })}</p>
           </div>
-          <BotonBorrarFirma onBorrar={onBorrar} />
+          {soloLectura ? null : <BotonBorrarFirma onBorrar={onBorrar} />}
         </div>
 
         {/* eslint-disable-next-line @next/next/no-img-element -- la ruta es
@@ -71,6 +80,10 @@ export function SignatureBlock({
         />
       </div>
     );
+  }
+
+  if (soloLectura) {
+    return <p className="text-sm italic text-muted">{t("sinFirmarBloqueado")}</p>;
   }
 
   return (

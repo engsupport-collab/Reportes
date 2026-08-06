@@ -7,7 +7,11 @@ import { revalidatePath } from "next/cache";
 import { db } from "@/db";
 import { reports } from "@/db/schema";
 import { contenidoCoincide } from "@/lib/archivos-firma";
-import { puedeAccederAReporte, requireAccesoReportes } from "@/lib/auth-guard";
+import {
+  puedeAccederAReporte,
+  reporteBloqueado,
+  requireAccesoReportes,
+} from "@/lib/auth-guard";
 import { obtenerReporte } from "@/lib/queries/reports";
 import { borrarArchivo, guardarArchivo } from "@/lib/storage";
 import { firmaSchema } from "@/lib/validation";
@@ -43,6 +47,11 @@ export async function firmarReporteAction(
   // manipulada.
   if (!reporte || reporte.type !== "servicio" || !puedeAccederAReporte(user, reporte)) {
     return { error: t("reporteNoExiste") };
+  }
+  // Terminado es cerrado: la firma que quedó registrada al cerrarlo no se
+  // vuelve a tocar hasta que se reabra.
+  if (reporteBloqueado(reporte)) {
+    return { error: t("reporteTerminadoBloqueado") };
   }
 
   const parsed = firmaSchema(t).safeParse({
@@ -104,6 +113,7 @@ export async function borrarFirmaAction(reportId: string) {
   const reporte = await obtenerReporte(reportId);
 
   if (!reporte || !puedeAccederAReporte(user, reporte)) return;
+  if (reporteBloqueado(reporte)) return;
   if (!reporte.signatureUrl) return;
 
   await db

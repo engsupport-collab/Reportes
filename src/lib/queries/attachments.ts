@@ -63,6 +63,9 @@ export async function obtenerAdjuntoConDueno(id: string) {
       // esto, alguien con acceso a las dos podría descargar un adjunto de Corp
       // estando en SaaS.
       companyId: reports.companyId,
+      // Para `reporteBloqueado()`: un reporte terminado no admite borrar sus
+      // adjuntos, ni siquiera el propio autor.
+      status: reports.status,
     })
     .from(attachments)
     .innerJoin(reports, eq(reports.id, attachments.reportId))

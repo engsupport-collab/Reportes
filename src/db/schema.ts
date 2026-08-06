@@ -13,7 +13,7 @@ import { ESTADOS_COTIZACION } from "@/lib/cotizaciones";
 import { TIPOS_SERVICIO_IDS } from "@/lib/etiquetas";
 import { IDIOMAS } from "@/lib/idiomas";
 import { MONEDAS } from "@/lib/moneda";
-import { REPORT_STATUSES, USER_ROLES } from "@/lib/roles";
+import { REPORT_EVENT_TYPES, REPORT_STATUSES, USER_ROLES } from "@/lib/roles";
 
 export { REPORT_STATUSES, USER_ROLES };
 export type { ReportStatus, UserRole } from "@/lib/roles";
@@ -422,6 +422,51 @@ export const reports = sqliteTable(
     index("reports_type_idx").on(table.companyId, table.type),
     index("reports_linked_report_idx").on(table.linkedReportId),
     index("reports_quote_idx").on(table.quoteId),
+  ],
+);
+
+/**
+ * Bitácora de auditoría de un reporte — servicio o viáticos por igual, no hay
+ * una tabla distinta por tipo.
+ *
+ * Es una tabla de EVENTOS y no columnas en `reports` a propósito: una columna
+ * como "finalizado por / cuándo" solo guardaría el último evento de esa
+ * clase, y un reporte reabierto y cerrado varias veces perdería el rastro de
+ * las veces anteriores. Aquí cada evento es una fila nueva que nunca se
+ * sobrescribe ni se borra.
+ *
+ * Diseñada como bitácora genérica, no acoplada a "cambios de estado": hoy
+ * solo se usa para `REPORT_EVENT_TYPES` (finalizado/reabierto), pero la forma
+ * —tipo, quién, cuándo, motivo, y `metadata` para lo que no quepa en las
+ * columnas anteriores— sirve para cualquier evento de auditoría que este
+ * reporte necesite en el futuro, sin tocar el modelo otra vez.
+ *
+ * `motivo` hoy solo tiene contenido en los eventos "reabierto" —se pide al
+ * administrador al reabrir, pero no es obligatorio—; un evento "finalizado"
+ * no lo pide. `metadata` no se usa todavía: queda reservada para el día que
+ * un evento necesite datos propios que no encajen en `motivo`.
+ */
+export const reportEvents = sqliteTable(
+  "report_events",
+  {
+    id: text("id").primaryKey(),
+    reportId: text("report_id")
+      .notNull()
+      .references(() => reports.id, { onDelete: "cascade" }),
+    tipo: text("tipo", { enum: REPORT_EVENT_TYPES }).notNull(),
+    // `set null` y no `restrict`: si la cuenta de quien hizo el evento se
+    // borra algún día, el hecho de que ocurrió no debe desaparecer con ella
+    // — el evento sobrevive, solo pierde a quién apuntaba.
+    userId: text("user_id").references(() => users.id, { onDelete: "set null" }),
+    motivo: text("motivo"),
+    /** JSON sin usar todavía. Ver el comentario de la tabla. */
+    metadata: text("metadata"),
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
+      .notNull()
+      .default(sql`(unixepoch() * 1000)`),
+  },
+  (table) => [
+    index("report_events_report_idx").on(table.reportId, table.createdAt),
   ],
 );
 

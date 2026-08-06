@@ -233,7 +233,15 @@
     "gastos": "Expenses",
     "firma": "Signature",
     "editar": "Edit",
-    "volverEnProceso": "To delete it, set it back to in progress"
+    "volverEnProceso": "To delete it, it has to be reopened first.",
+    "bloqueadoGastos": "Report completed. Only an administrator can reopen it to add or remove expenses.",
+    "bloqueadoArchivos": "Report completed. Only an administrator can reopen it to add or remove files.",
+    "historialTitulo": "History",
+    "eventoFinalizado": "Completed",
+    "eventoReabierto": "Reopened",
+    "eventoPorYCuando": "by {nombre} · {fecha}",
+    "usuarioEliminado": "a deleted account",
+    "motivoLabel": "Reason"
   },
   "filtros": {
     "tipoServicio": "Service type",
@@ -319,7 +327,8 @@
     "guardando": "Saving…",
     "guardarFirma": "Save signature",
     "errorGenerarFirma": "Couldn't generate the signature. Try again.",
-    "errorDibujaFirma": "Draw the signature before saving."
+    "errorDibujaFirma": "Draw the signature before saving.",
+    "sinFirmarBloqueado": "This report was completed without a signature."
   },
   "reportActions": {
     "confirmTerminado": "This report has no attachments.\n\nYou can still mark it as completed, but it will stay flagged as incomplete —for you and for the administrator— until you upload the document.\n\nMark as completed?",
@@ -329,7 +338,15 @@
     "confirmEliminar": "Delete this report? This action can't be undone.",
     "eliminando": "Deleting…",
     "eliminar": "Delete",
-    "enviando": "Sending…"
+    "enviando": "Sending…",
+    "soloAdminReabre": "This report is completed. Only an administrator can reopen it.",
+    "reabrirReporte": "Reopen report",
+    "motivoReapertura": "Reason for reopening",
+    "opcional": "(optional)",
+    "motivoEjemplo": "For example: missing photos, illegible signature, expense error…",
+    "reabriendo": "Reopening…",
+    "confirmarReabrir": "Confirm reopening",
+    "cancelar": "Cancel"
   },
   "analiticasPage": {
     "titulo": "Analytics · {empresa}",
@@ -409,7 +426,10 @@
     "firmaGuardada": "Signature saved.",
     "terminadoSinCorreo": "The report was marked as completed, but the email didn't go out. Press the button again to retry sending it.",
     "firmaAntesDeTerminar": "Sign the report before finishing it: the client's email comes from the signature.",
-    "numeroCotizacionEnUso": "That quote number is already taken. Choose another one."
+    "numeroCotizacionEnUso": "That quote number is already taken. Choose another one.",
+    "reporteTerminadoBloqueado": "This report is completed. An administrator has to reopen it before it can be changed.",
+    "motivoReaperturaLargo": "The reason cannot be longer than 500 characters.",
+    "ingresaCorreoCliente": "The client email is missing."
   },
   "estadosCotizacion": {
     "pendiente_autorizacion": "Pending authorization",

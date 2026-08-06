@@ -67,6 +67,9 @@ export async function obtenerViaticoConDueno(id: string) {
       authorId: reports.authorId,
       companyId: reports.companyId,
       quoteId: reports.quoteId,
+      // Para `reporteBloqueado()`: un reporte de viáticos terminado no
+      // admite borrar sus líneas de gasto.
+      status: reports.status,
     })
     .from(reportViaticos)
     .innerJoin(reports, eq(reports.id, reportViaticos.reportId))

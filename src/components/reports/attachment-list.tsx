@@ -45,9 +45,12 @@ function BotonBorrar({
 export function AttachmentList({
   adjuntos,
   onEliminar,
+  soloLectura = false,
 }: {
   adjuntos: AdjuntoEnLista[];
   onEliminar: (id: string) => void | Promise<void>;
+  /** El reporte está terminado: se ve el archivo, pero no se borra. */
+  soloLectura?: boolean;
 }) {
   const t = useTranslations("adjuntos");
 
@@ -95,10 +98,12 @@ export function AttachmentList({
             <p className="text-xs text-muted">{formatearTamano(a.sizeBytes)}</p>
           </div>
 
-          <BotonBorrar
-            nombre={a.fileName}
-            onBorrar={() => onEliminar(a.id)}
-          />
+          {soloLectura ? null : (
+            <BotonBorrar
+              nombre={a.fileName}
+              onBorrar={() => onEliminar(a.id)}
+            />
+          )}
         </li>
       ))}
     </ul>

@@ -192,6 +192,14 @@ export function correoClienteSchema(t: T) {
     .pipe(z.email(t("correoInvalido")));
 }
 
+/**
+ * Motivo de reapertura de un reporte terminado. Opcional a propósito —el
+ * admin puede reabrir sin explicar por qué—, solo se limita el largo.
+ */
+export function motivoReaperturaSchema(t: T) {
+  return z.string().trim().max(500, t("motivoReaperturaLargo"));
+}
+
 export function firmaSchema(t: T) {
   return z.object({
     signatureName: z

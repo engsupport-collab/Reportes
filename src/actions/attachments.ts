@@ -13,7 +13,11 @@ import {
   validarArchivo,
 } from "@/lib/archivos";
 import { contenidoCoincide } from "@/lib/archivos-firma";
-import { puedeAccederAReporte, requireAccesoReportes } from "@/lib/auth-guard";
+import {
+  puedeAccederAReporte,
+  reporteBloqueado,
+  requireAccesoReportes,
+} from "@/lib/auth-guard";
 import { contarAdjuntos, obtenerAdjuntoConDueno } from "@/lib/queries/attachments";
 import { obtenerReporte } from "@/lib/queries/reports";
 import { borrarArchivo, guardarArchivo } from "@/lib/storage";
@@ -32,6 +36,10 @@ export async function subirAdjuntosAction(
   // fotos de cada gasto, que se agregan por su propia acción.
   if (!reporte || reporte.type !== "servicio" || !puedeAccederAReporte(user, reporte)) {
     return { error: "El reporte no existe o no tienes acceso." };
+  }
+  // Terminado es cerrado: ni el autor ni el admin suben nada más por aquí.
+  if (reporteBloqueado(reporte)) {
+    return { error: "Este reporte está terminado y no se puede editar." };
   }
 
   const archivos = formData
@@ -118,6 +126,8 @@ export async function eliminarAdjuntoAction(id: string) {
   const adjunto = await obtenerAdjuntoConDueno(id);
 
   if (!adjunto || !puedeAccederAReporte(user, adjunto)) return;
+  // Terminado es cerrado: sus adjuntos no se tocan hasta que se reabra.
+  if (reporteBloqueado(adjunto)) return;
 
   // Primero la fila, después el archivo: si falla el borrado del archivo queda
   // un huérfano en el almacenamiento, que es molesto pero inofensivo. Al revés,

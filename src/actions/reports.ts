@@ -6,9 +6,14 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { db } from "@/db";
-import { reportTags, reports } from "@/db/schema";
+import { reportEvents, reportTags, reports } from "@/db/schema";
 import { obtenerCotizacionActivaDeEmpresa } from "@/actions/quotes";
-import { puedeAccederAReporte, requireAccesoReportes } from "@/lib/auth-guard";
+import {
+  puedeAccederAReporte,
+  reporteBloqueado,
+  requireAccesoReportes,
+  requireAdmin,
+} from "@/lib/auth-guard";
 import { enviarReporteAlCliente } from "@/lib/correo-reporte";
 import { listarEmpresas } from "@/lib/queries/companies";
 import { obtenerCotizacion } from "@/lib/queries/quotes";
@@ -17,9 +22,31 @@ import {
   correoClienteSchema,
   estadoReporteSchema,
   leerEtiquetas,
+  motivoReaperturaSchema,
   reporteSchema,
   reporteViaticoSchema,
 } from "@/lib/validation";
+
+/**
+ * Registra un evento en la bitácora del reporte (`report_events`). Se llama
+ * DESPUÉS del `UPDATE` que cambia el estado, nunca antes ni en su lugar: son
+ * dos escrituras separadas porque son dos cosas separadas — el estado actual
+ * del reporte, y la historia de cómo llegó ahí.
+ */
+async function registrarEvento(datos: {
+  reportId: string;
+  tipo: "finalizado" | "reabierto";
+  userId: string;
+  motivo?: string | null;
+}) {
+  await db.insert(reportEvents).values({
+    id: crypto.randomUUID(),
+    reportId: datos.reportId,
+    tipo: datos.tipo,
+    userId: datos.userId,
+    motivo: datos.motivo ?? null,
+  });
+}
 
 export type ReporteState = { error?: string };
 
@@ -228,6 +255,12 @@ export async function actualizarReporteAction(
     return { error: tValidacion("reporteNoExiste") };
   }
 
+  // Un reporte terminado es un documento cerrado: ni el autor ni el admin lo
+  // editan por aquí. La única puerta de vuelta es `reabrirReporteAction`.
+  if (reporteBloqueado(reporte)) {
+    return { error: tValidacion("reporteTerminadoBloqueado") };
+  }
+
   const parsed = await leerFormulario(formData);
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? tValidacion("revisaLosDatos") };
@@ -298,6 +331,12 @@ export type FinalizarState = { error?: string };
  * enviar. Al revés, un webhook caído dejaría al técnico sin poder cerrar el
  * trabajo. Si el envío falla, el reporte queda terminado igual y se le dice
  * qué pasó, en vez de fingir que salió.
+ *
+ * Un reporte YA terminado puede volver a pasar por aquí sin que eso sea
+ * "editarlo": es el reintento de envío tras un fallo (ver más abajo), y no
+ * toca ningún dato del reporte — solo lo reintenta. Por eso esta acción NO
+ * usa `reporteBloqueado()` como las demás: bloquearla también le quitaría al
+ * técnico su única forma de reintentar un correo que falló.
  */
 export async function finalizarReporteAction(
   id: string,
@@ -316,15 +355,22 @@ export async function finalizarReporteAction(
     return { error: t("firmaAntesDeTerminar") };
   }
 
-  await db
-    .update(reports)
-    .set({
-      status: "terminado",
-      completedAt: new Date(),
-      updatedAt: new Date(),
-      updatedBy: user.id,
-    })
-    .where(eq(reports.id, id));
+  // Ya estaba terminado: esto es el reintento del correo, no una nueva
+  // finalización. No se vuelve a escribir el estado ni un evento nuevo — ese
+  // rastro es de la vez que de verdad se cerró, no de cada reintento.
+  if (!reporteBloqueado(reporte)) {
+    await db
+      .update(reports)
+      .set({
+        status: "terminado",
+        completedAt: new Date(),
+        updatedAt: new Date(),
+        updatedBy: user.id,
+      })
+      .where(eq(reports.id, id));
+
+    await registrarEvento({ reportId: id, tipo: "finalizado", userId: user.id });
+  }
 
   const enviado = await enviarReporteAlCliente({
     reportId: id,
@@ -350,6 +396,18 @@ export async function finalizarReporteAction(
   redirect("/reportes/nuevo");
 }
 
+/**
+ * Marca un reporte de viáticos como terminado (lo cierra). Es la única
+ * dirección que esta acción admite: la vuelta a "en proceso" ya no pasa por
+ * aquí, sino por `reabrirReporteAction`, exclusiva del administrador — sin
+ * esa separación habría dos caminos hacia lo mismo, uno con el candado y
+ * otro sin él.
+ *
+ * Para un reporte de SERVICIO, cerrarlo pasa siempre por
+ * `finalizarReporteAction`, que es donde se resuelve el correo y se envía;
+ * esta acción lo rechaza, para que una petición armada a mano no pueda dejar
+ * uno terminado sin que el cliente reciba nada.
+ */
 export async function cambiarEstadoAction(id: string, formData: FormData) {
   const { user, reporte } = await cargarConPermiso(id);
   if (!reporte) return;
@@ -357,27 +415,74 @@ export async function cambiarEstadoAction(id: string, formData: FormData) {
   const parsed = estadoReporteSchema.safeParse(formData.get("estado"));
   if (!parsed.success) return;
 
-  const nuevoEstado = parsed.data;
-
-  // Cerrar un reporte de servicio pasa siempre por `finalizarReporteAction`,
-  // que es donde se resuelve el correo y se envía. Sin esta puerta cerrada,
-  // una petición armada a mano podría dejarlo terminado sin que el cliente
-  // reciba nada, y "terminado" dejaría de significar "enviado".
-  if (nuevoEstado === "terminado" && reporte.type === "servicio") return;
+  if (parsed.data !== "terminado") return;
+  if (reporte.type === "servicio") return;
+  // Un reporte terminado no vuelve a "terminarse": ya lo está.
+  if (reporteBloqueado(reporte)) return;
 
   await db
     .update(reports)
     .set({
-      status: nuevoEstado,
-      // Al volver a "en proceso" se limpia la fecha de finalización, para que no
-      // quede una marca de terminado en un reporte que ya no lo está.
-      completedAt: nuevoEstado === "terminado" ? new Date() : null,
+      status: "terminado",
+      completedAt: new Date(),
       updatedAt: new Date(),
       updatedBy: user.id,
     })
     .where(eq(reports.id, id));
 
+  await registrarEvento({ reportId: id, tipo: "finalizado", userId: user.id });
+
   revalidarListas(id);
+}
+
+export type ReabrirState = { error?: string };
+
+/**
+ * Reabre un reporte terminado. Es el ÚNICO camino de vuelta a "en proceso",
+ * para servicio y para viáticos por igual, y exclusivo del administrador —
+ * `requireAdmin()`, no un chequeo de rol suelto, para que quede tan protegido
+ * como cualquier otra pantalla exclusiva de admin en el sistema.
+ *
+ * El motivo es opcional: el admin puede escribir por qué reabre ("faltaban
+ * fotos", "firma ilegible") y queda en la bitácora junto al evento, pero no
+ * se exige — a veces la razón ya se habló de palabra.
+ */
+export async function reabrirReporteAction(
+  id: string,
+  _prevState: ReabrirState,
+  formData: FormData,
+): Promise<ReabrirState> {
+  const user = await requireAdmin();
+  const t = await getTranslations("validacion");
+  const reporte = await obtenerReporte(id);
+
+  if (!reporte || !reporteBloqueado(reporte)) {
+    return { error: t("reporteNoExiste") };
+  }
+
+  const parsed = motivoReaperturaSchema(t).safeParse(formData.get("motivo") ?? "");
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? t("revisaLosDatos") };
+  }
+
+  await db
+    .update(reports)
+    .set({
+      status: "en_proceso",
+      updatedAt: new Date(),
+      updatedBy: user.id,
+    })
+    .where(eq(reports.id, id));
+
+  await registrarEvento({
+    reportId: id,
+    tipo: "reabierto",
+    userId: user.id,
+    motivo: parsed.data.length > 0 ? parsed.data : null,
+  });
+
+  revalidarListas(id);
+  return {};
 }
 
 export async function eliminarReporteAction(id: string) {

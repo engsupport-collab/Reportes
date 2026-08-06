@@ -233,7 +233,15 @@
     "gastos": "Gastos",
     "firma": "Firma",
     "editar": "Editar",
-    "volverEnProceso": "Para eliminarlo, vuelve a ponerlo en proceso"
+    "volverEnProceso": "Para eliminarlo, primero hay que reabrirlo.",
+    "bloqueadoGastos": "Reporte terminado. Solo un administrador puede reabrirlo para agregar o quitar gastos.",
+    "bloqueadoArchivos": "Reporte terminado. Solo un administrador puede reabrirlo para agregar o quitar archivos.",
+    "historialTitulo": "Historial",
+    "eventoFinalizado": "Finalizado",
+    "eventoReabierto": "Reabierto",
+    "eventoPorYCuando": "por {nombre} · {fecha}",
+    "usuarioEliminado": "una cuenta ya eliminada",
+    "motivoLabel": "Motivo"
   },
   "filtros": {
     "tipoServicio": "Tipo de servicio",
@@ -319,7 +327,8 @@
     "guardando": "Guardando…",
     "guardarFirma": "Guardar firma",
     "errorGenerarFirma": "No se pudo generar la firma. Intenta de nuevo.",
-    "errorDibujaFirma": "Dibuja la firma antes de guardar."
+    "errorDibujaFirma": "Dibuja la firma antes de guardar.",
+    "sinFirmarBloqueado": "Este reporte quedó terminado sin firma."
   },
   "reportActions": {
     "confirmTerminado": "Este reporte no tiene ningún archivo adjunto.\n\nPuedes marcarlo como terminado igual, pero va a quedar señalado como incompleto —para ti y para el administrador— hasta que subas el documento.\n\n¿Marcar como terminado?",
@@ -329,7 +338,15 @@
     "confirmEliminar": "¿Eliminar este reporte? Esta acción no se puede deshacer.",
     "eliminando": "Eliminando…",
     "eliminar": "Eliminar",
-    "enviando": "Enviando…"
+    "enviando": "Enviando…",
+    "soloAdminReabre": "Este reporte está terminado. Solo un administrador puede reabrirlo.",
+    "reabrirReporte": "Reabrir reporte",
+    "motivoReapertura": "Motivo de la reapertura",
+    "opcional": "(opcional)",
+    "motivoEjemplo": "Por ejemplo: faltaban fotografías, firma ilegible, error en viáticos…",
+    "reabriendo": "Reabriendo…",
+    "confirmarReabrir": "Confirmar reapertura",
+    "cancelar": "Cancelar"
   },
   "analiticasPage": {
     "titulo": "Analíticas · {empresa}",
@@ -409,7 +426,10 @@
     "firmaGuardada": "Firma guardada.",
     "terminadoSinCorreo": "El reporte quedó terminado, pero el correo no salió. Vuelve a pulsar el botón para reintentar el envío.",
     "firmaAntesDeTerminar": "Firma el reporte antes de terminarlo: el correo del cliente se toma de la firma.",
-    "numeroCotizacionEnUso": "Ese número de cotización ya está en uso. Elige otro."
+    "numeroCotizacionEnUso": "Ese número de cotización ya está en uso. Elige otro.",
+    "reporteTerminadoBloqueado": "Este reporte está terminado. Un administrador tiene que reabrirlo antes de poder cambiarlo.",
+    "motivoReaperturaLargo": "El motivo no puede superar los 500 caracteres.",
+    "ingresaCorreoCliente": "Falta el correo del cliente."
   },
   "estadosCotizacion": {
     "pendiente_autorizacion": "Pendiente por autorización",

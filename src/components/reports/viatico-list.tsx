@@ -48,10 +48,13 @@ export function ViaticoList({
   viaticos,
   moneda,
   onEliminar,
+  soloLectura = false,
 }: {
   viaticos: ViaticoEnLista[];
   moneda: Moneda;
   onEliminar: (id: string) => void | Promise<void>;
+  /** El reporte está terminado: se ve el gasto, pero no se borra. */
+  soloLectura?: boolean;
 }) {
   const t = useTranslations("viaticosForm");
 
@@ -99,7 +102,9 @@ export function ViaticoList({
             </a>
           </div>
 
-          <BotonBorrar nombre={v.fileName} onBorrar={() => onEliminar(v.id)} />
+          {soloLectura ? null : (
+            <BotonBorrar nombre={v.fileName} onBorrar={() => onEliminar(v.id)} />
+          )}
         </li>
       ))}
     </ul>

@@ -233,7 +233,15 @@
     "gastos": "Despesas",
     "firma": "Assinatura",
     "editar": "Editar",
-    "volverEnProceso": "Para excluí-lo, coloque-o de volta em andamento"
+    "volverEnProceso": "Para excluí-lo, é preciso reabri-lo primeiro.",
+    "bloqueadoGastos": "Relatório concluído. Só um administrador pode reabri-lo para adicionar ou remover despesas.",
+    "bloqueadoArchivos": "Relatório concluído. Só um administrador pode reabri-lo para adicionar ou remover arquivos.",
+    "historialTitulo": "Histórico",
+    "eventoFinalizado": "Concluído",
+    "eventoReabierto": "Reaberto",
+    "eventoPorYCuando": "por {nombre} · {fecha}",
+    "usuarioEliminado": "uma conta já excluída",
+    "motivoLabel": "Motivo"
   },
   "filtros": {
     "tipoServicio": "Tipo de serviço",
@@ -319,7 +327,8 @@
     "guardando": "Salvando…",
     "guardarFirma": "Salvar assinatura",
     "errorGenerarFirma": "Não foi possível gerar a assinatura. Tente novamente.",
-    "errorDibujaFirma": "Desenhe a assinatura antes de salvar."
+    "errorDibujaFirma": "Desenhe a assinatura antes de salvar.",
+    "sinFirmarBloqueado": "Este relatório ficou concluído sem assinatura."
   },
   "reportActions": {
     "confirmTerminado": "Este relatório não tem nenhum anexo.\n\nVocê pode marcá-lo como concluído mesmo assim, mas ele ficará sinalizado como incompleto —para você e para o administrador— até que envie o documento.\n\nMarcar como concluído?",
@@ -329,7 +338,15 @@
     "confirmEliminar": "Excluir este relatório? Esta ação não pode ser desfeita.",
     "eliminando": "Excluindo…",
     "eliminar": "Excluir",
-    "enviando": "Enviando…"
+    "enviando": "Enviando…",
+    "soloAdminReabre": "Este relatório está concluído. Só um administrador pode reabri-lo.",
+    "reabrirReporte": "Reabrir relatório",
+    "motivoReapertura": "Motivo da reabertura",
+    "opcional": "(opcional)",
+    "motivoEjemplo": "Por exemplo: faltavam fotos, assinatura ilegível, erro nas despesas…",
+    "reabriendo": "Reabrindo…",
+    "confirmarReabrir": "Confirmar reabertura",
+    "cancelar": "Cancelar"
   },
   "analiticasPage": {
     "titulo": "Análises · {empresa}",
@@ -409,7 +426,10 @@
     "firmaGuardada": "Assinatura salva.",
     "terminadoSinCorreo": "O relatório ficou concluído, mas o e-mail não saiu. Pressione o botão de novo para tentar enviar outra vez.",
     "firmaAntesDeTerminar": "Assine o relatório antes de concluí-lo: o e-mail do cliente vem da assinatura.",
-    "numeroCotizacionEnUso": "Esse número de cotação já está em uso. Escolha outro."
+    "numeroCotizacionEnUso": "Esse número de cotação já está em uso. Escolha outro.",
+    "reporteTerminadoBloqueado": "Este relatório está concluído. Um administrador precisa reabri-lo antes de poder alterá-lo.",
+    "motivoReaperturaLargo": "O motivo não pode ter mais de 500 caracteres.",
+    "ingresaCorreoCliente": "Falta o e-mail do cliente."
   },
   "estadosCotizacion": {
     "pendiente_autorizacion": "Pendente de autorização",

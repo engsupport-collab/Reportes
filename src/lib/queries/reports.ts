@@ -3,7 +3,14 @@ import "server-only";
 import { and, desc, eq, like, or, sql } from "drizzle-orm";
 
 import { db } from "@/db";
-import { attachments, companies, reportTags, reports, users } from "@/db/schema";
+import {
+  attachments,
+  companies,
+  reportEvents,
+  reportTags,
+  reports,
+  users,
+} from "@/db/schema";
 import type { TipoServicio } from "@/lib/etiquetas";
 import type { ReportStatus } from "@/lib/roles";
 
@@ -424,5 +431,37 @@ export async function obtenerReporte(id: string) {
     attachmentCount: Number(fila.attachmentCount),
     etiquetas: csvAEtiquetas(csv),
   };
+}
+
+export type EventoEstadoReporte = {
+  id: string;
+  tipo: "finalizado" | "reabierto";
+  /** Null si la cuenta de quien hizo el evento ya no existe. */
+  userName: string | null;
+  /** Solo tiene contenido en los eventos "reabierto". */
+  motivo: string | null;
+  createdAt: Date;
+};
+
+/**
+ * Historial de cierres y reaperturas de un reporte, del más antiguo al más
+ * reciente — se lee como una línea de tiempo, no como una lista de "últimas
+ * novedades".
+ */
+export async function listarEventosDeReporte(
+  reportId: string,
+): Promise<EventoEstadoReporte[]> {
+  return db
+    .select({
+      id: reportEvents.id,
+      tipo: reportEvents.tipo,
+      userName: users.fullName,
+      motivo: reportEvents.motivo,
+      createdAt: reportEvents.createdAt,
+    })
+    .from(reportEvents)
+    .leftJoin(users, eq(users.id, reportEvents.userId))
+    .where(eq(reportEvents.reportId, reportId))
+    .orderBy(reportEvents.createdAt);
 }
 

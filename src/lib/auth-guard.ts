@@ -243,3 +243,17 @@ export function puedeAccederAReporte(
   if (reporte.companyId !== user.empresaActiva.id) return false;
   return user.id === reporte.authorId;
 }
+
+/**
+ * Un reporte terminado es un documento cerrado: nada se modifica en él hasta
+ * que un administrador lo reabra con `reabrirReporteAction`. Se comprueba
+ * aquí, en el servidor, en cada acción que cambia algo del reporte —esconder
+ * el botón no alcanza, porque una petición se puede armar a mano sin pasar
+ * por la interfaz.
+ *
+ * Vale igual para servicio y para viáticos: no hay una regla de bloqueo
+ * distinta por tipo, solo `status`.
+ */
+export function reporteBloqueado(reporte: { status: string }): boolean {
+  return reporte.status === "terminado";
+}

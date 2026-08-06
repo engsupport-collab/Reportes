@@ -6,10 +6,12 @@ import {
   eliminarAdjuntoAction,
   subirAdjuntosAction,
 } from "@/actions/attachments";
+import type { ReabrirState } from "@/actions/reports";
 import {
   cambiarEstadoAction,
   eliminarReporteAction,
   finalizarReporteAction,
+  reabrirReporteAction,
 } from "@/actions/reports";
 import { borrarFirmaAction, firmarReporteAction } from "@/actions/signature";
 import {
@@ -23,17 +25,23 @@ import {
   EstadoBadge,
   Faltantes,
 } from "@/components/reports/badges";
+import { HistorialEstado } from "@/components/reports/historial-estado";
 import {
   EliminarReporte,
   EstadoToggle,
   FinalizarReporte,
+  ReabrirReporte,
 } from "@/components/reports/report-actions";
 import { SignatureBlock } from "@/components/reports/signature-block";
 import { ViaticoList } from "@/components/reports/viatico-list";
 import { ViaticoUploader } from "@/components/reports/viatico-uploader";
 import { MAX_ARCHIVOS_POR_REPORTE } from "@/lib/archivos";
 import { Saludo } from "@/components/saludo";
-import { puedeAccederAReporte, requireAccesoReportes } from "@/lib/auth-guard";
+import {
+  puedeAccederAReporte,
+  reporteBloqueado,
+  requireAccesoReportes,
+} from "@/lib/auth-guard";
 import { formatFechaLarga, formatInstante } from "@/lib/fechas";
 import { formatearMonto, type Moneda } from "@/lib/moneda";
 import { listarAdjuntos } from "@/lib/queries/attachments";
@@ -41,7 +49,7 @@ import {
   listarReportesDeCotizacion,
   type ReporteDeCotizacion,
 } from "@/lib/queries/quotes";
-import { obtenerReporte } from "@/lib/queries/reports";
+import { listarEventosDeReporte, obtenerReporte } from "@/lib/queries/reports";
 import { listarViaticos } from "@/lib/queries/viaticos";
 
 type Params = {
@@ -80,7 +88,11 @@ async function ContenidoViatico({
   esAdmin: boolean;
   t: Awaited<ReturnType<typeof getTranslations<"reportDetail">>>;
 }) {
-  const gastos = await listarViaticos(reporte.id);
+  const bloqueado = reporteBloqueado(reporte);
+  const [gastos, eventos] = await Promise.all([
+    listarViaticos(reporte.id),
+    listarEventosDeReporte(reporte.id),
+  ]);
   const total = gastos.reduce((suma, g) => suma + (g.amount ?? 0), 0);
 
   return (
@@ -135,15 +147,42 @@ async function ContenidoViatico({
             viaticos={gastos}
             moneda={reporte.currency}
             onEliminar={eliminarViaticoAction}
+            soloLectura={bloqueado}
           />
-          <ViaticoUploader
-            action={agregarViaticoAction.bind(null, reporte.id)}
-            moneda={reporte.currency}
-          />
+          {bloqueado ? (
+            <p className="text-sm text-muted">{t("bloqueadoGastos")}</p>
+          ) : (
+            <ViaticoUploader
+              action={agregarViaticoAction.bind(null, reporte.id)}
+              moneda={reporte.currency}
+            />
+          )}
         </div>
       </div>
+
+      <HistorialEstado eventos={eventos} t={t} />
     </>
   );
+}
+
+/**
+ * Botón de reabrir, o el aviso de que hace falta un administrador —el mismo
+ * corte para el reporte de servicio y para el de viáticos, factorizado aquí
+ * para no repetirlo dos veces en este archivo.
+ */
+function AccionReabrir({
+  esAdmin,
+  action,
+  tAcciones,
+}: {
+  esAdmin: boolean;
+  action: (estado: ReabrirState, formData: FormData) => Promise<ReabrirState>;
+  tAcciones: Awaited<ReturnType<typeof getTranslations<"reportActions">>>;
+}) {
+  if (!esAdmin) {
+    return <p className="text-xs text-muted">{tAcciones("soloAdminReabre")}</p>;
+  }
+  return <ReabrirReporte action={action} />;
 }
 
 /** Detalle de un reporte de viáticos: cabecera propia + `ContenidoViatico`. */
@@ -151,11 +190,15 @@ async function DetalleViatico({
   reporte,
   esAdmin,
   t,
+  tAcciones,
 }: {
   reporte: NonNullable<Awaited<ReturnType<typeof obtenerReporte>>>;
   esAdmin: boolean;
   t: Awaited<ReturnType<typeof getTranslations<"reportDetail">>>;
+  tAcciones: Awaited<ReturnType<typeof getTranslations<"reportActions">>>;
 }) {
+  const bloqueado = reporteBloqueado(reporte);
+
   return (
     <div className="mx-auto max-w-3xl space-y-5">
       <div className="flex items-center justify-between gap-3">
@@ -178,12 +221,20 @@ async function DetalleViatico({
 
       <ContenidoViatico reporte={reporte} esAdmin={esAdmin} t={t} />
 
-      <div className="flex flex-wrap items-center gap-3">
-        <EstadoToggle
-          action={cambiarEstadoAction.bind(null, reporte.id)}
-          status={reporte.status}
-          sinAdjuntos={false}
-        />
+      <div className="flex flex-wrap items-start gap-3">
+        {bloqueado ? (
+          <AccionReabrir
+            esAdmin={esAdmin}
+            action={reabrirReporteAction.bind(null, reporte.id)}
+            tAcciones={tAcciones}
+          />
+        ) : (
+          <EstadoToggle
+            action={cambiarEstadoAction.bind(null, reporte.id)}
+            status={reporte.status}
+            sinAdjuntos={false}
+          />
+        )}
 
         <div className="ml-auto">
           {reporte.status === "en_proceso" ? (
@@ -361,7 +412,10 @@ export default async function DetalleReportePage({ params, searchParams }: Param
   }
 
   const esAdmin = user.role === "admin";
-  const t = await getTranslations("reportDetail");
+  const [t, tAcciones] = await Promise.all([
+    getTranslations("reportDetail"),
+    getTranslations("reportActions"),
+  ]);
 
   // Un reporte de viáticos es una pantalla distinta: casi ningún campo del
   // reporte de servicio le aplica (ni orden, ni firma, ni adjuntos de
@@ -372,7 +426,7 @@ export default async function DetalleReportePage({ params, searchParams }: Param
       <>
       <Saludo nombreCompleto={user.fullName} />
 
-        <DetalleViatico reporte={reporte} esAdmin={esAdmin} t={t} />
+        <DetalleViatico reporte={reporte} esAdmin={esAdmin} t={t} tAcciones={tAcciones} />
       </>
     );
   }
@@ -416,6 +470,9 @@ export default async function DetalleReportePage({ params, searchParams }: Param
   // selector de tipo al crear un reporte — ni una clave de i18n nueva.
   const tTipo = await getTranslations("nuevoReportePage");
   const mostrandoViaticos = vista === "viaticos" && viaticosVisibles.length > 0;
+
+  const bloqueado = reporteBloqueado(reporte);
+  const eventos = await listarEventosDeReporte(reporte.id);
 
   return (
     <>
@@ -564,15 +621,20 @@ export default async function DetalleReportePage({ params, searchParams }: Param
             {/* Editar va justo aquí, encima de los adjuntos: es el orden real del
                 trabajo — se corrige lo que quedó mal escrito y recién entonces se
                 empiezan a subir los documentos. Al final de la pantalla quedaba
-                después de todo lo que venía a corregir. */}
-            <div className="flex justify-end">
-              <Link
-                href={`/reportes/${reporte.id}/editar`}
-                className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-muted transition hover:bg-surface-muted hover:text-text"
-              >
-                {t("editar")}
-              </Link>
-            </div>
+                después de todo lo que venía a corregir.
+                Terminado es cerrado: el enlace directamente desaparece — no se
+                deshabilita, porque un enlace deshabilitado sigue siendo un
+                enlace que invita a intentarlo. */}
+            {bloqueado ? null : (
+              <div className="flex justify-end">
+                <Link
+                  href={`/reportes/${reporte.id}/editar`}
+                  className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-muted transition hover:bg-surface-muted hover:text-text"
+                >
+                  {t("editar")}
+                </Link>
+              </div>
+            )}
 
             <div className="rounded-2xl border border-border bg-surface p-5 sm:p-6">
               <div className="mb-4 flex items-center justify-between gap-3">
@@ -588,11 +650,16 @@ export default async function DetalleReportePage({ params, searchParams }: Param
                 <AttachmentList
                   adjuntos={adjuntos}
                   onEliminar={eliminarAdjuntoAction}
+                  soloLectura={bloqueado}
                 />
-                <AttachmentUploader
-                  action={subirAdjuntosAction.bind(null, reporte.id)}
-                  restantes={MAX_ARCHIVOS_POR_REPORTE - adjuntos.length}
-                />
+                {bloqueado ? (
+                  <p className="text-sm text-muted">{t("bloqueadoArchivos")}</p>
+                ) : (
+                  <AttachmentUploader
+                    action={subirAdjuntosAction.bind(null, reporte.id)}
+                    restantes={MAX_ARCHIVOS_POR_REPORTE - adjuntos.length}
+                  />
+                )}
               </div>
             </div>
 
@@ -608,46 +675,53 @@ export default async function DetalleReportePage({ params, searchParams }: Param
                 nombrePorDefecto={reporte.clientName}
                 onFirmar={firmarReporteAction.bind(null, reporte.id)}
                 onBorrar={borrarFirmaAction.bind(null, reporte.id)}
+                soloLectura={bloqueado}
               />
             </div>
+
+            <HistorialEstado eventos={eventos} t={t} />
           </>
         )}
 
-        {/* Las acciones de aquí abajo (terminar y enviar, eliminar) son del
+        {/* Las acciones de aquí abajo (terminar/reabrir, eliminar) son del
             reporte de SERVICIO — terminar manda el PDF al cliente, eliminar
             borra ese reporte. Se ocultan en la pestaña Viáticos a propósito:
-            un botón "Marcar como terminado" quedando debajo de un gasto en
-            pantalla se leería como si fuera de ese gasto, y no lo es. */}
+            un botón sobre el reporte de servicio quedando debajo de un gasto
+            en pantalla se leería como si fuera de ese gasto, y no lo es. */}
         {mostrandoViaticos ? null : (
           <div className="flex flex-wrap items-start gap-3">
-            {/* Cerrar el reporte y mandárselo al cliente son el mismo gesto, y
-                por eso el mismo botón: ver FinalizarReporte. Volver a ponerlo en
-                proceso no manda nada, así que sigue siendo el toggle de siempre. */}
-            {reporte.status === "en_proceso" ? (
-              <FinalizarReporte
-                action={finalizarReporteAction.bind(null, reporte.id)}
-                sinAdjuntos={sinAdjuntos}
+            {/* Terminado: la única acción posible es reabrir, y solo para el
+                admin. Cerrar y mandárselo al cliente son el mismo gesto, y
+                por eso el mismo botón: ver FinalizarReporte. */}
+            {/* Un reporte de servicio solo tiene dos estados: mientras no esté
+                `bloqueado` (es decir, "terminado"), siempre está en_proceso —
+                así que la rama que faltaría aquí (bloqueado, pero admin YA
+                habilitó de nuevo la edición) no puede ocurrir: en cuanto se
+                reabre, `bloqueado` pasa a false y esto vuelve a mostrar
+                FinalizarReporte por su cuenta. */}
+            {bloqueado ? (
+              <AccionReabrir
+                esAdmin={esAdmin}
+                action={reabrirReporteAction.bind(null, reporte.id)}
+                tAcciones={tAcciones}
               />
             ) : (
-              <EstadoToggle
-                action={cambiarEstadoAction.bind(null, reporte.id)}
-                status={reporte.status}
+              <FinalizarReporte
+                action={finalizarReporteAction.bind(null, reporte.id)}
                 sinAdjuntos={sinAdjuntos}
               />
             )}
 
             <div className="ml-auto">
-              {reporte.status === "en_proceso" ? (
+              {bloqueado ? (
+                // Un reporte terminado es el registro de un trabajo hecho:
+                // no se borra sin más. Reabrirlo (arriba) es lo único que
+                // vuelve a habilitar esta acción.
+                <p className="text-xs text-muted">{t("volverEnProceso")}</p>
+              ) : (
                 <EliminarReporte
                   action={eliminarReporteAction.bind(null, reporte.id)}
                 />
-              ) : (
-                // Un reporte terminado es el registro de un trabajo hecho. Para
-                // borrarlo hay que devolverlo antes a "en proceso", y eso queda
-                // anotado en el historial de edición.
-                <p className="text-xs text-muted">
-                  {t("volverEnProceso")}
-                </p>
               )}
             </div>
           </div>

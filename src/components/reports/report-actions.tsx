@@ -1,10 +1,10 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { useTranslations } from "next-intl";
 
-import type { FinalizarState } from "@/actions/reports";
+import type { FinalizarState, ReabrirState } from "@/actions/reports";
 import type { ReportStatus } from "@/lib/roles";
 
 /**
@@ -146,6 +146,87 @@ export function EliminarReporte({ action }: { action: () => void }) {
   return (
     <form action={action}>
       <BotonEliminar />
+    </form>
+  );
+}
+
+/**
+ * Reabre un reporte terminado. Solo la ve un administrador — quien no lo es
+ * ni siquiera recibe este componente, ver `reportes/[id]/page.tsx` — así que
+ * aquí no hace falta volver a comprobar el rol: la acción del servidor ya lo
+ * exige por su cuenta con `requireAdmin()`, y esta pantalla es solo el atajo.
+ *
+ * El primer clic revela el campo de motivo en vez de disparar la acción de
+ * una vez: reabrir un documento que ya se le mandó al cliente es algo que
+ * conviene poder explicar, y el propio campo —escribir algo, o decidir
+ * dejarlo vacío y confirmar— ya funciona como el "¿estás seguro?" de esta
+ * acción, sin necesitar además un `window.confirm()` encima.
+ */
+export function ReabrirReporte({
+  action,
+}: {
+  action: (estado: ReabrirState, formData: FormData) => Promise<ReabrirState>;
+}) {
+  const [revelado, setRevelado] = useState(false);
+  const [state, formAction, pendiente] = useActionState<ReabrirState, FormData>(
+    action,
+    {},
+  );
+  const t = useTranslations("reportActions");
+
+  if (!revelado) {
+    return (
+      <button
+        type="button"
+        onClick={() => setRevelado(true)}
+        className="rounded-lg border border-warning/40 px-4 py-2.5 text-sm font-medium text-warning transition hover:bg-warning/10"
+      >
+        {t("reabrirReporte")}
+      </button>
+    );
+  }
+
+  return (
+    <form
+      action={formAction}
+      className="w-full space-y-2 rounded-xl border border-dashed border-border p-4"
+    >
+      <label htmlFor="motivo" className="block text-sm font-medium text-text">
+        {t("motivoReapertura")}{" "}
+        <span className="font-normal text-muted">{t("opcional")}</span>
+      </label>
+      <textarea
+        id="motivo"
+        name="motivo"
+        rows={2}
+        maxLength={500}
+        autoFocus
+        placeholder={t("motivoEjemplo")}
+        className="w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-sm text-text placeholder:text-muted focus:border-brand focus:outline-none"
+      />
+
+      {state.error ? (
+        <p role="alert" className="text-sm text-danger">
+          {state.error}
+        </p>
+      ) : null}
+
+      <div className="flex items-center gap-2">
+        <button
+          type="submit"
+          disabled={pendiente}
+          className="rounded-lg bg-warning px-4 py-2 text-sm font-semibold text-white transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {pendiente ? t("reabriendo") : t("confirmarReabrir")}
+        </button>
+        <button
+          type="button"
+          onClick={() => setRevelado(false)}
+          className="rounded-lg px-3 py-2 text-sm font-medium text-muted transition hover:text-text"
+        >
+          {t("cancelar")}
+        </button>
+      </div>
     </form>
   );
 }

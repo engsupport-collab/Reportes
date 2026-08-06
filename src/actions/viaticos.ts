@@ -13,7 +13,11 @@ import {
   validarArchivo,
 } from "@/lib/archivos";
 import { contenidoCoincide } from "@/lib/archivos-firma";
-import { puedeAccederAReporte, requireAccesoReportes } from "@/lib/auth-guard";
+import {
+  puedeAccederAReporte,
+  reporteBloqueado,
+  requireAccesoReportes,
+} from "@/lib/auth-guard";
 import { obtenerReporte } from "@/lib/queries/reports";
 import { contarViaticos, obtenerViaticoConDueno } from "@/lib/queries/viaticos";
 import { borrarArchivo, guardarArchivo } from "@/lib/storage";
@@ -51,6 +55,10 @@ export async function agregarViaticoAction(
   // una petición manipulada.
   if (!reporte || reporte.type !== "viaticos" || !puedeAccederAReporte(user, reporte)) {
     return { error: t("reporteNoExiste") };
+  }
+  // Terminado es cerrado: no se agregan más gastos hasta que se reabra.
+  if (reporteBloqueado(reporte)) {
+    return { error: t("reporteTerminadoBloqueado") };
   }
 
   const parsed = gastoViaticoSchema(t).safeParse({
@@ -131,6 +139,7 @@ export async function eliminarViaticoAction(id: string) {
   const viatico = await obtenerViaticoConDueno(id);
 
   if (!viatico || !puedeAccederAReporte(user, viatico)) return;
+  if (reporteBloqueado(viatico)) return;
 
   await db.delete(reportViaticos).where(eq(reportViaticos.id, id));
 

@@ -1,12 +1,16 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 
 import { actualizarReporteAction } from "@/actions/reports";
 import { ReportForm } from "@/components/reports/report-form";
 import type { OpcionCotizacionSelector } from "@/components/reports/quote-selector";
 import { Saludo } from "@/components/saludo";
-import { puedeAccederAReporte, requireAccesoReportes } from "@/lib/auth-guard";
+import {
+  puedeAccederAReporte,
+  reporteBloqueado,
+  requireAccesoReportes,
+} from "@/lib/auth-guard";
 import { aValorInput, formatFechaLarga } from "@/lib/fechas";
 import { listarClientesActivos } from "@/lib/queries/clients";
 import { listarCotizacionesActivas, obtenerCotizacion } from "@/lib/queries/quotes";
@@ -25,6 +29,15 @@ export default async function EditarReportePage({ params }: Params) {
   // propio detalle.
   if (!reporte || !puedeAccederAReporte(user, reporte) || reporte.type !== "servicio") {
     notFound();
+  }
+
+  // Un reporte terminado es un documento cerrado: no basta con esconder el
+  // enlace "Editar" en el detalle — quien llegue aquí por una pestaña vieja,
+  // un marcador o el botón "atrás" del navegador no debe encontrar el
+  // formulario abierto, ni por un instante. `actualizarReporteAction` ya lo
+  // rechaza en el servidor; esto evita además mostrárselo.
+  if (reporteBloqueado(reporte)) {
+    redirect(`/reportes/${id}`);
   }
 
   const [t, tSelector] = await Promise.all([
