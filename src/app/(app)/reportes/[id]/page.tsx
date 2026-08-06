@@ -35,12 +35,24 @@ import { MAX_ARCHIVOS_POR_REPORTE } from "@/lib/archivos";
 import { Saludo } from "@/components/saludo";
 import { puedeAccederAReporte, requireAccesoReportes } from "@/lib/auth-guard";
 import { formatFechaLarga, formatInstante } from "@/lib/fechas";
-import { formatearMonto } from "@/lib/moneda";
+import { formatearMonto, type Moneda } from "@/lib/moneda";
 import { listarAdjuntos } from "@/lib/queries/attachments";
+import {
+  listarReportesDeCotizacion,
+  type ReporteDeCotizacion,
+} from "@/lib/queries/quotes";
 import { obtenerReporte } from "@/lib/queries/reports";
 import { listarViaticos } from "@/lib/queries/viaticos";
 
-type Params = { params: Promise<{ id: string }> };
+type Params = {
+  params: Promise<{ id: string }>;
+  /**
+   * `?vista=viaticos` cambia el selector de la pestaña (ver `SelectorVista`);
+   * `?viaticoId=` elige cuál de varios viáticos hermanos ver en detalle
+   * (ver `PestanaViaticos`).
+   */
+  searchParams: Promise<{ vista?: string; viaticoId?: string }>;
+};
 
 function Dato({ etiqueta, valor }: { etiqueta: string; valor: string }) {
   return (
@@ -53,8 +65,13 @@ function Dato({ etiqueta, valor }: { etiqueta: string; valor: string }) {
   );
 }
 
-/** Detalle de un reporte de viáticos: solo los gastos y a qué reporte pertenecen. */
-async function DetalleViatico({
+/**
+ * El cuerpo de un reporte de viáticos: la ficha y la lista de gastos. Separado
+ * de `DetalleViatico` para poder reutilizarlo tal cual dentro de la pestaña
+ * "Viáticos" del reporte de servicio (ver `PestanaViaticos` más abajo), sin
+ * duplicar el marcado ni la lógica en un segundo lugar.
+ */
+async function ContenidoViatico({
   reporte,
   esAdmin,
   t,
@@ -67,25 +84,7 @@ async function DetalleViatico({
   const total = gastos.reduce((suma, g) => suma + (g.amount ?? 0), 0);
 
   return (
-    <div className="mx-auto max-w-3xl space-y-5">
-      <div className="flex items-center justify-between gap-3">
-        <Link
-          href={esAdmin ? "/admin/reportes" : "/reportes"}
-          className="inline-block text-sm font-medium text-muted transition hover:text-text"
-        >
-          {t("volver", {
-            destino: esAdmin ? t("todosLosReportes") : t("misReportes"),
-          })}
-        </Link>
-
-        <a
-          href={`/api/reportes/${reporte.id}/pdf`}
-          className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-text transition hover:bg-surface-muted"
-        >
-          {t("descargarReporte")}
-        </a>
-      </div>
-
+    <>
       <div className="rounded-2xl border border-border bg-surface p-5 sm:p-6">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
@@ -143,6 +142,41 @@ async function DetalleViatico({
           />
         </div>
       </div>
+    </>
+  );
+}
+
+/** Detalle de un reporte de viáticos: cabecera propia + `ContenidoViatico`. */
+async function DetalleViatico({
+  reporte,
+  esAdmin,
+  t,
+}: {
+  reporte: NonNullable<Awaited<ReturnType<typeof obtenerReporte>>>;
+  esAdmin: boolean;
+  t: Awaited<ReturnType<typeof getTranslations<"reportDetail">>>;
+}) {
+  return (
+    <div className="mx-auto max-w-3xl space-y-5">
+      <div className="flex items-center justify-between gap-3">
+        <Link
+          href={esAdmin ? "/admin/reportes" : "/reportes"}
+          className="inline-block text-sm font-medium text-muted transition hover:text-text"
+        >
+          {t("volver", {
+            destino: esAdmin ? t("todosLosReportes") : t("misReportes"),
+          })}
+        </Link>
+
+        <a
+          href={`/api/reportes/${reporte.id}/pdf`}
+          className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-text transition hover:bg-surface-muted"
+        >
+          {t("descargarReporte")}
+        </a>
+      </div>
+
+      <ContenidoViatico reporte={reporte} esAdmin={esAdmin} t={t} />
 
       <div className="flex flex-wrap items-center gap-3">
         <EstadoToggle
@@ -163,9 +197,160 @@ async function DetalleViatico({
   );
 }
 
-export default async function DetalleReportePage({ params }: Params) {
+/**
+ * Pestaña "Viáticos" dentro del reporte de servicio.
+ *
+ * Si solo hay un viático hermano, se muestra directo — no hay nada que
+ * elegir. Si hay varios, primero aparece una lista (autor, fecha, total) y
+ * SOLO al elegir uno se carga su detalle completo. Nunca se abre el primero
+ * por defecto: eso sería una elección del sistema, no del usuario, y con
+ * varios viáticos no hay forma de saber cuál esperaba ver.
+ *
+ * La selección viaja por la URL (`?viaticoId=`), no por estado de cliente —
+ * mismo patrón que ya usa `SelectorVista` para la pestaña misma, y por la
+ * misma razón: el servidor ya sabe resolver esto, no hace falta convertir la
+ * página en un Client Component para ello.
+ *
+ * El detalle reutiliza `ContenidoViatico` tal cual, sin `EstadoToggle` ni
+ * `EliminarReporte`: esas son acciones sobre el ciclo de vida de ESE reporte
+ * de viáticos puntual (marcarlo terminado, borrarlo), y siguen viviendo
+ * únicamente en su propia página (`/reportes/[id]` con ese id), igual que
+ * hoy. Aquí se puede seguir agregando o quitando líneas de gasto — que es lo
+ * que ya hacía `ContenidoViatico` sin ningún cambio.
+ */
+async function PestanaViaticos({
+  reportId,
+  moneda,
+  hermanos,
+  viaticoIdSeleccionado,
+  esAdmin,
+  t,
+  tTipo,
+}: {
+  reportId: string;
+  moneda: Moneda;
+  /** Ya filtrados a los que este usuario puede ver. */
+  hermanos: ReporteDeCotizacion[];
+  viaticoIdSeleccionado: string | undefined;
+  esAdmin: boolean;
+  t: Awaited<ReturnType<typeof getTranslations<"reportDetail">>>;
+  tTipo: Awaited<ReturnType<typeof getTranslations<"nuevoReportePage">>>;
+}) {
+  const unico = hermanos.length === 1 ? hermanos[0] : undefined;
+  // Si la URL trae un id que no es uno de los visibles (viejo, ajeno o
+  // manipulado), se ignora y cae en la lista — nunca en un detalle al azar.
+  const elegido = unico ?? hermanos.find((v) => v.id === viaticoIdSeleccionado);
+
+  if (elegido) {
+    const completo = await obtenerReporte(elegido.id);
+    // No debería faltar: ya pasó por `puedeAccederAReporte` al armar
+    // `hermanos`. Si de todos modos falta (se borró entre una consulta y la
+    // otra), se cae a la lista en vez de romper la página.
+    if (!completo) {
+      return (
+        <PestanaViaticos
+          reportId={reportId}
+          moneda={moneda}
+          hermanos={hermanos.filter((v) => v.id !== elegido.id)}
+          viaticoIdSeleccionado={undefined}
+          esAdmin={esAdmin}
+          t={t}
+          tTipo={tTipo}
+        />
+      );
+    }
+
+    return (
+      <div className="space-y-5">
+        {unico ? null : (
+          <Link
+            href={`/reportes/${reportId}?vista=viaticos`}
+            className="inline-block text-sm font-medium text-muted transition hover:text-text"
+          >
+            {t("volver", { destino: tTipo("tipoViaticos") })}
+          </Link>
+        )}
+        <ContenidoViatico reporte={completo} esAdmin={esAdmin} t={t} />
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-2xl border border-border bg-surface p-5 sm:p-6">
+      <h3 className="mb-4 text-sm font-semibold text-text">{tTipo("tipoViaticos")}</h3>
+      <ul className="space-y-2">
+        {hermanos.map((v) => (
+          <li key={v.id}>
+            <Link
+              href={`/reportes/${reportId}?vista=viaticos&viaticoId=${v.id}`}
+              className="flex items-center justify-between gap-3 rounded-xl border border-border bg-surface-muted px-3 py-2.5 text-sm transition hover:border-brand"
+            >
+              <span className="min-w-0 truncate text-text">
+                {v.authorName} · {formatInstante(v.createdAt)}
+              </span>
+              <span className="shrink-0 text-xs font-medium text-text">
+                {formatearMonto(v.totalGastos, moneda)}
+              </span>
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/**
+ * Selector "Servicio / Viáticos (N)" encima del contenido del reporte.
+ *
+ * Es navegación de servidor pura — dos `<Link>` a la misma ruta con o sin
+ * `?vista=viaticos`, igual patrón que ya usa `Paginacion` en
+ * `report-list.tsx`. No hace falta estado de cliente: cada pestaña es
+ * simplemente la misma página pidiendo otra cosa.
+ *
+ * Si no hay viáticos visibles, se muestra solo la etiqueta "Servicio", sin
+ * enlace — no hay nada que elegir.
+ */
+function SelectorVista({
+  reportId,
+  mostrandoViaticos,
+  totalViaticos,
+  tTipo,
+}: {
+  reportId: string;
+  mostrandoViaticos: boolean;
+  totalViaticos: number;
+  tTipo: Awaited<ReturnType<typeof getTranslations<"nuevoReportePage">>>;
+}) {
+  const pill = (activa: boolean) =>
+    `rounded-lg px-4 py-2 text-sm font-medium transition ${
+      activa ? "bg-brand text-white" : "text-muted hover:bg-surface"
+    }`;
+
+  return (
+    <div className="inline-flex gap-2 rounded-xl border border-border bg-surface-muted p-1">
+      <Link
+        href={`/reportes/${reportId}`}
+        aria-current={!mostrandoViaticos ? "page" : undefined}
+        className={pill(!mostrandoViaticos)}
+      >
+        {tTipo("tipoServicio")}
+      </Link>
+      {totalViaticos > 0 ? (
+        <Link
+          href={`/reportes/${reportId}?vista=viaticos`}
+          aria-current={mostrandoViaticos ? "page" : undefined}
+          className={pill(mostrandoViaticos)}
+        >
+          {tTipo("tipoViaticos")} ({totalViaticos})
+        </Link>
+      ) : null}
+    </div>
+  );
+}
+
+export default async function DetalleReportePage({ params, searchParams }: Params) {
   const user = await requireAccesoReportes();
-  const { id } = await params;
+  const [{ id }, { vista, viaticoId }] = await Promise.all([params, searchParams]);
 
   const reporte = await obtenerReporte(id);
 
@@ -196,6 +381,42 @@ export default async function DetalleReportePage({ params }: Params) {
   const sinAdjuntos = adjuntos.length === 0;
   const editado = reporte.updatedBy !== null;
 
+  // Viáticos hermanos de esta misma cotización, para la pestaña de arriba.
+  // No son un dato del reporte de servicio ni cuelgan de él — son
+  // independientes bajo el mismo quoteId — así que se buscan aparte.
+  const hermanosViaticos = reporte.quoteId
+    ? (await listarReportesDeCotizacion(reporte.quoteId)).filter(
+        (r) => r.type === "viaticos",
+      )
+    : [];
+
+  // Para decidir cuáles se pueden ver, se resuelve cada hermano completo y se
+  // filtra con `puedeAccederAReporte` — la MISMA función que ya decide si
+  // este usuario puede abrir cualquier otro reporte, no una regla nueva. Un
+  // empleado solo ve aquí los viáticos que él mismo redactó (autor distinto →
+  // como si no existiera, igual que si intentara abrir esa página
+  // directamente); el admin los ve todos, igual que ya ve todo en el detalle
+  // de la cotización.
+  //
+  // El objeto completo se descarta enseguida: para la pestaña alcanza con la
+  // fila ligera que ya trae `listarReportesDeCotizacion` (autor, fecha,
+  // total). Volver a pedir el reporte entero de cada uno solo hace falta para
+  // el que el usuario efectivamente elija ver — eso lo resuelve
+  // `PestanaViaticos` cuando corresponde.
+  const viaticosVisibles = (
+    await Promise.all(
+      hermanosViaticos.map(async (v) => {
+        const completo = await obtenerReporte(v.id);
+        return completo && puedeAccederAReporte(user, completo) ? v : null;
+      }),
+    )
+  ).filter((v): v is NonNullable<typeof v> => v !== null);
+
+  // Reutiliza las mismas claves que ya traducen "Servicio"/"Viáticos" en el
+  // selector de tipo al crear un reporte — ni una clave de i18n nueva.
+  const tTipo = await getTranslations("nuevoReportePage");
+  const mostrandoViaticos = vista === "viaticos" && viaticosVisibles.length > 0;
+
   return (
     <>
       <Saludo nombreCompleto={user.fullName} />
@@ -221,183 +442,216 @@ export default async function DetalleReportePage({ params }: Params) {
           </a>
         </div>
 
-        <div className="rounded-2xl border border-border bg-surface p-5 sm:p-6">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <h2 className="text-lg font-semibold text-text">
-                  {reporte.projectName}
-                </h2>
-                {/* El admin ve reportes de las dos empresas mezclados; sin
-                    esto, nada en esta pantalla diría de cuál es este. */}
-                {esAdmin ? (
-                  <span className="rounded-full bg-brand-soft px-2 py-0.5 text-xs font-medium text-brand">
-                    {reporte.companyName}
-                  </span>
-                ) : null}
-              </div>
-              <p className="mt-0.5 text-sm text-muted">{reporte.clientName}</p>
-            </div>
-            <EstadoBadge status={reporte.status} />
-          </div>
-
-          <div className="mt-4 flex flex-wrap gap-2 empty:hidden">
-            <Clasificacion
-              serviceType={reporte.serviceType}
-              etiquetas={reporte.etiquetas}
-            />
-            <Faltantes
-              status={reporte.status}
-              attachmentCount={adjuntos.length}
-              tieneFirma={reporte.signatureUrl !== null}
-              purchaseOrderNo={reporte.purchaseOrderNo}
-            />
-          </div>
-
-          <dl className="mt-6 grid gap-5 sm:grid-cols-2">
-            <div>
-              <dt className="text-xs font-medium uppercase tracking-wide text-muted">
-                {t("cotizacion")}
-              </dt>
-              <dd className="mt-1 text-sm text-text">
-                {/* El enlace a la cotización de origen solo tiene sentido para
-                    el admin: es la única vista que existe de ella. */}
-                {esAdmin && reporte.quoteId ? (
-                  <Link
-                    href={`/admin/cotizaciones/${reporte.quoteId}`}
-                    className="text-brand hover:underline"
-                  >
-                    {reporte.quoteNumber ?? t("sinAsignar")}
-                  </Link>
-                ) : (
-                  (reporte.quoteNumber ?? t("sinAsignar"))
-                )}
-              </dd>
-            </div>
-            <Dato
-              etiqueta={t("ordenCompra")}
-              valor={reporte.purchaseOrderNo ?? t("sinAsignar")}
-            />
-            <Dato
-              etiqueta={t("fechaTrabajo")}
-              valor={formatFechaLarga(reporte.workDate)}
-            />
-            <Dato etiqueta={t("creadoPor")} valor={reporte.authorName} />
-            <Dato
-              etiqueta={t("creadoEl")}
-              valor={formatInstante(reporte.createdAt)}
-            />
-          </dl>
-
-          <div className="mt-6">
-            <h3 className="text-xs font-medium uppercase tracking-wide text-muted">
-              {t("detallesTrabajo")}
-            </h3>
-            {reporte.details ? (
-              // whitespace-pre-line conserva los saltos de línea que escribió
-              // el empleado, sin permitir HTML: React escapa el contenido.
-              <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-text">
-                {reporte.details}
-              </p>
-            ) : (
-              // Sin alerta ni badge — el detalle es opcional a propósito, y su
-              // ausencia no es un pendiente, solo la falta de una nota.
-              <p className="mt-2 text-sm italic text-muted">{t("sinDetalles")}</p>
-            )}
-          </div>
-
-          {editado ? (
-            <p className="mt-6 border-t border-border pt-4 text-xs text-muted">
-              {t("ultimaEdicion", { fecha: formatInstante(reporte.updatedAt) })}
-              {reporte.updatedBy !== reporte.authorId
-                ? t("modificadoAdmin")
-                : ""}
-            </p>
-          ) : null}
-        </div>
-
-        {/* Editar va justo aquí, encima de los adjuntos: es el orden real del
-            trabajo — se corrige lo que quedó mal escrito y recién entonces se
-            empiezan a subir los documentos. Al final de la pantalla quedaba
-            después de todo lo que venía a corregir. */}
-        <div className="flex justify-end">
-          <Link
-            href={`/reportes/${reporte.id}/editar`}
-            className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-muted transition hover:bg-surface-muted hover:text-text"
-          >
-            {t("editar")}
-          </Link>
-        </div>
-
-        <div className="rounded-2xl border border-border bg-surface p-5 sm:p-6">
-          <div className="mb-4 flex items-center justify-between gap-3">
-            <h3 className="text-sm font-semibold text-text">
-              {t("archivosAdjuntos")}
-            </h3>
-            <span className="text-xs text-muted">
-              {t("deTotal", { count: adjuntos.length, max: MAX_ARCHIVOS_POR_REPORTE })}
-            </span>
-          </div>
-
-          <div className="space-y-4">
-            <AttachmentList
-              adjuntos={adjuntos}
-              onEliminar={eliminarAdjuntoAction}
-            />
-            <AttachmentUploader
-              action={subirAdjuntosAction.bind(null, reporte.id)}
-              restantes={MAX_ARCHIVOS_POR_REPORTE - adjuntos.length}
-            />
-          </div>
-        </div>
-
-        <div className="rounded-2xl border border-border bg-surface p-5 sm:p-6">
-          <h3 className="mb-4 text-sm font-semibold text-text">{t("firma")}</h3>
-          <SignatureBlock
-            // Se pasa la ruta autenticada, nunca la del almacenamiento.
-            firmaUrl={reporte.signatureUrl ? `/api/firmas/${reporte.id}` : null}
-            firmanteNombre={reporte.signatureName}
-            firmadoEl={
-              reporte.signedAt ? formatInstante(reporte.signedAt) : null
-            }
-            nombrePorDefecto={reporte.clientName}
-            onFirmar={firmarReporteAction.bind(null, reporte.id)}
-            onBorrar={borrarFirmaAction.bind(null, reporte.id)}
+        {/* Solo aparece si hay algo entre lo que elegir: si esta cotización no
+            tiene viáticos —el caso normal—, la pantalla queda idéntica a como
+            estaba. */}
+        {viaticosVisibles.length > 0 ? (
+          <SelectorVista
+            reportId={reporte.id}
+            mostrandoViaticos={mostrandoViaticos}
+            totalViaticos={viaticosVisibles.length}
+            tTipo={tTipo}
           />
-        </div>
+        ) : null}
 
-        <div className="flex flex-wrap items-start gap-3">
-          {/* Cerrar el reporte y mandárselo al cliente son el mismo gesto, y
-              por eso el mismo botón: ver FinalizarReporte. Volver a ponerlo en
-              proceso no manda nada, así que sigue siendo el toggle de siempre. */}
-          {reporte.status === "en_proceso" ? (
-            <FinalizarReporte
-              action={finalizarReporteAction.bind(null, reporte.id)}
-              sinAdjuntos={sinAdjuntos}
-            />
-          ) : (
-            <EstadoToggle
-              action={cambiarEstadoAction.bind(null, reporte.id)}
-              status={reporte.status}
-              sinAdjuntos={sinAdjuntos}
-            />
-          )}
+        {mostrandoViaticos ? (
+          <PestanaViaticos
+            reportId={reporte.id}
+            moneda={reporte.currency}
+            hermanos={viaticosVisibles}
+            viaticoIdSeleccionado={viaticoId}
+            esAdmin={esAdmin}
+            t={t}
+            tTipo={tTipo}
+          />
+        ) : (
+          <>
+            <div className="rounded-2xl border border-border bg-surface p-5 sm:p-6">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-lg font-semibold text-text">
+                      {reporte.projectName}
+                    </h2>
+                    {/* El admin ve reportes de las dos empresas mezclados; sin
+                        esto, nada en esta pantalla diría de cuál es este. */}
+                    {esAdmin ? (
+                      <span className="rounded-full bg-brand-soft px-2 py-0.5 text-xs font-medium text-brand">
+                        {reporte.companyName}
+                      </span>
+                    ) : null}
+                  </div>
+                  <p className="mt-0.5 text-sm text-muted">{reporte.clientName}</p>
+                </div>
+                <EstadoBadge status={reporte.status} />
+              </div>
 
-          <div className="ml-auto">
+              <div className="mt-4 flex flex-wrap gap-2 empty:hidden">
+                <Clasificacion
+                  serviceType={reporte.serviceType}
+                  etiquetas={reporte.etiquetas}
+                />
+                <Faltantes
+                  status={reporte.status}
+                  attachmentCount={adjuntos.length}
+                  tieneFirma={reporte.signatureUrl !== null}
+                  purchaseOrderNo={reporte.purchaseOrderNo}
+                />
+              </div>
+
+              <dl className="mt-6 grid gap-5 sm:grid-cols-2">
+                <div>
+                  <dt className="text-xs font-medium uppercase tracking-wide text-muted">
+                    {t("cotizacion")}
+                  </dt>
+                  <dd className="mt-1 text-sm text-text">
+                    {/* El enlace a la cotización de origen solo tiene sentido para
+                        el admin: es la única vista que existe de ella. */}
+                    {esAdmin && reporte.quoteId ? (
+                      <Link
+                        href={`/admin/cotizaciones/${reporte.quoteId}`}
+                        className="text-brand hover:underline"
+                      >
+                        {reporte.quoteNumber ?? t("sinAsignar")}
+                      </Link>
+                    ) : (
+                      (reporte.quoteNumber ?? t("sinAsignar"))
+                    )}
+                  </dd>
+                </div>
+                <Dato
+                  etiqueta={t("ordenCompra")}
+                  valor={reporte.purchaseOrderNo ?? t("sinAsignar")}
+                />
+                <Dato
+                  etiqueta={t("fechaTrabajo")}
+                  valor={formatFechaLarga(reporte.workDate)}
+                />
+                <Dato etiqueta={t("creadoPor")} valor={reporte.authorName} />
+                <Dato
+                  etiqueta={t("creadoEl")}
+                  valor={formatInstante(reporte.createdAt)}
+                />
+              </dl>
+
+              <div className="mt-6">
+                <h3 className="text-xs font-medium uppercase tracking-wide text-muted">
+                  {t("detallesTrabajo")}
+                </h3>
+                {reporte.details ? (
+                  // whitespace-pre-line conserva los saltos de línea que escribió
+                  // el empleado, sin permitir HTML: React escapa el contenido.
+                  <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-text">
+                    {reporte.details}
+                  </p>
+                ) : (
+                  // Sin alerta ni badge — el detalle es opcional a propósito, y su
+                  // ausencia no es un pendiente, solo la falta de una nota.
+                  <p className="mt-2 text-sm italic text-muted">{t("sinDetalles")}</p>
+                )}
+              </div>
+
+              {editado ? (
+                <p className="mt-6 border-t border-border pt-4 text-xs text-muted">
+                  {t("ultimaEdicion", { fecha: formatInstante(reporte.updatedAt) })}
+                  {reporte.updatedBy !== reporte.authorId
+                    ? t("modificadoAdmin")
+                    : ""}
+                </p>
+              ) : null}
+            </div>
+
+            {/* Editar va justo aquí, encima de los adjuntos: es el orden real del
+                trabajo — se corrige lo que quedó mal escrito y recién entonces se
+                empiezan a subir los documentos. Al final de la pantalla quedaba
+                después de todo lo que venía a corregir. */}
+            <div className="flex justify-end">
+              <Link
+                href={`/reportes/${reporte.id}/editar`}
+                className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-muted transition hover:bg-surface-muted hover:text-text"
+              >
+                {t("editar")}
+              </Link>
+            </div>
+
+            <div className="rounded-2xl border border-border bg-surface p-5 sm:p-6">
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <h3 className="text-sm font-semibold text-text">
+                  {t("archivosAdjuntos")}
+                </h3>
+                <span className="text-xs text-muted">
+                  {t("deTotal", { count: adjuntos.length, max: MAX_ARCHIVOS_POR_REPORTE })}
+                </span>
+              </div>
+
+              <div className="space-y-4">
+                <AttachmentList
+                  adjuntos={adjuntos}
+                  onEliminar={eliminarAdjuntoAction}
+                />
+                <AttachmentUploader
+                  action={subirAdjuntosAction.bind(null, reporte.id)}
+                  restantes={MAX_ARCHIVOS_POR_REPORTE - adjuntos.length}
+                />
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-border bg-surface p-5 sm:p-6">
+              <h3 className="mb-4 text-sm font-semibold text-text">{t("firma")}</h3>
+              <SignatureBlock
+                // Se pasa la ruta autenticada, nunca la del almacenamiento.
+                firmaUrl={reporte.signatureUrl ? `/api/firmas/${reporte.id}` : null}
+                firmanteNombre={reporte.signatureName}
+                firmadoEl={
+                  reporte.signedAt ? formatInstante(reporte.signedAt) : null
+                }
+                nombrePorDefecto={reporte.clientName}
+                onFirmar={firmarReporteAction.bind(null, reporte.id)}
+                onBorrar={borrarFirmaAction.bind(null, reporte.id)}
+              />
+            </div>
+          </>
+        )}
+
+        {/* Las acciones de aquí abajo (terminar y enviar, eliminar) son del
+            reporte de SERVICIO — terminar manda el PDF al cliente, eliminar
+            borra ese reporte. Se ocultan en la pestaña Viáticos a propósito:
+            un botón "Marcar como terminado" quedando debajo de un gasto en
+            pantalla se leería como si fuera de ese gasto, y no lo es. */}
+        {mostrandoViaticos ? null : (
+          <div className="flex flex-wrap items-start gap-3">
+            {/* Cerrar el reporte y mandárselo al cliente son el mismo gesto, y
+                por eso el mismo botón: ver FinalizarReporte. Volver a ponerlo en
+                proceso no manda nada, así que sigue siendo el toggle de siempre. */}
             {reporte.status === "en_proceso" ? (
-              <EliminarReporte
-                action={eliminarReporteAction.bind(null, reporte.id)}
+              <FinalizarReporte
+                action={finalizarReporteAction.bind(null, reporte.id)}
+                sinAdjuntos={sinAdjuntos}
               />
             ) : (
-              // Un reporte terminado es el registro de un trabajo hecho. Para
-              // borrarlo hay que devolverlo antes a "en proceso", y eso queda
-              // anotado en el historial de edición.
-              <p className="text-xs text-muted">
-                {t("volverEnProceso")}
-              </p>
+              <EstadoToggle
+                action={cambiarEstadoAction.bind(null, reporte.id)}
+                status={reporte.status}
+                sinAdjuntos={sinAdjuntos}
+              />
             )}
+
+            <div className="ml-auto">
+              {reporte.status === "en_proceso" ? (
+                <EliminarReporte
+                  action={eliminarReporteAction.bind(null, reporte.id)}
+                />
+              ) : (
+                // Un reporte terminado es el registro de un trabajo hecho. Para
+                // borrarlo hay que devolverlo antes a "en proceso", y eso queda
+                // anotado en el historial de edición.
+                <p className="text-xs text-muted">
+                  {t("volverEnProceso")}
+                </p>
+              )}
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </>
   );
