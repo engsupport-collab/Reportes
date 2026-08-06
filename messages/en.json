@@ -241,7 +241,8 @@
     "eventoReabierto": "Reopened",
     "eventoPorYCuando": "by {nombre} · {fecha}",
     "usuarioEliminado": "a deleted account",
-    "motivoLabel": "Reason"
+    "motivoLabel": "Reason",
+    "resumenServicioAviso": "This service report was written by another technician. You only see this summary to get your bearings; to see your own expense, go to the Expenses tab."
   },
   "filtros": {
     "tipoServicio": "Service type",

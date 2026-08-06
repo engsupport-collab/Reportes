@@ -241,7 +241,8 @@
     "eventoReabierto": "Reaberto",
     "eventoPorYCuando": "por {nombre} · {fecha}",
     "usuarioEliminado": "uma conta já excluída",
-    "motivoLabel": "Motivo"
+    "motivoLabel": "Motivo",
+    "resumenServicioAviso": "Este relatório de serviço foi redigido por outro técnico. Você só vê este resumo para se situar; para ver a sua própria despesa, entre na aba Despesas."
   },
   "filtros": {
     "tipoServicio": "Tipo de serviço",

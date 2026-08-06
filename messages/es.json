@@ -241,7 +241,8 @@
     "eventoReabierto": "Reabierto",
     "eventoPorYCuando": "por {nombre} · {fecha}",
     "usuarioEliminado": "una cuenta ya eliminada",
-    "motivoLabel": "Motivo"
+    "motivoLabel": "Motivo",
+    "resumenServicioAviso": "Este reporte de servicio lo redactó otro técnico. Solo ves este resumen para ubicarte; para ver tu propio gasto, entra a la pestaña Viáticos."
   },
   "filtros": {
     "tipoServicio": "Tipo de servicio",

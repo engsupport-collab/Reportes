@@ -245,6 +245,36 @@ export function puedeAccederAReporte(
 }
 
 /**
+ * Los tres niveles de acceso a un reporte de SERVICIO:
+ *
+ * - `"completo"`: su autor, o un admin. Todo lo que ya existía —edición,
+ *   firma, adjuntos, terminar, reabrir, eliminar, el PDF— sigue exigiendo
+ *   exactamente esto, sin cambios.
+ * - `"resumen"`: alguien que no escribió este servicio, pero sí un reporte de
+ *   viáticos hermano (misma cotización). No es su documento — no lo edita, no
+ *   ve su firma ni sus adjuntos ni su historial— pero necesita entrar para
+ *   ubicarse (proyecto, cliente, cotización) y llegar a la pestaña Viáticos
+ *   donde está el suyo. Sin esto, un técnico puede crear un viático y después
+ *   no tiene ninguna forma de volver a encontrarlo: la única puerta a un
+ *   viático es la pestaña del servicio que lo agrupa.
+ * - `"ninguno"`: ni lo uno ni lo otro. `notFound()`, igual que siempre.
+ *
+ * `esAutorDeViaticoHermano` se calcula aparte (requiere una consulta) y se
+ * pasa ya resuelto — esta función solo compone el resultado.
+ */
+export type AccesoServicio = "completo" | "resumen" | "ninguno";
+
+export function nivelAccesoServicio(
+  user: CurrentUser,
+  reporte: { authorId: string; companyId: string },
+  esAutorDeViaticoHermano: boolean,
+): AccesoServicio {
+  if (puedeAccederAReporte(user, reporte)) return "completo";
+  if (esAutorDeViaticoHermano) return "resumen";
+  return "ninguno";
+}
+
+/**
  * Un reporte terminado es un documento cerrado: nada se modifica en él hasta
  * que un administrador lo reabra con `reabrirReporteAction`. Se comprueba
  * aquí, en el servidor, en cada acción que cambia algo del reporte —esconder

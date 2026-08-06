@@ -41,11 +41,13 @@ import {
   puedeAccederAReporte,
   reporteBloqueado,
   requireAccesoReportes,
+  nivelAccesoServicio,
 } from "@/lib/auth-guard";
 import { formatFechaLarga, formatInstante } from "@/lib/fechas";
 import { formatearMonto, type Moneda } from "@/lib/moneda";
 import { listarAdjuntos } from "@/lib/queries/attachments";
 import {
+  esAutorDeViaticoDeCotizacion,
   listarReportesDeCotizacion,
   type ReporteDeCotizacion,
 } from "@/lib/queries/quotes";
@@ -183,6 +185,41 @@ function AccionReabrir({
     return <p className="text-xs text-muted">{tAcciones("soloAdminReabre")}</p>;
   }
   return <ReabrirReporte action={action} />;
+}
+
+/**
+ * Lo único que ve alguien con acceso "resumen": no escribió este servicio,
+ * pero sí un viático hermano, así que llega hasta acá únicamente para
+ * ubicarse antes de pasar a la pestaña Viáticos. Nada de detalles del
+ * trabajo, adjuntos ni firma — ver `nivelAccesoServicio` en `auth-guard.ts`.
+ */
+function ResumenServicio({
+  reporte,
+  t,
+}: {
+  reporte: NonNullable<Awaited<ReturnType<typeof obtenerReporte>>>;
+  t: Awaited<ReturnType<typeof getTranslations<"reportDetail">>>;
+}) {
+  return (
+    <div className="rounded-2xl border border-border bg-surface p-5 sm:p-6">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h2 className="text-lg font-semibold text-text">{reporte.projectName}</h2>
+          <p className="mt-0.5 text-sm text-muted">{reporte.clientName}</p>
+        </div>
+        <EstadoBadge status={reporte.status} />
+      </div>
+
+      <dl className="mt-6 grid gap-5 sm:grid-cols-2">
+        <Dato
+          etiqueta={t("cotizacion")}
+          valor={reporte.quoteNumber ?? t("sinAsignar")}
+        />
+      </dl>
+
+      <p className="mt-6 text-sm text-muted">{t("resumenServicioAviso")}</p>
+    </div>
+  );
 }
 
 /** Detalle de un reporte de viáticos: cabecera propia + `ContenidoViatico`. */
@@ -404,12 +441,23 @@ export default async function DetalleReportePage({ params, searchParams }: Param
   const [{ id }, { vista, viaticoId }] = await Promise.all([params, searchParams]);
 
   const reporte = await obtenerReporte(id);
+  if (!reporte) notFound();
 
-  // Mismo resultado si el reporte no existe o si es de otra persona: decir
-  // "existe pero no es tuyo" confirmaría qué identificadores son reales.
-  if (!reporte || !puedeAccederAReporte(user, reporte)) {
+  // Un reporte de viáticos no tiene acceso "resumen": ese nivel existe para
+  // entrar al reporte de SERVICIO que agrupa un viático ajeno, no al revés.
+  const esAutorDeViaticoHermano =
+    reporte.type === "servicio" && reporte.quoteId
+      ? await esAutorDeViaticoDeCotizacion(reporte.quoteId, user.id)
+      : false;
+  const acceso = nivelAccesoServicio(user, reporte, esAutorDeViaticoHermano);
+
+  // Mismo resultado si el reporte no existe, si es de otra persona y tampoco
+  // tiene un viático propio en esta cotización: decir "existe pero no es
+  // tuyo" confirmaría qué identificadores son reales.
+  if (acceso === "ninguno") {
     notFound();
   }
+  const resumenSolamente = acceso === "resumen";
 
   const esAdmin = user.role === "admin";
   const [t, tAcciones] = await Promise.all([
@@ -431,7 +479,9 @@ export default async function DetalleReportePage({ params, searchParams }: Param
     );
   }
 
-  const adjuntos = await listarAdjuntos(reporte.id);
+  // Acceso "resumen": nada de esto se muestra, así que no vale la pena
+  // pedirlo — ver el bloque de render más abajo.
+  const adjuntos = resumenSolamente ? [] : await listarAdjuntos(reporte.id);
   const sinAdjuntos = adjuntos.length === 0;
   const editado = reporte.updatedBy !== null;
 
@@ -472,7 +522,9 @@ export default async function DetalleReportePage({ params, searchParams }: Param
   const mostrandoViaticos = vista === "viaticos" && viaticosVisibles.length > 0;
 
   const bloqueado = reporteBloqueado(reporte);
-  const eventos = await listarEventosDeReporte(reporte.id);
+  // El historial también queda fuera del resumen: cuenta quién reabrió y por
+  // qué, y eso es tan "de este servicio" como su firma o sus adjuntos.
+  const eventos = resumenSolamente ? [] : await listarEventosDeReporte(reporte.id);
 
   return (
     <>
@@ -491,12 +543,19 @@ export default async function DetalleReportePage({ params, searchParams }: Param
             })}
           </Link>
 
-          <a
-            href={`/api/reportes/${reporte.id}/pdf`}
-            className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-text transition hover:bg-surface-muted"
-          >
-            {t("descargarReporte")}
-          </a>
+          {/* El PDF es el documento completo (detalles, adjuntos, firma) — el
+              mismo motivo por el que el acceso "resumen" no lo alcanza. La
+              ruta ya lo rechazaría igual (usa `puedeAccederAReporte`, sin
+              cambios), pero no tiene sentido ofrecer un enlace que solo lleva
+              a un error. */}
+          {resumenSolamente ? null : (
+            <a
+              href={`/api/reportes/${reporte.id}/pdf`}
+              className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-text transition hover:bg-surface-muted"
+            >
+              {t("descargarReporte")}
+            </a>
+          )}
         </div>
 
         {/* Solo aparece si hay algo entre lo que elegir: si esta cotización no
@@ -521,6 +580,8 @@ export default async function DetalleReportePage({ params, searchParams }: Param
             t={t}
             tTipo={tTipo}
           />
+        ) : resumenSolamente ? (
+          <ResumenServicio reporte={reporte} t={t} />
         ) : (
           <>
             <div className="rounded-2xl border border-border bg-surface p-5 sm:p-6">
@@ -687,8 +748,10 @@ export default async function DetalleReportePage({ params, searchParams }: Param
             reporte de SERVICIO — terminar manda el PDF al cliente, eliminar
             borra ese reporte. Se ocultan en la pestaña Viáticos a propósito:
             un botón sobre el reporte de servicio quedando debajo de un gasto
-            en pantalla se leería como si fuera de ese gasto, y no lo es. */}
-        {mostrandoViaticos ? null : (
+            en pantalla se leería como si fuera de ese gasto, y no lo es. Se
+            ocultan también en el acceso "resumen": ninguna de las dos es una
+            acción que le corresponda a quien no escribió este servicio. */}
+        {mostrandoViaticos || resumenSolamente ? null : (
           <div className="flex flex-wrap items-start gap-3">
             {/* Terminado: la única acción posible es reabrir, y solo para el
                 admin. Cerrar y mandárselo al cliente son el mismo gesto, y

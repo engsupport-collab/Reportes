@@ -444,3 +444,30 @@ export async function listarReportesDeCotizacion(
     totalGastos: Number(f.totalGastos),
   }));
 }
+
+/**
+ * ¿Este usuario redactó algún reporte de viáticos bajo esta cotización?
+ *
+ * Es la base del acceso "resumen" al reporte de servicio hermano: quien
+ * justificó un viaje con un viático necesita poder volver a encontrarlo, y la
+ * única puerta a un viático es la pestaña del servicio que lo agrupa — ver
+ * `nivelAccesoServicio` en `auth-guard.ts`.
+ */
+export async function esAutorDeViaticoDeCotizacion(
+  quoteId: string,
+  userId: string,
+): Promise<boolean> {
+  const [fila] = await db
+    .select({ id: reports.id })
+    .from(reports)
+    .where(
+      and(
+        eq(reports.quoteId, quoteId),
+        eq(reports.type, "viaticos"),
+        eq(reports.authorId, userId),
+      ),
+    )
+    .limit(1);
+
+  return fila !== undefined;
+}
