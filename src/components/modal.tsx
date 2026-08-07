@@ -41,7 +41,13 @@ export function Modal({
         // los dos con un evento aparte.
         if (e.target === e.currentTarget) onCerrar();
       }}
-      className="w-[min(28rem,calc(100vw-2rem))] rounded-2xl border border-border bg-surface p-0 text-text backdrop:bg-black/50"
+      // El centrado nativo de <dialog> depende de `margin: auto` en el
+      // navegador — el preflight de Tailwind lo resetea a `margin: 0` en
+      // todos los elementos, este incluido, así que sin centrarlo a mano
+      // quedaba pegado a la esquina superior izquierda. `fixed` + `inset-0`
+      // + `m-auto` sobre un tamaño explícito es lo que lo vuelve a centrar,
+      // sin depender de ese reset.
+      className="fixed inset-0 m-auto h-fit w-[min(28rem,calc(100vw-2rem))] rounded-2xl border border-border bg-surface p-0 text-text backdrop:bg-black/50"
     >
       {abierto ? (
         <div className="p-5">
