@@ -15,8 +15,16 @@ export type UsuarioConAccesos = {
   empresas: string[];
 };
 
-/** Todos los usuarios del sistema, con las empresas a las que cada uno accede. */
-export async function listarUsuarios(): Promise<UsuarioConAccesos[]> {
+/**
+ * Todos los usuarios del sistema, con las empresas a las que cada uno accede.
+ *
+ * Por defecto solo los activos — igual que `listarClientes` — para que la
+ * lista no acumule para siempre cuentas que ya nadie usa. `incluirInactivos`
+ * es lo que enciende la casilla "Mostrar usuarios desactivados".
+ */
+export async function listarUsuarios(opciones?: {
+  incluirInactivos?: boolean;
+}): Promise<UsuarioConAccesos[]> {
   const [filas, accesos] = await Promise.all([
     db
       .select({
@@ -27,6 +35,7 @@ export async function listarUsuarios(): Promise<UsuarioConAccesos[]> {
         isActive: users.isActive,
       })
       .from(users)
+      .where(opciones?.incluirInactivos ? undefined : eq(users.isActive, true))
       .orderBy(asc(users.fullName)),
 
     db

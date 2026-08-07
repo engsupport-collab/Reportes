@@ -136,7 +136,12 @@
     "confirmDesactivar": "Desativar {nombre}?",
     "confirmReactivar": "Reativar {nombre}?",
     "tooltipNoPropia": "Você não pode desativar sua própria conta",
-    "confirmResetear": "Gerar uma nova senha para {nombre}? A anterior deixará de funcionar."
+    "confirmResetear": "Gerar uma nova senha para {nombre}? A anterior deixará de funcionar.",
+    "mostrarDesactivados": "Mostrar usuários desativados",
+    "eliminar": "Excluir",
+    "confirmEliminar": "Excluir definitivamente {nombre}? Esta ação não pode ser desfeita.",
+    "usuarioActivoNoSeElimina": "Este usuário está ativo. Desative-o primeiro.",
+    "usuarioConHistorialNoSeElimina": "Este usuário criou relatórios, cotações ou clientes e não pode ser excluído. Deixe-o desativado — seu histórico e seu registro como autor continuam preservados."
   },
   "crearUsuarioForm": {
     "creando": "Criando…",
@@ -169,7 +174,12 @@
     "reactivar": "Reativar",
     "desactivado": "Desativado",
     "confirmDesactivar": "Desativar {nombre}? Deixa de aparecer no seletor de cotações novas; as que já o usam não mudam.",
-    "confirmReactivar": "Reativar {nombre}?"
+    "confirmReactivar": "Reativar {nombre}?",
+    "mostrarInactivos": "Mostrar clientes inativos",
+    "eliminar": "Excluir",
+    "confirmEliminar": "Excluir definitivamente {nombre}? Esta ação não pode ser desfeita.",
+    "clienteActivoNoSeElimina": "Este cliente está ativo. Desative-o primeiro.",
+    "clienteConHistorialNoSeElimina": "Este cliente tem cotações associadas e não pode ser excluído. Deixe-o desativado — os documentos que o usam continuarão mostrando-o normalmente."
   },
   "reportForm": {
     "guardando": "Salvando…",
@@ -473,7 +483,8 @@
     "guardar": "Salvar alterações",
     "guardando": "Salvando…",
     "cancelar": "Cancelar",
-    "volver": "← Voltar às cotações"
+    "volver": "← Voltar às cotações",
+    "crearNuevoCliente": "+ Criar novo cliente"
   },
   "cotizacionDetail": {
     "creadaPor": "Criada por",

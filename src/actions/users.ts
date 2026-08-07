@@ -5,7 +5,7 @@ import { getTranslations } from "next-intl/server";
 import { revalidatePath } from "next/cache";
 
 import { db } from "@/db";
-import { userCompanies, users } from "@/db/schema";
+import { clients, quotes, reports, userCompanies, users } from "@/db/schema";
 import { requireAdmin } from "@/lib/auth-guard";
 import {
   generarContrasenaTemporal,
@@ -151,6 +151,69 @@ export async function alternarActivoAction(userId: string) {
     .where(eq(users.id, userId));
 
   revalidatePath("/admin/usuarios");
+}
+
+export type EliminarUsuarioState = { error?: string };
+
+/**
+ * Borrado definitivo — solo cuando de verdad no deja nada huérfano.
+ *
+ * `clients.createdBy`, `quotes.createdBy` y `reports.authorId` referencian a
+ * `users` con `onDelete: "restrict"`: si esta persona alguna vez creó un
+ * cliente, una cotización o un reporte, la base rechazaría el borrado igual
+ * que con un cliente en uso (ver `eliminarClienteAction`). Se comprueba antes
+ * para devolver un mensaje legible. En la práctica, esto significa que
+ * cualquier cuenta que de verdad se haya usado se queda desactivada para
+ * siempre — que es exactamente lo que preserva el historial y la auditoría.
+ *
+ * Los rastros que sí se sueltan (`quotes.updatedBy`, `reports.updatedBy`,
+ * `report_events.userId`) tienen `onDelete: "set null"` y ya se muestran con
+ * un texto de reemplazo cuando faltan (ver `usuarioEliminado` en
+ * `HistorialEstado`): perder ESE dato puntual no es perder el historial.
+ */
+export async function eliminarUsuarioAction(
+  userId: string,
+): Promise<EliminarUsuarioState> {
+  const admin = await requireAdmin();
+  if (userId === admin.id) return {};
+  const t = await getTranslations("usuarios");
+
+  const [usuario] = await db
+    .select({ isActive: users.isActive })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+
+  if (!usuario) return {};
+  if (usuario.isActive) {
+    return { error: t("usuarioActivoNoSeElimina") };
+  }
+
+  const [tieneClientes] = await db
+    .select({ id: clients.id })
+    .from(clients)
+    .where(eq(clients.createdBy, userId))
+    .limit(1);
+  const [tieneCotizaciones] = await db
+    .select({ id: quotes.id })
+    .from(quotes)
+    .where(eq(quotes.createdBy, userId))
+    .limit(1);
+  const [tieneReportes] = await db
+    .select({ id: reports.id })
+    .from(reports)
+    .where(eq(reports.authorId, userId))
+    .limit(1);
+
+  if (tieneClientes || tieneCotizaciones || tieneReportes) {
+    return { error: t("usuarioConHistorialNoSeElimina") };
+  }
+
+  await db.delete(users).where(eq(users.id, userId));
+  // user_companies cae en cascada solo; nunca queda una fila de acceso
+  // apuntando a un usuario que ya no existe.
+  revalidatePath("/admin/usuarios");
+  return {};
 }
 
 export type ResetState = { credenciales?: string };

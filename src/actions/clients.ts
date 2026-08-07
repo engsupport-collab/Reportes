@@ -5,12 +5,21 @@ import { getTranslations } from "next-intl/server";
 import { revalidatePath } from "next/cache";
 
 import { db } from "@/db";
-import { clients } from "@/db/schema";
+import { clients, quotes } from "@/db/schema";
 import { requireAdmin } from "@/lib/auth-guard";
 import { listarEmpresas } from "@/lib/queries/companies";
 import { clienteSchema } from "@/lib/validation";
 
-export type ClienteState = { error?: string };
+export type ClienteState = {
+  error?: string;
+  /**
+   * Presente solo tras crear con éxito: lo mínimo que un selector de cliente
+   * (el de una cotización) necesita para agregarlo a su lista y dejarlo
+   * elegido, sin recargar la página — mismo patrón que `creada` en
+   * `CotizacionState` (src/actions/quotes.ts).
+   */
+  creado?: { id: string; name: string };
+};
 
 /**
  * Alta de un cliente. Solo el admin: es la fuente oficial del catálogo, y
@@ -36,15 +45,20 @@ export async function crearClienteAction(
     return { error: parsed.error.issues[0]?.message ?? t("revisaLosDatos") };
   }
 
+  const id = crypto.randomUUID();
   await db.insert(clients).values({
-    id: crypto.randomUUID(),
+    id,
     companyId: empresa.id,
     name: parsed.data.name,
     createdBy: user.id,
   });
 
   revalidatePath("/admin/clientes");
-  return {};
+  // También se ofrece desde el formulario de cotización (botón "+ Crear
+  // nuevo cliente"); su selector se refresca de verdad al volver a esa
+  // pantalla, no solo con el estado que ya trae en memoria.
+  revalidatePath("/admin/cotizaciones/nueva");
+  return { creado: { id, name: parsed.data.name } };
 }
 
 /**
@@ -97,4 +111,51 @@ export async function alternarActivoClienteAction(clientId: string) {
     .where(eq(clients.id, clientId));
 
   revalidatePath("/admin/clientes");
+}
+
+export type EliminarClienteState = { error?: string };
+
+/**
+ * Borrado definitivo — solo cuando de verdad no deja nada huérfano.
+ *
+ * `quotes.clientId` referencia a `clients` con `onDelete: "restrict"`: la
+ * base ya rechazaría este borrado si alguna cotización lo usa. Se comprueba
+ * aquí antes, para devolver un mensaje legible en vez de dejar que la
+ * consulta falle con un error de restricción — mismo criterio que ya usa
+ * `crearCotizacionAction` con el número de cotización repetido.
+ *
+ * Ambos requisitos —estar desactivado, y no tener cotizaciones— se
+ * comprueban aunque la interfaz ya solo ofrezca este botón en ese caso: la
+ * integridad se garantiza en el servidor, no en lo que el botón deja hacer.
+ */
+export async function eliminarClienteAction(
+  clientId: string,
+): Promise<EliminarClienteState> {
+  await requireAdmin();
+  const t = await getTranslations("clientes");
+
+  const [cliente] = await db
+    .select({ isActive: clients.isActive })
+    .from(clients)
+    .where(eq(clients.id, clientId))
+    .limit(1);
+
+  if (!cliente) return {};
+  if (cliente.isActive) {
+    return { error: t("clienteActivoNoSeElimina") };
+  }
+
+  const [enUso] = await db
+    .select({ id: quotes.id })
+    .from(quotes)
+    .where(eq(quotes.clientId, clientId))
+    .limit(1);
+
+  if (enUso) {
+    return { error: t("clienteConHistorialNoSeElimina") };
+  }
+
+  await db.delete(clients).where(eq(clients.id, clientId));
+  revalidatePath("/admin/clientes");
+  return {};
 }

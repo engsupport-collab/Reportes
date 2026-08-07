@@ -6,10 +6,43 @@ import { useTranslations } from "next-intl";
 import {
   alternarAccesoEmpresaAction,
   alternarActivoAction,
+  eliminarUsuarioAction,
   resetearContrasenaAction,
 } from "@/actions/users";
 import type { Empresa } from "@/lib/queries/companies";
 import type { UsuarioConAccesos } from "@/lib/queries/users";
+
+function BotonEliminar({ usuario }: { usuario: UsuarioConAccesos }) {
+  const [pendiente, startTransition] = useTransition();
+  const [error, setError] = useState<string | undefined>();
+  const t = useTranslations("usuarios");
+
+  return (
+    <div className="flex flex-col items-end gap-1">
+      <button
+        type="button"
+        disabled={pendiente}
+        onClick={() => {
+          if (!window.confirm(t("confirmEliminar", { nombre: usuario.fullName }))) {
+            return;
+          }
+          startTransition(async () => {
+            const r = await eliminarUsuarioAction(usuario.id);
+            setError(r.error);
+          });
+        }}
+        className="rounded-lg border border-danger/40 px-3 py-1.5 text-xs font-medium text-danger transition hover:bg-danger/10 disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        {pendiente ? "…" : t("eliminar")}
+      </button>
+      {error ? (
+        <p role="alert" className="text-xs text-danger">
+          {error}
+        </p>
+      ) : null}
+    </div>
+  );
+}
 
 function ToggleEmpresa({
   usuario,
@@ -149,6 +182,11 @@ export function UsersTable({
               <div className="flex flex-wrap items-center gap-2">
                 <BotonResetear usuario={u} />
                 <BotonActivo usuario={u} esUnoMismo={esUnoMismo} />
+                {/* Mismo flujo que un cliente: activo → desactivar → (si
+                    sigue desactivado) → eliminar. `esUnoMismo` nunca llega
+                    aquí desactivado —no puede desactivarse a sí mismo—, así
+                    que no hace falta repetir esa comprobación. */}
+                {!u.isActive ? <BotonEliminar usuario={u} /> : null}
               </div>
             </div>
 

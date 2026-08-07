@@ -136,7 +136,12 @@
     "confirmDesactivar": "¿Desactivar a {nombre}?",
     "confirmReactivar": "¿Reactivar a {nombre}?",
     "tooltipNoPropia": "No puedes desactivar tu propia cuenta",
-    "confirmResetear": "¿Generar una contraseña nueva para {nombre}? La anterior dejará de servir."
+    "confirmResetear": "¿Generar una contraseña nueva para {nombre}? La anterior dejará de servir.",
+    "mostrarDesactivados": "Mostrar usuarios desactivados",
+    "eliminar": "Eliminar",
+    "confirmEliminar": "¿Eliminar definitivamente a {nombre}? Esta acción no se puede deshacer.",
+    "usuarioActivoNoSeElimina": "Este usuario está activo. Desactívalo primero.",
+    "usuarioConHistorialNoSeElimina": "Este usuario creó reportes, cotizaciones o clientes y no se puede eliminar. Déjalo desactivado — su historial y su firma como autor se conservan igual."
   },
   "crearUsuarioForm": {
     "creando": "Creando…",
@@ -169,7 +174,12 @@
     "reactivar": "Reactivar",
     "desactivado": "Desactivado",
     "confirmDesactivar": "¿Desactivar a {nombre}? Deja de aparecer en el selector de cotizaciones nuevas; las que ya lo usan no cambian.",
-    "confirmReactivar": "¿Reactivar a {nombre}?"
+    "confirmReactivar": "¿Reactivar a {nombre}?",
+    "mostrarInactivos": "Mostrar clientes inactivos",
+    "eliminar": "Eliminar",
+    "confirmEliminar": "¿Eliminar definitivamente a {nombre}? Esta acción no se puede deshacer.",
+    "clienteActivoNoSeElimina": "Este cliente está activo. Desactívalo primero.",
+    "clienteConHistorialNoSeElimina": "Este cliente tiene cotizaciones asociadas y no se puede eliminar. Déjalo desactivado — los documentos que lo usan lo van a seguir mostrando igual."
   },
   "reportForm": {
     "guardando": "Guardando…",
@@ -473,7 +483,8 @@
     "guardar": "Guardar cambios",
     "guardando": "Guardando…",
     "cancelar": "Cancelar",
-    "volver": "← Volver a cotizaciones"
+    "volver": "← Volver a cotizaciones",
+    "crearNuevoCliente": "+ Crear nuevo cliente"
   },
   "cotizacionDetail": {
     "creadaPor": "Creada por",

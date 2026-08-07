@@ -6,9 +6,42 @@ import { useTranslations } from "next-intl";
 import {
   actualizarClienteAction,
   alternarActivoClienteAction,
+  eliminarClienteAction,
   type ClienteState,
 } from "@/actions/clients";
 import type { ClienteConEmpresa } from "@/lib/queries/clients";
+
+function BotonEliminar({ cliente }: { cliente: ClienteConEmpresa }) {
+  const [pendiente, startTransition] = useTransition();
+  const [error, setError] = useState<string | undefined>();
+  const t = useTranslations("clientes");
+
+  return (
+    <div className="flex flex-col items-end gap-1">
+      <button
+        type="button"
+        disabled={pendiente}
+        onClick={() => {
+          if (!window.confirm(t("confirmEliminar", { nombre: cliente.name }))) {
+            return;
+          }
+          startTransition(async () => {
+            const r = await eliminarClienteAction(cliente.id);
+            setError(r.error);
+          });
+        }}
+        className="rounded-lg border border-danger/40 px-3 py-1.5 text-xs font-medium text-danger transition hover:bg-danger/10 disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        {pendiente ? "…" : t("eliminar")}
+      </button>
+      {error ? (
+        <p role="alert" className="text-xs text-danger">
+          {error}
+        </p>
+      ) : null}
+    </div>
+  );
+}
 
 function BotonActivo({ cliente }: { cliente: ClienteConEmpresa }) {
   const [pendiente, startTransition] = useTransition();
@@ -131,6 +164,10 @@ export function ClientsTable({ clientes }: { clientes: ClienteConEmpresa[] }) {
                 {t("editar")}
               </button>
               <BotonActivo cliente={c} />
+              {/* Solo un cliente ya desactivado puede eliminarse: activo →
+                  desactivar → (si sigue desactivado) → eliminar. Nunca se
+                  salta el paso de en medio. */}
+              {!c.isActive ? <BotonEliminar cliente={c} /> : null}
             </div>
           </div>
 

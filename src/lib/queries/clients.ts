@@ -20,10 +20,21 @@ export type OpcionCliente = { id: string; name: string };
  * Clientes de una empresa, con su nombre, para el listado del admin.
  * Sin `companyId` trae los de las dos empresas — solo uso legítimo desde
  * `/admin/clientes`, que muestra el catálogo completo.
+ *
+ * Por defecto solo los activos, igual que la lista de usuarios: un catálogo
+ * que crece con el tiempo se vuelve ruido si mezcla para siempre lo que ya no
+ * se usa. `incluirInactivos` es lo que enciende la casilla "Mostrar clientes
+ * inactivos" de la pantalla.
  */
 export async function listarClientes(
   companyId?: string,
+  opciones?: { incluirInactivos?: boolean },
 ): Promise<ClienteConEmpresa[]> {
+  const condiciones = [
+    companyId ? eq(clients.companyId, companyId) : undefined,
+    opciones?.incluirInactivos ? undefined : eq(clients.isActive, true),
+  ].filter((c) => c !== undefined);
+
   return db
     .select({
       id: clients.id,
@@ -35,7 +46,7 @@ export async function listarClientes(
     })
     .from(clients)
     .innerJoin(companies, eq(companies.id, clients.companyId))
-    .where(companyId ? eq(clients.companyId, companyId) : undefined)
+    .where(condiciones.length > 0 ? and(...condiciones) : undefined)
     .orderBy(asc(clients.name));
 }
 

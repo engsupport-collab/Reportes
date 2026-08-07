@@ -136,7 +136,12 @@
     "confirmDesactivar": "Disable {nombre}?",
     "confirmReactivar": "Re-enable {nombre}?",
     "tooltipNoPropia": "You can't disable your own account",
-    "confirmResetear": "Generate a new password for {nombre}? The old one will stop working."
+    "confirmResetear": "Generate a new password for {nombre}? The old one will stop working.",
+    "mostrarDesactivados": "Show deactivated users",
+    "eliminar": "Delete",
+    "confirmEliminar": "Permanently delete {nombre}? This cannot be undone.",
+    "usuarioActivoNoSeElimina": "This user is active. Deactivate it first.",
+    "usuarioConHistorialNoSeElimina": "This user created reports, quotes, or clients and can't be deleted. Leave it deactivated — their history and their record as author are preserved either way."
   },
   "crearUsuarioForm": {
     "creando": "Creating…",
@@ -169,7 +174,12 @@
     "reactivar": "Reactivate",
     "desactivado": "Deactivated",
     "confirmDesactivar": "Deactivate {nombre}? It stops appearing in the selector for new quotes; quotes that already use it are unaffected.",
-    "confirmReactivar": "Reactivate {nombre}?"
+    "confirmReactivar": "Reactivate {nombre}?",
+    "mostrarInactivos": "Show inactive clients",
+    "eliminar": "Delete",
+    "confirmEliminar": "Permanently delete {nombre}? This cannot be undone.",
+    "clienteActivoNoSeElimina": "This client is active. Deactivate it first.",
+    "clienteConHistorialNoSeElimina": "This client has quotes associated with it and can't be deleted. Leave it deactivated — documents that use it will keep showing it the same way."
   },
   "reportForm": {
     "guardando": "Saving…",
@@ -473,7 +483,8 @@
     "guardar": "Save changes",
     "guardando": "Saving…",
     "cancelar": "Cancel",
-    "volver": "← Back to quotes"
+    "volver": "← Back to quotes",
+    "crearNuevoCliente": "+ Create new client"
   },
   "cotizacionDetail": {
     "creadaPor": "Created by",

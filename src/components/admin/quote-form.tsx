@@ -6,10 +6,14 @@ import { useFormStatus } from "react-dom";
 import { useTranslations } from "next-intl";
 
 import type { CotizacionState } from "@/actions/quotes";
+import { CrearClienteModal } from "@/components/admin/crear-cliente-modal";
 import { ESTADOS_COTIZACION } from "@/lib/cotizaciones";
 import type { Moneda } from "@/lib/moneda";
 import type { OpcionCliente } from "@/lib/queries/clients";
 import type { Empresa } from "@/lib/queries/companies";
+
+/** Valor centinela de la opción "+ Crear nuevo cliente" del selector. */
+const CREAR_CLIENTE = "__crear_cliente__";
 
 type Valores = {
   quoteNumber: string;
@@ -95,10 +99,25 @@ export function QuoteForm({
   );
   const moneda =
     monedaFija ?? empresas?.find((e) => e.id === companyId)?.currency ?? "COP";
-  const clientesDisponibles =
-    clientesPorEmpresa.find((e) => e.companyId === companyId)?.opciones ?? [];
+
+  // El cliente sí queda controlado (a diferencia del resto del formulario):
+  // es lo que permite que "+ Crear nuevo cliente" abra el modal sin que el
+  // <select> se quede mostrando esa opción como si fuera la elegida, y que
+  // el cliente recién creado quede seleccionado apenas se cierra el modal.
+  const [clientId, setClientId] = useState(valores?.clientId ?? "");
+  const [clientesCreados, setClientesCreados] = useState<
+    { companyId: string; id: string; name: string }[]
+  >([]);
+  const [modalClienteAbierto, setModalClienteAbierto] = useState(false);
+
+  const clientesDisponibles = [
+    ...(clientesPorEmpresa.find((e) => e.companyId === companyId)?.opciones ??
+      []),
+    ...clientesCreados.filter((c) => c.companyId === companyId),
+  ];
 
   return (
+    <>
     <form action={formAction} className="space-y-5">
       <div className="grid gap-5 sm:grid-cols-2">
         {empresas ? (
@@ -118,7 +137,12 @@ export function QuoteForm({
                     value={e.id}
                     required
                     checked={companyId === e.id}
-                    onChange={() => setCompanyId(e.id)}
+                    onChange={() => {
+                      setCompanyId(e.id);
+                      // El cliente elegido pertenece a la empresa anterior:
+                      // no tiene sentido dejarlo seleccionado bajo la nueva.
+                      setClientId("");
+                    }}
                     className="sr-only"
                   />
                   {e.name}
@@ -183,16 +207,21 @@ export function QuoteForm({
             {t("clientName")}
           </label>
           {clientesDisponibles.length > 0 ? (
-            // key={companyId}: sin esto, un <select> no controlado no se
-            // entera de que cambiaron sus opciones al cambiar de empresa y se
-            // queda mostrando la selección vieja — mismo fix que ya usa
-            // QuoteSelector en el formulario de reporte.
             <select
-              key={companyId}
               id="clientId"
               name="clientId"
               required
-              defaultValue={valores?.clientId}
+              value={clientId}
+              onChange={(e) => {
+                if (e.target.value === CREAR_CLIENTE) {
+                  // No se toca clientId: el <select> controlado vuelve a
+                  // mostrar la selección de antes, y el modal se ocupa del
+                  // resto — nunca queda "elegida" la opción de crear.
+                  setModalClienteAbierto(true);
+                  return;
+                }
+                setClientId(e.target.value);
+              }}
               className={CAMPO}
             >
               <option value="" disabled>
@@ -203,17 +232,19 @@ export function QuoteForm({
                   {c.name}
                 </option>
               ))}
+              <option value={CREAR_CLIENTE}>{t("crearNuevoCliente")}</option>
             </select>
           ) : (
-            <p className="rounded-lg bg-surface-muted px-3 py-2.5 text-sm text-muted">
-              {t("sinClientesActivos")}{" "}
-              <Link
-                href="/admin/clientes"
-                className="font-medium text-brand hover:underline"
+            <div className="space-y-2 rounded-lg bg-surface-muted px-3 py-2.5">
+              <p className="text-sm text-muted">{t("sinClientesActivos")}</p>
+              <button
+                type="button"
+                onClick={() => setModalClienteAbierto(true)}
+                className="text-sm font-medium text-brand hover:underline"
               >
-                {t("irAClientes")}
-              </Link>
-            </p>
+                {t("crearNuevoCliente")}
+              </button>
+            </div>
           )}
         </div>
 
@@ -331,5 +362,21 @@ export function QuoteForm({
         </Link>
       </div>
     </form>
+
+    {/* Fuera del <form> a propósito: un <dialog> con su propio formulario
+        anidado dentro de este sería HTML inválido (dos <form> uno dentro del
+        otro). Vive aquí como hermano; `showModal()` lo pone por encima de
+        todo igual, sin depender de su posición en el árbol. */}
+    <CrearClienteModal
+      abierto={modalClienteAbierto}
+      companyId={companyId}
+      onCerrar={() => setModalClienteAbierto(false)}
+      onCreado={(cliente) => {
+        setClientesCreados((prev) => [...prev, { companyId, ...cliente }]);
+        setClientId(cliente.id);
+        setModalClienteAbierto(false);
+      }}
+    />
+    </>
   );
 }
