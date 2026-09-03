@@ -87,7 +87,10 @@ export async function serieMensual(
 
   const filas = await db
     .select({
-      mes: sql<string>`strftime('%Y-%m', ${reports.createdAt} / 1000, 'unixepoch')`,
+      // to_char, no strftime: era la función de fecha de SQLite. createdAt ya
+      // es un timestamp nativo, así que tampoco hace falta dividir por 1000
+      // ni el modificador 'unixepoch' que exigía cuando era un entero.
+      mes: sql<string>`to_char(${reports.createdAt}, 'YYYY-MM')`,
       n: sql<number>`COUNT(*)`,
     })
     .from(reports)
@@ -212,9 +215,7 @@ export async function obtenerAnaliticas(
 
     db
       .select({
-        // strftime sobre milisegundos: la columna guarda el instante en ms y
-        // SQLite espera segundos, de ahí la división.
-        mes: sql<string>`strftime('%Y-%m', ${reports.createdAt} / 1000, 'unixepoch')`,
+        mes: sql<string>`to_char(${reports.createdAt}, 'YYYY-MM')`,
         n: sql<number>`COUNT(*)`,
       })
       .from(reports)

@@ -11,10 +11,9 @@ import { config } from "dotenv";
 
 config({ path: ".env.local" });
 
-import { createClient } from "@libsql/client";
 import { eq } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/libsql";
 
+import { crearClienteScript } from "./db-cliente";
 import { reportTags, reports, userCompanies, users } from "../src/db/schema";
 import { ETIQUETAS_TRABAJO, TIPOS_SERVICIO } from "../src/lib/etiquetas";
 import { parseFechaISO } from "../src/lib/fechas";
@@ -57,11 +56,14 @@ function elegir<T>(lista: T[], i: number): T {
 async function main() {
   const cantidad = Number(process.argv[2]) || 10;
 
-  const client = createClient({
-    url: process.env.TURSO_DATABASE_URL!,
-    authToken: process.env.TURSO_AUTH_TOKEN!,
+  const { db, cerrar } = await crearClienteScript({
+    instanceConnectionName: process.env.DB_INSTANCE_CONNECTION_NAME!,
+    user: process.env.DB_USER!,
+    password: process.env.DB_PASSWORD!,
+    database: process.env.DB_NAME!,
+    origen: ".env.local",
+    esProduccion: false,
   });
-  const db = drizzle(client);
 
   // --- Empleado de prueba ---
   let [empleado] = await db
@@ -163,7 +165,7 @@ async function main() {
   }
 
   console.log(`${filas.length} reportes creados, ${etiquetas.length} etiquetas.`);
-  client.close();
+  await cerrar();
 }
 
 main().catch((e) => {

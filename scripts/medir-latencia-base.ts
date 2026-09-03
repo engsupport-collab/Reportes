@@ -6,6 +6,11 @@
  * (irrelevante para producción, porque Vercel no corre desde aquí) y cuánto
  * tarda realmente la base en resolver la consulta (lo único que sí viaja con
  * el código a producción).
+ *
+ * HISTÓRICO — específico de Turso: mide su modelo de una petición HTTP suelta
+ * por consulta, que ya no es como se conecta la app (ahora es un pool `pg`
+ * sobre el conector de Cloud SQL). Se conserva sin tocar mientras Turso siga
+ * viva como red de seguridad; no se usa en la operación normal de la app.
  */
 import { config } from "dotenv";
 

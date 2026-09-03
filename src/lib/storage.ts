@@ -1,26 +1,51 @@
 import "server-only";
 
-import { del, put } from "@vercel/blob";
 import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
+
+import { Storage } from "@google-cloud/storage";
+
+import { env } from "@/lib/env";
+import { prepararCredencialesGoogle } from "@/lib/google-credenciales";
 
 /**
  * Almacenamiento de archivos.
  *
- * En producción usa Vercel Blob. En desarrollo, si no hay token configurado,
- * guarda en una carpeta local: así se puede construir y probar toda la subida,
- * la validación y la descarga sin depender de una cuenta ni de una conexión.
- * El resto de la aplicación no sabe cuál de los dos está activo.
+ * En producción usa Cloud Storage, con el bucket en acceso privado — la app
+ * nunca entrega la URL del objeto al navegador, las descargas siempre pasan
+ * por /api/archivos/[id] (y equivalentes), que comprueba permisos antes de
+ * leer el archivo del lado del servidor. En desarrollo, si no hay bucket
+ * configurado, guarda en una carpeta local: así se puede construir y probar
+ * toda la subida, la validación y la descarga sin depender de una cuenta ni
+ * de una conexión. El resto de la aplicación no sabe cuál de los dos está
+ * activo.
  *
  * Lo que se guarda en la base es la referencia que devuelven estas funciones,
  * nunca una ruta armada con el nombre que escribió el usuario.
  */
 
 const PREFIJO_LOCAL = "local:";
+const PREFIJO_GCS = "gcs:";
 const CARPETA_LOCAL = path.join(process.cwd(), ".uploads");
 
-function usandoBlob(): boolean {
-  return Boolean(process.env.BLOB_READ_WRITE_TOKEN);
+function usandoGCS(): boolean {
+  return Boolean(env.GCS_BUCKET_NAME);
+}
+
+/**
+ * El cliente de Cloud Storage sí se puede construir de forma síncrona y
+ * perezosa (a diferencia del conector de Cloud SQL): no autentica nada hasta
+ * la primera llamada real a la API, así que no hace falta el mismo `await` de
+ * nivel superior que tiene `src/db/index.ts`.
+ */
+let storageClient: Storage | undefined;
+
+function bucket() {
+  if (!storageClient) {
+    prepararCredencialesGoogle();
+    storageClient = new Storage();
+  }
+  return storageClient.bucket(env.GCS_BUCKET_NAME!);
 }
 
 /**
@@ -37,16 +62,12 @@ export async function guardarArchivo(
 ): Promise<string> {
   const nombreInterno = `${crypto.randomUUID()}${opciones.extension}`;
 
-  if (usandoBlob()) {
-    const { url } = await put(`reportes/${nombreInterno}`, datos, {
-      access: "public",
-      contentType: opciones.contentType,
-      // Sufijo aleatorio: la URL resulta imposible de adivinar. Aun así nunca
-      // se entrega al navegador — las descargas pasan por /api/archivos/[id],
-      // que comprueba permisos primero.
-      addRandomSuffix: true,
-    });
-    return url;
+  if (usandoGCS()) {
+    const objectName = `reportes/${nombreInterno}`;
+    await bucket()
+      .file(objectName)
+      .save(Buffer.from(datos), { contentType: opciones.contentType });
+    return `${PREFIJO_GCS}${objectName}`;
   }
 
   await mkdir(CARPETA_LOCAL, { recursive: true });
@@ -77,6 +98,17 @@ export async function leerArchivo(
       ) as ArrayBuffer;
     }
 
+    if (referencia.startsWith(PREFIJO_GCS)) {
+      const objectName = referencia.slice(PREFIJO_GCS.length);
+      const [buffer] = await bucket().file(objectName).download();
+      return buffer.buffer.slice(
+        buffer.byteOffset,
+        buffer.byteOffset + buffer.byteLength,
+      ) as ArrayBuffer;
+    }
+
+    // Referencia de una URL completa (legado de Vercel Blob, o cualquier otra
+    // http/https) — se conserva este camino por si queda alguna sin migrar.
     const res = await fetch(referencia);
     if (!res.ok) return null;
     return await res.arrayBuffer();
@@ -96,7 +128,14 @@ export async function borrarArchivo(referencia: string): Promise<void> {
       return;
     }
 
-    await del(referencia);
+    if (referencia.startsWith(PREFIJO_GCS)) {
+      const objectName = referencia.slice(PREFIJO_GCS.length);
+      await bucket().file(objectName).delete();
+      return;
+    }
+
+    // Referencia de URL completa (legado) — nada que borrar por este camino;
+    // ver el comentario equivalente en `leerArchivo`.
   } catch {
     // Si el archivo ya no está, la fila igual debe poder borrarse: dejar un
     // registro apuntando a un archivo inexistente es peor que no borrar nada.

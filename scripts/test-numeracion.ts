@@ -204,7 +204,9 @@ async function main() {
   const repetidos = await db
     .select({ numero: quotes.quoteNumber, veces: sql<number>`COUNT(*)` })
     .from(quotes)
-    .where(sql`${quotes.quoteNumber} GLOB 'Q[0-9][0-9][0-9][0-9]_[0-9]*'`)
+    // ~ y no GLOB: GLOB era de SQLite. El patrón va anclado (^...$) porque a
+    // diferencia de GLOB, el operador ~ de Postgres empareja subcadenas.
+    .where(sql`${quotes.quoteNumber} ~ '^Q[0-9]{4}_[0-9]+$'`)
     .groupBy(quotes.quoteNumber)
     .having(sql`COUNT(*) > 1`);
 

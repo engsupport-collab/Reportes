@@ -5,6 +5,12 @@
  * corran concurrentes y que el tiempo total sea el de la más lenta, no la
  * suma de todas. Esto lo comprueba con una consulta trivial, para aislar el
  * comportamiento del cliente del costo de las consultas reales.
+ *
+ * HISTÓRICO — específico de Turso: la pregunta que responde este script es
+ * sobre el cliente HTTP `/web` de libSQL, y no aplica igual a un pool `pg`
+ * (su concurrencia real la gobierna el tamaño del pool, `max`, no algo que
+ * haga falta medir así). Se conserva sin tocar mientras Turso siga viva como
+ * red de seguridad; no se usa en la operación normal de la app.
  */
 import { config } from "dotenv";
 

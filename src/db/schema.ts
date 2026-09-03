@@ -1,13 +1,14 @@
-import { sql } from "drizzle-orm";
 import {
-  type AnySQLiteColumn,
+  type AnyPgColumn,
+  boolean,
   index,
   integer,
+  pgTable,
   primaryKey,
-  sqliteTable,
   text,
+  timestamp,
   uniqueIndex,
-} from "drizzle-orm/sqlite-core";
+} from "drizzle-orm/pg-core";
 
 import { ESTADOS_COTIZACION } from "@/lib/cotizaciones";
 import { TIPOS_SERVICIO_IDS } from "@/lib/etiquetas";
@@ -17,6 +18,13 @@ import { REPORT_EVENT_TYPES, REPORT_STATUSES, USER_ROLES } from "@/lib/roles";
 
 export { REPORT_STATUSES, USER_ROLES };
 export type { ReportStatus, UserRole } from "@/lib/roles";
+
+/** Cada `createdAt`/`updatedAt`/etc. guarda un instante, no una hora de pared
+ * — `withTimezone: true` (mapea a `timestamptz`) evita cualquier ambigüedad
+ * de zona horaria entre dónde corre la app y dónde corre la base. */
+function marcaDeTiempo(nombreColumna: string) {
+  return timestamp(nombreColumna, { withTimezone: true });
+}
 
 /**
  * Las dos empresas del grupo.
@@ -34,10 +42,10 @@ export type { ReportStatus, UserRole } from "@/lib/roles";
  * visible tiene que poder cambiarse sin tocar código, y porque agregar una
  * tercera sucursal debe ser insertar una fila, no una migración.
  */
-export const companies = sqliteTable("companies", {
+export const companies = pgTable("companies", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
-  isActive: integer("is_active", { mode: "boolean" }).notNull().default(true),
+  isActive: boolean("is_active").notNull().default(true),
   /**
    * Moneda en la que esta empresa cotiza y cobra — determina cómo se
    * formatea cada monto de sus cotizaciones y viáticos (agrupamiento de
@@ -45,9 +53,7 @@ export const companies = sqliteTable("companies", {
    * colombianos, que por eso queda como valor por defecto.
    */
   currency: text("currency", { enum: MONEDAS }).notNull().default("COP"),
-  createdAt: integer("created_at", { mode: "timestamp_ms" })
-    .notNull()
-    .default(sql`(unixepoch() * 1000)`),
+  createdAt: marcaDeTiempo("created_at").notNull().defaultNow(),
 });
 
 /**
@@ -55,7 +61,7 @@ export const companies = sqliteTable("companies", {
  * `failed_attempts` y `locked_until` implementan el bloqueo por fuerza bruta
  * sin depender de Redis ni de ningún servicio externo.
  */
-export const users = sqliteTable(
+export const users = pgTable(
   "users",
   {
     id: text("id").primaryKey(),
@@ -72,15 +78,11 @@ export const users = sqliteTable(
      * a cambio de nada.
      */
     locale: text("locale", { enum: IDIOMAS }).notNull().default("es"),
-    isActive: integer("is_active", { mode: "boolean" }).notNull().default(true),
+    isActive: boolean("is_active").notNull().default(true),
     failedAttempts: integer("failed_attempts").notNull().default(0),
-    lockedUntil: integer("locked_until", { mode: "timestamp_ms" }),
-    createdAt: integer("created_at", { mode: "timestamp_ms" })
-      .notNull()
-      .default(sql`(unixepoch() * 1000)`),
-    updatedAt: integer("updated_at", { mode: "timestamp_ms" })
-      .notNull()
-      .default(sql`(unixepoch() * 1000)`),
+    lockedUntil: marcaDeTiempo("locked_until"),
+    createdAt: marcaDeTiempo("created_at").notNull().defaultNow(),
+    updatedAt: marcaDeTiempo("updated_at").notNull().defaultNow(),
   },
   (table) => [index("users_role_idx").on(table.role)],
 );
@@ -93,7 +95,7 @@ export const users = sqliteTable(
  * dos. Con una columna habría que inventar valores como "ambas", y agregar una
  * tercera empresa obligaría a rehacerlo.
  */
-export const userCompanies = sqliteTable(
+export const userCompanies = pgTable(
   "user_companies",
   {
     userId: text("user_id")
@@ -102,9 +104,7 @@ export const userCompanies = sqliteTable(
     companyId: text("company_id")
       .notNull()
       .references(() => companies.id, { onDelete: "cascade" }),
-    createdAt: integer("created_at", { mode: "timestamp_ms" })
-      .notNull()
-      .default(sql`(unixepoch() * 1000)`),
+    createdAt: marcaDeTiempo("created_at").notNull().defaultNow(),
   },
   (table) => [
     primaryKey({ columns: [table.userId, table.companyId] }),
@@ -132,7 +132,7 @@ export const userCompanies = sqliteTable(
  * cotizaciones nuevas, pero las cotizaciones que ya lo usan lo siguen
  * mostrando — igual que `companies.isActive`.
  */
-export const clients = sqliteTable(
+export const clients = pgTable(
   "clients",
   {
     id: text("id").primaryKey(),
@@ -140,16 +140,12 @@ export const clients = sqliteTable(
       .notNull()
       .references(() => companies.id, { onDelete: "restrict" }),
     name: text("name").notNull(),
-    isActive: integer("is_active", { mode: "boolean" }).notNull().default(true),
+    isActive: boolean("is_active").notNull().default(true),
     createdBy: text("created_by")
       .notNull()
       .references(() => users.id, { onDelete: "restrict" }),
-    createdAt: integer("created_at", { mode: "timestamp_ms" })
-      .notNull()
-      .default(sql`(unixepoch() * 1000)`),
-    updatedAt: integer("updated_at", { mode: "timestamp_ms" })
-      .notNull()
-      .default(sql`(unixepoch() * 1000)`),
+    createdAt: marcaDeTiempo("created_at").notNull().defaultNow(),
+    updatedAt: marcaDeTiempo("updated_at").notNull().defaultNow(),
   },
   (table) => [
     index("clients_company_active_idx").on(table.companyId, table.isActive),
@@ -159,11 +155,13 @@ export const clients = sqliteTable(
 /**
  * Contador de números de cotización, uno por año.
  *
- * SQLite no tiene secuencias, así que esta tabla es la secuencia: guarda el
- * último valor entregado de cada año y se incrementa con un `INSERT ... ON
- * CONFLICT DO UPDATE ... RETURNING`, una sola sentencia que reserva el número
- * y lo devuelve. Dos peticiones simultáneas se serializan en el bloqueo de
- * escritura de SQLite, así que es imposible que reciban el mismo valor.
+ * Guarda el último valor entregado de cada año y se incrementa con un
+ * `INSERT ... ON CONFLICT DO UPDATE ... RETURNING`, una sola sentencia que
+ * reserva el número y lo devuelve — Postgres serializa esa fila bajo el
+ * índice de la clave primaria, así que dos peticiones simultáneas no pueden
+ * recibir el mismo valor. Se mantiene esta tabla en vez de una secuencia
+ * nativa de Postgres (`CREATE SEQUENCE`) para no perder el historial de años
+ * ya usados y por continuidad con las filas que ya existían.
  *
  * Es lo que sustituye a mirar la propia tabla `quotes` para decidir el
  * siguiente número. Cualquier variante de eso —`MAX + 1`, `COUNT + 1`, buscar
@@ -177,7 +175,7 @@ export const clients = sqliteTable(
  * es el comportamiento correcto, no un defecto: es lo mismo que hace una
  * secuencia de Postgres.
  */
-export const quoteSequences = sqliteTable("quote_sequences", {
+export const quoteSequences = pgTable("quote_sequences", {
   /** El año del prefijo, p. ej. 2026 en "Q2026_001". */
   year: integer("year").primaryKey(),
   /** Último consecutivo entregado para ese año. Nunca retrocede. */
@@ -199,10 +197,10 @@ export const quoteSequences = sqliteTable("quote_sequences", {
  * un instante en el que el otro todavía no ha guardado— y solo el índice los
  * separa.
  *
- * Sigue admitiendo null, y eso convive con el índice: en SQLite un índice
- * único deja pasar tantos nulos como haga falta. Es lo que necesitan las
- * cotizaciones antiguas que se crearon antes de que existiera la numeración
- * automática.
+ * Sigue admitiendo null, y eso convive con el índice: un índice único en
+ * Postgres, igual que en SQLite, deja pasar tantos nulos como haga falta (NULL
+ * nunca se considera igual a otro NULL). Es lo que necesitan las cotizaciones
+ * antiguas que se crearon antes de que existiera la numeración automática.
  *
  * Nota para una carga masiva desde el Excel del cliente: ese control lleva
  * números repetidos a propósito (una cotización con varias entregas mensuales
@@ -210,7 +208,7 @@ export const quoteSequences = sqliteTable("quote_sequences", {
  * índice. Si llega ese momento, esas entregas son filas de otra tabla que
  * cuelga de la cotización, no cotizaciones distintas con el mismo nombre.
  */
-export const quotes = sqliteTable(
+export const quotes = pgTable(
   "quotes",
   {
     id: text("id").primaryKey(),
@@ -254,7 +252,7 @@ export const quotes = sqliteTable(
     // justo el caso de la autorización verbal, donde el trabajo ya arrancó.
     purchaseOrderNo: text("purchase_order_no"),
     /** Fecha comprometida de entrega. */
-    dueDate: integer("due_date", { mode: "timestamp_ms" }),
+    dueDate: marcaDeTiempo("due_date"),
     description: text("description"),
     /** Valor cotizado, en pesos y sin decimales. Opcional. */
     amount: integer("amount"),
@@ -264,17 +262,13 @@ export const quotes = sqliteTable(
      * nacen con lo mínimo (proyecto y cliente) y necesitan que un admin las
      * complete. Es lo que alimenta el filtro "sin revisar" del panel.
      */
-    revisada: integer("revisada", { mode: "boolean" }).notNull().default(true),
+    revisada: boolean("revisada").notNull().default(true),
 
     createdBy: text("created_by")
       .notNull()
       .references(() => users.id, { onDelete: "restrict" }),
-    createdAt: integer("created_at", { mode: "timestamp_ms" })
-      .notNull()
-      .default(sql`(unixepoch() * 1000)`),
-    updatedAt: integer("updated_at", { mode: "timestamp_ms" })
-      .notNull()
-      .default(sql`(unixepoch() * 1000)`),
+    createdAt: marcaDeTiempo("created_at").notNull().defaultNow(),
+    updatedAt: marcaDeTiempo("updated_at").notNull().defaultNow(),
     updatedBy: text("updated_by").references(() => users.id, {
       onDelete: "set null",
     }),
@@ -297,7 +291,7 @@ export const quotes = sqliteTable(
  * se calcula al consultar, en src/lib/queries/reports.ts. Un campo almacenado
  * se desincronizaría en cuanto alguien subiera o borrara un adjunto.
  */
-export const reports = sqliteTable(
+export const reports = pgTable(
   "reports",
   {
     id: text("id").primaryKey(),
@@ -337,7 +331,7 @@ export const reports = sqliteTable(
      * estorba, y todas las filas existentes ya se migraron a `quoteId`.
      */
     linkedReportId: text("linked_report_id").references(
-      (): AnySQLiteColumn => reports.id,
+      (): AnyPgColumn => reports.id,
       { onDelete: "set null" },
     ),
 
@@ -372,7 +366,7 @@ export const reports = sqliteTable(
     // este campo. No aplica a un reporte de viáticos.
     quoteNumber: text("quote_number"),
     clientName: text("client_name").notNull(),
-    workDate: integer("work_date", { mode: "timestamp_ms" }).notNull(),
+    workDate: marcaDeTiempo("work_date").notNull(),
     // Opcional a propósito: el detalle es una ayuda para quien lee el reporte
     // después, no un requisito. A diferencia de la orden de compra, su
     // ausencia no se marca con ninguna alerta.
@@ -388,7 +382,7 @@ export const reports = sqliteTable(
     status: text("status", { enum: REPORT_STATUSES })
       .notNull()
       .default("en_proceso"),
-    completedAt: integer("completed_at", { mode: "timestamp_ms" }),
+    completedAt: marcaDeTiempo("completed_at"),
 
     signatureUrl: text("signature_url"),
     signatureName: text("signature_name"),
@@ -397,14 +391,10 @@ export const reports = sqliteTable(
     // por formulario desde que existe este campo; admite null solo por los
     // reportes firmados antes.
     signatureEmail: text("signature_email"),
-    signedAt: integer("signed_at", { mode: "timestamp_ms" }),
+    signedAt: marcaDeTiempo("signed_at"),
 
-    createdAt: integer("created_at", { mode: "timestamp_ms" })
-      .notNull()
-      .default(sql`(unixepoch() * 1000)`),
-    updatedAt: integer("updated_at", { mode: "timestamp_ms" })
-      .notNull()
-      .default(sql`(unixepoch() * 1000)`),
+    createdAt: marcaDeTiempo("created_at").notNull().defaultNow(),
+    updatedAt: marcaDeTiempo("updated_at").notNull().defaultNow(),
     // Rastro de quién editó por última vez: el admin puede editar reportes ajenos.
     updatedBy: text("updated_by").references(() => users.id, {
       onDelete: "set null",
@@ -446,7 +436,7 @@ export const reports = sqliteTable(
  * no lo pide. `metadata` no se usa todavía: queda reservada para el día que
  * un evento necesite datos propios que no encajen en `motivo`.
  */
-export const reportEvents = sqliteTable(
+export const reportEvents = pgTable(
   "report_events",
   {
     id: text("id").primaryKey(),
@@ -461,9 +451,7 @@ export const reportEvents = sqliteTable(
     motivo: text("motivo"),
     /** JSON sin usar todavía. Ver el comentario de la tabla. */
     metadata: text("metadata"),
-    createdAt: integer("created_at", { mode: "timestamp_ms" })
-      .notNull()
-      .default(sql`(unixepoch() * 1000)`),
+    createdAt: marcaDeTiempo("created_at").notNull().defaultNow(),
   },
   (table) => [
     index("report_events_report_idx").on(table.reportId, table.createdAt),
@@ -482,7 +470,7 @@ export const reportEvents = sqliteTable(
  * que va como columna del reporte, donde la base impide marcar los dos a la vez.
  * El catálogo de valores vive en src/lib/etiquetas.ts.
  */
-export const reportTags = sqliteTable(
+export const reportTags = pgTable(
   "report_tags",
   {
     reportId: text("report_id")
@@ -499,12 +487,13 @@ export const reportTags = sqliteTable(
 /**
  * Archivos adjuntos de un reporte (evidencia del trabajo).
  *
- * `blobUrl` apunta a Vercel Blob con acceso privado; nunca se expone al cliente.
- * Las descargas pasan por /api/archivos/[id], que verifica permisos primero.
- * `thumbnailUrl` es la miniatura generada en el navegador antes de subir, para
- * que las listas no tengan que cargar fotos de 5 MB. Null en PDF y documentos.
+ * `blobUrl` apunta a Cloud Storage con acceso privado; nunca se expone al
+ * cliente. Las descargas pasan por /api/archivos/[id], que verifica permisos
+ * primero. `thumbnailUrl` es la miniatura generada en el navegador antes de
+ * subir, para que las listas no tengan que cargar fotos de 5 MB. Null en PDF
+ * y documentos.
  */
-export const attachments = sqliteTable(
+export const attachments = pgTable(
   "attachments",
   {
     id: text("id").primaryKey(),
@@ -516,9 +505,7 @@ export const attachments = sqliteTable(
     fileName: text("file_name").notNull(),
     mimeType: text("mime_type").notNull(),
     sizeBytes: integer("size_bytes").notNull(),
-    uploadedAt: integer("uploaded_at", { mode: "timestamp_ms" })
-      .notNull()
-      .default(sql`(unixepoch() * 1000)`),
+    uploadedAt: marcaDeTiempo("uploaded_at").notNull().defaultNow(),
   },
   (table) => [index("attachments_report_idx").on(table.reportId)],
 );
@@ -539,7 +526,7 @@ export const attachments = sqliteTable(
  * mezclar los dos ahí complicaría el conteo de "sin documento" del reporte de
  * servicio, que solo debe mirar la evidencia del trabajo, no los recibos.
  */
-export const reportViaticos = sqliteTable(
+export const reportViaticos = pgTable(
   "report_viaticos",
   {
     id: text("id").primaryKey(),
@@ -547,7 +534,7 @@ export const reportViaticos = sqliteTable(
       .notNull()
       .references(() => reports.id, { onDelete: "cascade" }),
     concepto: text("concepto"),
-    fechaGasto: integer("fecha_gasto", { mode: "timestamp_ms" }),
+    fechaGasto: marcaDeTiempo("fecha_gasto"),
     blobUrl: text("blob_url").notNull(),
     thumbnailUrl: text("thumbnail_url"),
     fileName: text("file_name").notNull(),
@@ -556,9 +543,7 @@ export const reportViaticos = sqliteTable(
     // En pesos, sin decimales. Null solo en filas creadas antes de que el
     // monto fuera obligatorio.
     amount: integer("amount"),
-    uploadedAt: integer("uploaded_at", { mode: "timestamp_ms" })
-      .notNull()
-      .default(sql`(unixepoch() * 1000)`),
+    uploadedAt: marcaDeTiempo("uploaded_at").notNull().defaultNow(),
   },
   (table) => [index("report_viaticos_report_idx").on(table.reportId)],
 );
@@ -575,18 +560,14 @@ export const reportViaticos = sqliteTable(
  * rociado desde un equipo; la de `users` frena el ataque distribuido contra una
  * cuenta concreta desde muchas IPs.
  */
-export const loginAttempts = sqliteTable(
+export const loginAttempts = pgTable(
   "login_attempts",
   {
     ip: text("ip").primaryKey(),
     failedCount: integer("failed_count").notNull().default(0),
-    firstAttemptAt: integer("first_attempt_at", {
-      mode: "timestamp_ms",
-    }).notNull(),
-    lastAttemptAt: integer("last_attempt_at", {
-      mode: "timestamp_ms",
-    }).notNull(),
-    lockedUntil: integer("locked_until", { mode: "timestamp_ms" }),
+    firstAttemptAt: marcaDeTiempo("first_attempt_at").notNull(),
+    lastAttemptAt: marcaDeTiempo("last_attempt_at").notNull(),
+    lockedUntil: marcaDeTiempo("locked_until"),
   },
   (table) => [index("login_attempts_last_idx").on(table.lastAttemptAt)],
 );

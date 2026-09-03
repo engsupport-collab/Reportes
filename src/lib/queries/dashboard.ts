@@ -18,6 +18,7 @@ import { inicioDeMes } from "@/lib/fechas";
 
 const SEMANAS_TENDENCIA = 12;
 const MS_POR_SEMANA = 7 * 24 * 60 * 60 * 1000;
+const SEGUNDOS_POR_SEMANA = MS_POR_SEMANA / 1000;
 
 export type ResumenPanel = {
   reportesDelMes: number;
@@ -50,14 +51,16 @@ async function contar(condicion: ReturnType<typeof and>): Promise<number> {
  */
 async function tendenciaSemanal(
   companyId: string | undefined,
-  ahora: number,
+  ahora: Date,
 ): Promise<number[]> {
-  const desde = ahora - SEMANAS_TENDENCIA * MS_POR_SEMANA;
+  const desde = new Date(ahora.getTime() - SEMANAS_TENDENCIA * MS_POR_SEMANA);
 
   const filas = await db
     .select({
-      // Semana 0 es la actual; 11, la más antigua del rango.
-      semana: sql<number>`CAST((${ahora} - ${reports.createdAt}) / ${MS_POR_SEMANA} AS INTEGER)`,
+      // Semana 0 es la actual; 11, la más antigua del rango. Restar dos
+      // timestamptz da un `interval`, no un número — EXTRACT(EPOCH FROM ...)
+      // es lo que lo vuelve a convertir en segundos para poder dividirlo.
+      semana: sql<number>`FLOOR(EXTRACT(EPOCH FROM (${ahora}::timestamptz - ${reports.createdAt})) / ${SEGUNDOS_POR_SEMANA})`,
       total: sql<number>`COUNT(*)`,
     })
     .from(reports)
@@ -65,7 +68,7 @@ async function tendenciaSemanal(
       and(
         eq(reports.type, "servicio"),
         companyId ? eq(reports.companyId, companyId) : undefined,
-        gte(reports.createdAt, new Date(desde)),
+        gte(reports.createdAt, desde),
       ),
     )
     .groupBy(sql`1`);
@@ -86,7 +89,7 @@ async function tendenciaSemanal(
 export async function obtenerResumen(
   companyId?: string,
 ): Promise<ResumenPanel> {
-  const ahora = Date.now();
+  const ahora = new Date();
   const esteMes = inicioDeMes(0);
   const mesPasado = inicioDeMes(1);
 

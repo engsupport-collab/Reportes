@@ -63,8 +63,12 @@ export async function bloqueoDeIp(ip: string): Promise<Date | null> {
 export async function registrarFalloDeIp(
   ip: string,
 ): Promise<{ intentos: number; lockedUntil: Date | null }> {
-  const ahora = Date.now();
-  const inicioVentana = ahora - VENTANA_MS;
+  // `lastAttemptAt`/`lockedUntil` son `timestamptz` nativos ahora — las
+  // comparaciones van contra objetos Date, no contra milisegundos crudos
+  // (así fallaba antes contra SQLite, que los guardaba como enteros).
+  const ahora = new Date();
+  const inicioVentana = new Date(ahora.getTime() - VENTANA_MS);
+  const bloqueadoHasta = new Date(ahora.getTime() + BLOQUEO_MS);
 
   // Si el último fallo quedó fuera de la ventana, el conteo empieza de nuevo.
   const conteoNuevo = sql`
@@ -79,8 +83,8 @@ export async function registrarFalloDeIp(
     .values({
       ip,
       failedCount: 1,
-      firstAttemptAt: new Date(ahora),
-      lastAttemptAt: new Date(ahora),
+      firstAttemptAt: ahora,
+      lastAttemptAt: ahora,
       lockedUntil: null,
     })
     .onConflictDoUpdate({
@@ -93,10 +97,10 @@ export async function registrarFalloDeIp(
             ELSE ${loginAttempts.firstAttemptAt}
           END
         `,
-        lastAttemptAt: new Date(ahora),
+        lastAttemptAt: ahora,
         lockedUntil: sql`
           CASE
-            WHEN (${conteoNuevo}) >= ${MAX_INTENTOS} THEN ${ahora + BLOQUEO_MS}
+            WHEN (${conteoNuevo}) >= ${MAX_INTENTOS} THEN ${bloqueadoHasta}
             ELSE ${loginAttempts.lockedUntil}
           END
         `,
@@ -129,6 +133,8 @@ export async function limpiarIp(ip: string): Promise<void> {
 export async function registrarIntentoFallido(
   userId: string,
 ): Promise<{ intentos: number; lockedUntil: Date | null }> {
+  const bloqueadoHasta = new Date(Date.now() + BLOQUEO_MS);
+
   const [fila] = await db
     .update(users)
     .set({
@@ -136,7 +142,7 @@ export async function registrarIntentoFallido(
       lockedUntil: sql`
         CASE
           WHEN ${users.failedAttempts} + 1 >= ${MAX_INTENTOS}
-          THEN (unixepoch() * 1000) + ${BLOQUEO_MS}
+          THEN ${bloqueadoHasta}
           ELSE ${users.lockedUntil}
         END
       `,

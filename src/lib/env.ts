@@ -11,10 +11,37 @@ import { z } from "zod";
  * cliente, porque expondría los secretos en el bundle del navegador.
  */
 const envSchema = z.object({
-  // Turso. Se usa la URL https:// (no libsql://) a propósito: evita abrir un
-  // WebSocket en cada invocación serverless. Ver PLAN.md, sección 7.1.
-  TURSO_DATABASE_URL: z.string().min(1, "Falta TURSO_DATABASE_URL"),
-  TURSO_AUTH_TOKEN: z.string().min(1, "Falta TURSO_AUTH_TOKEN"),
+  // Turso — de baja hacia PostgreSQL/Cloud SQL (ver DB_* abajo). Se dejan
+  // opcionales a propósito: la app ya no las necesita para arrancar, pero la
+  // base vieja se conserva como red de seguridad y los scripts de migración
+  // de datos todavía las leen.
+  TURSO_DATABASE_URL: z.string().optional(),
+  TURSO_AUTH_TOKEN: z.string().optional(),
+
+  // Cloud SQL (PostgreSQL). `DB_INSTANCE_CONNECTION_NAME` es el identificador
+  // "proyecto:región:instancia" que usa el conector oficial de Google
+  // (`@google-cloud/cloud-sql-connector`) para abrir el túnel autenticado —
+  // no es un host/puerto tradicional, así que no hay DB_HOST ni DB_PORT.
+  DB_INSTANCE_CONNECTION_NAME: z
+    .string()
+    .min(1, "Falta DB_INSTANCE_CONNECTION_NAME"),
+  DB_USER: z.string().min(1, "Falta DB_USER"),
+  DB_PASSWORD: z.string().min(1, "Falta DB_PASSWORD"),
+  DB_NAME: z.string().min(1, "Falta DB_NAME"),
+  // Contenido completo del JSON de la cuenta de servicio, como texto — no una
+  // ruta de archivo. Hace falta en Vercel, que no tiene sistema de archivos
+  // persistente donde apuntar `GOOGLE_APPLICATION_CREDENTIALS`. En desarrollo
+  // local se deja sin definir y se usa esa variable estándar de Google en su
+  // lugar (ver `src/lib/google-credenciales.ts`). La usan tanto la conexión a
+  // Cloud SQL como el cliente de Cloud Storage.
+  GOOGLE_CREDENTIALS_JSON: z.string().optional(),
+
+  // Cloud Storage — de baja hacia Vercel Blob. Opcional: sin ella,
+  // `storage.ts` cae al modo local (carpeta `.uploads`), igual que antes con
+  // `BLOB_READ_WRITE_TOKEN` — la diferencia es que ahora esta variable sí
+  // pasa por la validación centralizada, en vez de leerse suelta como pasaba
+  // con aquella.
+  GCS_BUCKET_NAME: z.string().optional(),
 
   // Secreto de firma de las cookies de sesión (JWT HS256).
   // 32 caracteres es el mínimo razonable para HS256.

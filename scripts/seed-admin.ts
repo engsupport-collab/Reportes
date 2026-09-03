@@ -14,23 +14,24 @@ import { config } from "dotenv";
 
 config({ path: ".env.local" });
 
-import { createClient } from "@libsql/client";
 import { eq } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/libsql";
 
+import { crearClienteScript } from "./db-cliente";
 import { users } from "../src/db/schema";
 import { PASSWORD_MIN_LENGTH, hashPassword } from "../src/lib/password";
 
 async function main() {
-  const url = process.env.TURSO_DATABASE_URL;
-  const authToken = process.env.TURSO_AUTH_TOKEN;
+  const instanceConnectionName = process.env.DB_INSTANCE_CONNECTION_NAME;
+  const user = process.env.DB_USER;
+  const password_ = process.env.DB_PASSWORD;
+  const database = process.env.DB_NAME;
   const username = process.env.SEED_ADMIN_USERNAME?.trim();
   const password = process.env.SEED_ADMIN_PASSWORD;
   const fullName = process.env.SEED_ADMIN_FULLNAME?.trim() || "Administrador";
 
-  if (!url || !authToken) {
+  if (!instanceConnectionName || !user || !password_ || !database) {
     throw new Error(
-      "Faltan TURSO_DATABASE_URL o TURSO_AUTH_TOKEN. Copia .env.example a .env.local y complétalo.",
+      "Faltan DB_INSTANCE_CONNECTION_NAME, DB_USER, DB_PASSWORD o DB_NAME. Copia .env.example a .env.local y complétalo.",
     );
   }
   if (!username || !password) {
@@ -44,8 +45,14 @@ async function main() {
     );
   }
 
-  const client = createClient({ url, authToken });
-  const db = drizzle(client);
+  const { db, cerrar } = await crearClienteScript({
+    instanceConnectionName,
+    user,
+    password: password_,
+    database,
+    origen: ".env.local",
+    esProduccion: false,
+  });
 
   const existente = await db
     .select({ id: users.id })
@@ -57,7 +64,7 @@ async function main() {
     console.log(
       `El usuario "${username}" ya existe. No se hizo ningún cambio.`,
     );
-    client.close();
+    await cerrar();
     return;
   }
 
@@ -75,7 +82,7 @@ async function main() {
     "Ahora borra SEED_ADMIN_PASSWORD de .env.local y cambia la contraseña desde la aplicación.",
   );
 
-  client.close();
+  await cerrar();
 }
 
 main().catch((error) => {

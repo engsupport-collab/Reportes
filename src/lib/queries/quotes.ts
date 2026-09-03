@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, desc, eq, like, or, sql } from "drizzle-orm";
+import { and, desc, eq, ilike, or, sql } from "drizzle-orm";
 
 import { db } from "@/db";
 import {
@@ -96,10 +96,13 @@ function construirWhere(filtros: FiltrosCotizaciones) {
   if (buscar) {
     const patron = `%${buscar}%`;
     condiciones.push(
+      // ilike: en Postgres (a diferencia de SQLite) LIKE distingue
+      // mayúsculas por defecto — ilike conserva la búsqueda insensible que
+      // ya se usaba.
       or(
-        like(quotes.quoteNumber, patron),
-        like(quotes.projectName, patron),
-        like(clients.name, patron),
+        ilike(quotes.quoteNumber, patron),
+        ilike(quotes.projectName, patron),
+        ilike(clients.name, patron),
       )!,
     );
   }
@@ -281,26 +284,21 @@ export async function siguienteNumeroCotizacionSugerido(): Promise<string> {
   return formatearNumeroCotizacion(anio, (fila?.lastValue ?? 0) + 1);
 }
 
-/** El `printf` de SQLite que rellena el consecutivo con ceros a la izquierda. */
-const FORMATO_CONSECUTIVO = sql.raw(`'%0${DIGITOS_CONSECUTIVO}d'`);
-
 /**
  * Inserta una cotización con el siguiente número del año.
  *
- * Van tres sentencias en un `batch`, que libSQL ejecuta como una transacción
- * en un solo viaje: incrementar el contador, insertar la cotización leyendo el
- * valor recién incrementado, y devolverlo. Si la inserción falla —un id
- * repetido, un cliente que ya no existe— el contador vuelve atrás con ella y
- * el número no se quema.
+ * Todo ocurre dentro de una transacción normal de Postgres: incrementar el
+ * contador (con un `INSERT ... ON CONFLICT DO UPDATE ... RETURNING`, que
+ * reserva el número y lo devuelve en una sola sentencia) y luego insertar la
+ * cotización con ese número. Si la inserción falla —un id repetido, un
+ * cliente que ya no existe— la transacción entera se revierte, contador
+ * incluido, y el número no se quema.
  *
- * Se usa `batch` y NO una transacción interactiva, y la diferencia importa
- * bajo carga: una transacción interactiva mantiene abierto un stream contra
- * Turso mientras dura, y cien creaciones a la vez agotan el límite de streams
- * — probado, y falla con ECONNRESET. El `batch` es una petición suelta, así
- * que cien simultáneas salen adelante sin un solo error.
- *
- * La segunda sentencia lee `last_value` de la primera porque las dos están en
- * la misma transacción; nadie más puede colarse entre ellas.
+ * (Turso resolvía esto mismo con `db.batch`, evitando a propósito una
+ * transacción interactiva porque agotaba el límite de streams HTTP bajo
+ * carga — ver el historial de este archivo. Ese límite no existe en Postgres
+ * con un pool de conexiones normal, así que la transacción de toda la vida
+ * es, aquí, la opción simple.)
  */
 export async function insertarCotizacionConNumeroAutomatico(valores: {
   id: string;
@@ -310,52 +308,42 @@ export async function insertarCotizacionConNumeroAutomatico(valores: {
   projectName: string;
   clientId: string;
   purchaseOrderNo: string | null;
-  dueDate: number | null;
+  dueDate: Date | null;
   description: string | null;
   amount: number | null;
   revisada: boolean;
 }): Promise<string> {
   const anio = anioActual();
-  const prefijo = `Q${anio}_`;
 
-  const resultados = await db.batch([
-    db.run(sql`
-      INSERT INTO ${quoteSequences} (year, last_value) VALUES (${anio}, 1)
-      ON CONFLICT(year) DO UPDATE SET last_value = last_value + 1
-    `),
-    db.run(sql`
-      INSERT INTO ${quotes} (
-        id, company_id, quote_number, project_name, client_id, status,
-        purchase_order_no, due_date, description, amount, revisada, created_by
-      )
-      SELECT
-        ${valores.id},
-        ${valores.companyId},
-        ${prefijo} || printf(${FORMATO_CONSECUTIVO}, last_value),
-        ${valores.projectName},
-        ${valores.clientId},
-        ${valores.status},
-        ${valores.purchaseOrderNo},
-        ${valores.dueDate},
-        ${valores.description},
-        ${valores.amount},
-        ${valores.revisada ? 1 : 0},
-        ${valores.createdBy}
-      FROM ${quoteSequences}
-      WHERE year = ${anio}
-    `),
-    db.get<{ last_value: number }>(
-      sql`SELECT last_value FROM ${quoteSequences} WHERE year = ${anio}`,
-    ),
-  ]);
+  return db.transaction(async (tx) => {
+    const [fila] = await tx
+      .insert(quoteSequences)
+      .values({ year: anio, lastValue: 1 })
+      .onConflictDoUpdate({
+        target: quoteSequences.year,
+        set: { lastValue: sql`${quoteSequences.lastValue} + 1` },
+      })
+      .returning({ lastValue: quoteSequences.lastValue });
 
-  const asignado = resultados[2] as { last_value: number } | undefined;
+    const quoteNumber = formatearNumeroCotizacion(anio, fila.lastValue);
 
-  if (!asignado) {
-    throw new Error(`No se pudo asignar el número de cotización de ${anio}.`);
-  }
+    await tx.insert(quotes).values({
+      id: valores.id,
+      companyId: valores.companyId,
+      quoteNumber,
+      projectName: valores.projectName,
+      clientId: valores.clientId,
+      status: valores.status,
+      purchaseOrderNo: valores.purchaseOrderNo,
+      dueDate: valores.dueDate,
+      description: valores.description,
+      amount: valores.amount,
+      revisada: valores.revisada,
+      createdBy: valores.createdBy,
+    });
 
-  return formatearNumeroCotizacion(anio, Number(asignado.last_value));
+    return quoteNumber;
+  });
 }
 
 /**
@@ -371,10 +359,17 @@ export function esNumeroCotizacionDuplicado(error: unknown): boolean {
   let actual: unknown = error;
 
   for (let saltos = 0; actual !== undefined && actual !== null && saltos < 5; saltos++) {
-    const mensaje = actual instanceof Error ? actual.message : String(actual);
+    // Postgres: violación de restricción única es el código SQLSTATE 23505,
+    // y el driver `pg` adjunta el nombre exacto de la restricción en
+    // `.constraint` — más confiable que buscar texto en el mensaje (que
+    // además viene en inglés o español según el locale del servidor).
     if (
-      mensaje.includes("UNIQUE constraint failed") &&
-      mensaje.includes("quote_number")
+      actual &&
+      typeof actual === "object" &&
+      "code" in actual &&
+      actual.code === "23505" &&
+      "constraint" in actual &&
+      actual.constraint === "quotes_quote_number_unique"
     ) {
       return true;
     }
@@ -401,9 +396,12 @@ export async function sincronizarSecuenciaConNumero(
   const leido = numero ? leerNumeroCotizacion(numero) : null;
   if (!leido) return;
 
-  await db.run(sql`
+  // GREATEST y no MAX: en Postgres, a diferencia de SQLite, MAX() es solo una
+  // función de agregación sobre filas — el máximo escalar entre dos valores
+  // sueltos es GREATEST().
+  await db.execute(sql`
     INSERT INTO ${quoteSequences} (year, last_value) VALUES (${leido.anio}, ${leido.valor})
-    ON CONFLICT(year) DO UPDATE SET last_value = MAX(last_value, ${leido.valor})
+    ON CONFLICT (year) DO UPDATE SET last_value = GREATEST(${quoteSequences.lastValue}, ${leido.valor})
   `);
 }
 

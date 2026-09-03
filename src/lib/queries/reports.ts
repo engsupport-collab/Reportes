@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, desc, eq, like, or, sql } from "drizzle-orm";
+import { and, desc, eq, ilike, or, sql } from "drizzle-orm";
 
 import { db } from "@/db";
 import {
@@ -56,15 +56,16 @@ const conteoAdjuntos = sql<number>`(
  * el costo más grande y más fácil de eliminar de toda la consulta — se paga en
  * cada carga de cada lista y de cada detalle, sin excepción.
  *
- * `group_concat` lo resuelve en un solo viaje: SQLite ya recorre los reportes
- * de la página, y por cada uno resuelve esta subconsulta contra el índice
+ * `string_agg` (el `group_concat` de Postgres, mismo orden de argumentos) lo
+ * resuelve en un solo viaje: Postgres ya recorre los reportes de la página, y
+ * por cada uno resuelve esta subconsulta contra el índice
  * `report_tags_tag_idx`, sin que eso implique una petición HTTP adicional. Las
  * etiquetas son un catálogo fijo y corto (electrico, mecanico, preventivo,
  * urgencia, online, proyecto) que nunca contiene comas, así que unirlas con
  * "," y separarlas después en JavaScript es seguro.
  */
 const etiquetasCsv = sql<string | null>`(
-  SELECT group_concat(${reportTags.tag}, ',')
+  SELECT string_agg(${reportTags.tag}, ',')
   FROM ${reportTags}
   WHERE ${reportTags.reportId} = ${reports.id}
 )`;
@@ -194,16 +195,19 @@ function construirWhere(filtros: FiltrosReportes) {
 
   const buscar = filtros.buscar?.trim();
   if (buscar) {
-    // Con 2.000 reportes, LIKE recorre la tabla entera y aun así responde al
-    // instante. Si algún día son decenas de miles, libSQL soporta FTS5 y se
-    // agrega sin rehacer el esquema. Ver PLAN.md, sección 7.2.
+    // Con 2.000 reportes, ILIKE recorre la tabla entera y aun así responde al
+    // instante. Si algún día son decenas de miles, Postgres tiene búsqueda de
+    // texto completo (tsvector + índice GIN) y se agrega sin rehacer el
+    // esquema.
+    // ilike: en Postgres (a diferencia de SQLite) LIKE distingue mayúsculas
+    // por defecto — ilike conserva la búsqueda insensible que ya se usaba.
     const patron = `%${buscar}%`;
     condiciones.push(
       or(
-        like(reports.projectName, patron),
-        like(reports.clientName, patron),
-        like(reports.purchaseOrderNo, patron),
-        like(reports.quoteNumber, patron),
+        ilike(reports.projectName, patron),
+        ilike(reports.clientName, patron),
+        ilike(reports.purchaseOrderNo, patron),
+        ilike(reports.quoteNumber, patron),
       )!,
     );
   }

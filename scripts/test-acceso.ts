@@ -13,10 +13,9 @@ import { config } from "dotenv";
 
 config({ path: ".env.local" });
 
-import { createClient } from "@libsql/client";
 import { and, eq } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/libsql";
 
+import { crearClienteScript } from "./db-cliente";
 import { reports, users } from "../src/db/schema";
 import { SESSION_COOKIE, signSession } from "../src/lib/session";
 
@@ -40,11 +39,14 @@ async function pedir(ruta: string, cookie?: string) {
 }
 
 async function main() {
-  const client = createClient({
-    url: process.env.TURSO_DATABASE_URL!,
-    authToken: process.env.TURSO_AUTH_TOKEN!,
+  const { db, cerrar } = await crearClienteScript({
+    instanceConnectionName: process.env.DB_INSTANCE_CONNECTION_NAME!,
+    user: process.env.DB_USER!,
+    password: process.env.DB_PASSWORD!,
+    database: process.env.DB_NAME!,
+    origen: ".env.local",
+    esProduccion: false,
   });
-  const db = drizzle(client);
 
   const [admin] = await db
     .select()
@@ -300,7 +302,7 @@ async function main() {
       : `\n${fallos} comprobación(es) fallaron.\n`,
   );
 
-  client.close();
+  await cerrar();
   process.exit(fallos === 0 ? 0 : 1);
 }
 

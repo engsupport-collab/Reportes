@@ -2,6 +2,7 @@
   "name": "gestor-reportes",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -11,6 +12,8 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx scripts/migrate.ts",
     "db:studio": "drizzle-kit studio",
+    "migrar:datos": "tsx scripts/migrar-datos-turso-postgres.ts",
+    "migrar:archivos": "tsx scripts/migrar-archivos-blob-gcs.ts",
     "seed:admin": "tsx scripts/seed-admin.ts",
     "seed:demo": "tsx scripts/seed-demo.ts",
     "seed:prueba": "tsx scripts/seed-prueba.ts",
@@ -26,14 +29,16 @@
     "medir:concurrencia": "tsx scripts/medir-concurrencia.ts"
   },
   "dependencies": {
+    "@google-cloud/cloud-sql-connector": "^1.12.0",
+    "@google-cloud/storage": "^8.0.1",
     "@libsql/client": "^0.17.4",
-    "@vercel/blob": "^2.6.1",
     "bcryptjs": "^3.0.3",
     "drizzle-orm": "^0.45.2",
     "jose": "^6.2.6",
     "next": "16.2.12",
     "next-intl": "^4.13.4",
     "pdf-lib": "^1.17.1",
+    "pg": "^8.23.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "server-only": "^0.0.1",
@@ -43,6 +48,7 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
+    "@types/pg": "^8.23.1",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "dotenv": "^17.4.2",

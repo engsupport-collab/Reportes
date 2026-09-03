@@ -9,38 +9,22 @@
  * comando sirva en local y en el despliegue, leyendo las credenciales de la
  * misma forma en ambos casos.
  */
-import { createClient } from "@libsql/client";
-import { drizzle } from "drizzle-orm/libsql";
-import { migrate } from "drizzle-orm/libsql/migrator";
+import { migrate } from "drizzle-orm/node-postgres/migrator";
 
+import { crearClienteScript } from "./db-cliente";
 import { anunciar, cargarCredenciales } from "./entorno";
 
 async function main() {
   const credenciales = cargarCredenciales(process.argv);
   anunciar(credenciales);
 
-  const { url, authToken } = credenciales;
-  const client = createClient({ url, authToken });
-  const db = drizzle(client);
-
-  // drizzle-orm@0.45.2 trae un bug real en su migrador de libsql: la tabla de
-  // control usa "id SERIAL PRIMARY KEY", sintaxis de Postgres que algunos
-  // servidores de Turso rechazan. Se crea antes, con sintaxis de SQLite, para
-  // que el CREATE TABLE IF NOT EXISTS del migrador la encuentre ya creada y
-  // nunca llegue a ejecutar la sentencia con el error.
-  await client.execute(`
-    CREATE TABLE IF NOT EXISTS "__drizzle_migrations" (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      hash text NOT NULL,
-      created_at numeric
-    )
-  `);
+  const { db, cerrar } = await crearClienteScript(credenciales);
 
   console.log("Aplicando migraciones...");
   await migrate(db, { migrationsFolder: "./drizzle" });
   console.log("Migraciones aplicadas correctamente.");
 
-  client.close();
+  await cerrar();
 }
 
 main().catch((error) => {

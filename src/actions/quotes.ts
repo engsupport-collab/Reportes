@@ -118,7 +118,7 @@ export async function crearCotizacionAction(
         projectName: parsed.data.projectName,
         clientId: parsed.data.clientId,
         purchaseOrderNo: parsed.data.purchaseOrderNo,
-        dueDate: parsed.data.dueDate ? parsed.data.dueDate.getTime() : null,
+        dueDate: parsed.data.dueDate,
         description: parsed.data.description,
         amount: parsed.data.amount,
         revisada: true,

@@ -14,10 +14,9 @@
  * a ojo para borrarlos después es justo lo que sale mal. Con el prefijo, la
  * limpieza es exacta y no depende de acordarse de cuáles eran.
  */
-import { createClient } from "@libsql/client";
 import { eq, like } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/libsql";
 
+import { crearClienteScript } from "./db-cliente";
 import { reportTags, reports, users } from "../src/db/schema";
 import { parseFechaISO } from "../src/lib/fechas";
 import { anunciar, cargarCredenciales } from "./entorno";
@@ -223,9 +222,7 @@ async function main() {
   const credenciales = cargarCredenciales(process.argv);
   anunciar(credenciales);
 
-  const { url, authToken } = credenciales;
-  const client = createClient({ url, authToken });
-  const db = drizzle(client);
+  const { db, cerrar } = await crearClienteScript(credenciales);
 
   if (limpiar) {
     // Las etiquetas y los adjuntos caen solos por ON DELETE CASCADE.
@@ -235,7 +232,7 @@ async function main() {
       .returning({ id: reports.id });
 
     console.log(`${borrados.length} reportes de prueba eliminados.`);
-    client.close();
+    await cerrar();
     return;
   }
 
@@ -291,7 +288,7 @@ async function main() {
   );
   console.log("Para borrarlos: npm run seed:prueba -- --limpiar");
 
-  client.close();
+  await cerrar();
 }
 
 main().catch((e) => {
