@@ -14,8 +14,32 @@ import { SESSION_COOKIE, verifySession } from "@/lib/session";
  * Dicho de otro modo: esto decide si alguien pasa la puerta. Lo que puede tocar
  * una vez adentro se decide en el servidor, no aquí.
  */
+/**
+ * Dominio propio de producción. Cualquier otro host de Vercel (el
+ * `*.vercel.app` original, alias de preview, etc.) redirige aquí — así todo
+ * el mundo termina siempre en la misma URL, sin importar por dónde entró.
+ *
+ * Se compara contra un valor fijo, no contra `env.APP_URL`, a propósito: esto
+ * corre en Edge Runtime delante de cada página, y no conviene que un typo en
+ * una variable de entorno tumbe el acceso a todo el sitio.
+ */
+const DOMINIO_CANONICO = "reportes.engsupports.com.co";
+
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  // Solo en producción real: los despliegues de preview tienen su propia URL
+  // `*.vercel.app` de un solo uso, y redirigirlos los dejaría inservibles.
+  if (
+    process.env.VERCEL_ENV === "production" &&
+    request.nextUrl.hostname !== DOMINIO_CANONICO
+  ) {
+    const destino = new URL(request.nextUrl);
+    destino.hostname = DOMINIO_CANONICO;
+    destino.port = "";
+    destino.protocol = "https:";
+    return NextResponse.redirect(destino, 308);
+  }
 
   const session = await verifySession(
     request.cookies.get(SESSION_COOKIE)?.value,
