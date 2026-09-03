@@ -10,6 +10,19 @@ const nextConfig: NextConfig = {
    */
   serverExternalPackages: ["sharp"],
 
+  /**
+   * Al externalizarlo, Next deja de rastrear el árbol de `require()` de sharp
+   * — pero sharp carga `libvips-cpp.so` con `dlopen()` en tiempo de
+   * ejecución, no con `require()`, así que el rastreador estático nunca lo ve
+   * y el binario compartido no viaja en el paquete de la función serverless.
+   * Resultado en Vercel: ERR_DLOPEN_FAILED. Se fuerza a incluir la carpeta
+   * completa de sharp (documentado como el patrón común para este caso en
+   * node_modules/next/dist/docs/.../output.md).
+   */
+  outputFileTracingIncludes: {
+    "/*": ["node_modules/sharp/**/*", "node_modules/@img/**/*"],
+  },
+
   experimental: {
     /**
      * Las subidas viajan dentro de una Server Action. El límite por defecto es
