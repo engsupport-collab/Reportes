@@ -451,12 +451,7 @@ export async function generarReportePdf(
 
   agregarPaginaFaltantes(doc, fuentes, contexto, paginasPropias, sinFusionar);
 
-  dibujarPies(
-    doc,
-    fuentes.normal,
-    paginasPropias,
-    `${reporte.companyName} · ${reporte.projectName} · Generado el ${formatInstante(new Date())}`,
-  );
+  dibujarPies(doc, fuentes, paginasPropias, formatInstante(new Date()));
 
   return doc.save();
 }
@@ -630,12 +625,7 @@ export async function generarReporteViaticoPdf(
 
   agregarPaginaFaltantes(doc, fuentes, contexto, paginasPropias, sinFusionar);
 
-  dibujarPies(
-    doc,
-    fuentes.normal,
-    paginasPropias,
-    `${reporte.companyName} · Viáticos · ${reporte.projectName} · Generado el ${formatInstante(new Date())}`,
-  );
+  dibujarPies(doc, fuentes, paginasPropias, formatInstante(new Date()));
 
   return doc.save();
 }

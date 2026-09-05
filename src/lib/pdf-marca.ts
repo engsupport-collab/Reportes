@@ -220,8 +220,17 @@ export function dibujarInsignia(
   });
 }
 
+const NOMBRE_LEGAL = "Eng-Support Corp.";
+const ESLOGAN = "Automation, Control & Digitalization I4.0";
+
 /**
  * Pie de página, al final de todo — hace falta conocer el total de páginas.
+ *
+ * Dos líneas: la identidad de la empresa (con el eslogan del propio logo, no
+ * inventado) junto a la numeración, y debajo un aviso de confidencialidad
+ * genérico. Ni el teléfono ni el sitio web de la empresa están aquí porque no
+ * son datos que este generador tenga — un dato de contacto equivocado en un
+ * documento que ve el cliente es peor que no ponerlo.
  *
  * Solo se dibuja en las páginas que arma este generador, nunca en las que
  * vienen de un PDF adjunto del cliente: ahí el contenido no es nuestro y
@@ -231,12 +240,13 @@ export function dibujarInsignia(
  */
 export function dibujarPies(
   doc: PDFDocument,
-  font: PDFFont,
+  fuentes: { normal: PDFFont; bold: PDFFont },
   paginasPropias: PDFPage[],
-  textoIzquierda: string,
+  fechaGeneracion: string,
 ): void {
   const paginas = doc.getPages();
   const total = paginas.length;
+  const aviso = `Documento generado electrónicamente el ${fechaGeneracion} — confidencial, uso exclusivo del destinatario.`;
 
   for (const page of paginasPropias) {
     const indice = paginas.indexOf(page);
@@ -245,27 +255,43 @@ export function dibujarPies(
     const { width } = page.getSize();
 
     page.drawLine({
-      start: { x: MARGEN, y: 40 },
-      end: { x: width - MARGEN, y: 40 },
+      start: { x: MARGEN, y: 46 },
+      end: { x: width - MARGEN, y: 46 },
       thickness: 0.5,
       color: COLOR_LINEA,
     });
 
-    page.drawText(textoIzquierda, {
+    page.drawText(NOMBRE_LEGAL, {
       x: MARGEN,
-      y: 28,
-      size: 7.5,
-      font,
+      y: 34,
+      size: 8,
+      font: fuentes.bold,
+      color: COLOR_MARCA,
+    });
+    const anchoNombre = fuentes.bold.widthOfTextAtSize(NOMBRE_LEGAL, 8);
+    page.drawText(`  ·  ${ESLOGAN}`, {
+      x: MARGEN + anchoNombre,
+      y: 34,
+      size: 8,
+      font: fuentes.normal,
       color: COLOR_MUTED,
     });
 
     const numero = `Página ${indice + 1} de ${total}`;
-    const anchoNumero = font.widthOfTextAtSize(numero, 7.5);
+    const anchoNumero = fuentes.normal.widthOfTextAtSize(numero, 8);
     page.drawText(numero, {
       x: width - MARGEN - anchoNumero,
-      y: 28,
-      size: 7.5,
-      font,
+      y: 34,
+      size: 8,
+      font: fuentes.normal,
+      color: COLOR_MUTED,
+    });
+
+    page.drawText(aviso, {
+      x: MARGEN,
+      y: 22,
+      size: 7,
+      font: fuentes.normal,
       color: COLOR_MUTED,
     });
   }
