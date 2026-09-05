@@ -58,11 +58,26 @@ const envSchema = z.object({
   // se envía el correo (queda anotado en el registro del servidor).
   APP_URL: z.string().url("APP_URL debe ser una URL completa").optional(),
 
-  // Webhook de n8n que recibe el aviso de "reporte firmado" y envía el
-  // correo con el enlace. Opcional por la misma razón que APP_URL.
-  N8N_WEBHOOK_URL: z
+  // Envío de correo por la API de Gmail, con la cuenta del cliente. Sustituye
+  // al webhook de n8n que corría en un servidor aparte. Las tres van juntas:
+  // sin alguna, `src/lib/gmail.ts` no intenta enviar y lo deja anotado en el
+  // registro, igual que antes cuando faltaba el webhook.
+  //
+  // El JSON completo de la cuenta de servicio, como texto — mismo motivo que
+  // GOOGLE_CREDENTIALS_JSON. Es una cuenta distinta y a propósito: esta solo
+  // tiene permiso de `gmail.send`, nada de la infraestructura.
+  GMAIL_SERVICE_ACCOUNT_JSON: z.string().optional(),
+  // Usuario real del Workspace al que suplanta la cuenta de servicio. Tiene
+  // que ser una persona con buzón: Google no permite suplantar un grupo.
+  GMAIL_IMPERSONATE_EMAIL: z
     .string()
-    .url("N8N_WEBHOOK_URL debe ser una URL completa")
+    .email("GMAIL_IMPERSONATE_EMAIL debe ser un correo válido")
+    .optional(),
+  // La dirección que ve quien recibe. Es una identidad de envío verificada de
+  // la cuenta de arriba, no su dirección personal.
+  GMAIL_SENDER_EMAIL: z
+    .string()
+    .email("GMAIL_SENDER_EMAIL debe ser un correo válido")
     .optional(),
 });
 
