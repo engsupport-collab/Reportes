@@ -28,16 +28,30 @@ export const COLOR_LINEA = rgb(0.85, 0.87, 0.9);
 export const COLOR_TERMINADO = rgb(0.13, 0.5, 0.28);
 export const COLOR_PROCESO = rgb(0.65, 0.47, 0.05);
 
-/** Proporción real del archivo (1333x379); fijarla evita deformarlo. */
-const LOGO_PROPORCION = 1333 / 379;
-const LOGO_ANCHO = 128;
-export const LOGO_ALTO = LOGO_ANCHO / LOGO_PROPORCION;
+/** Proporción real del archivo (277x379); fijarla evita deformarlo. */
+const MONOGRAMA_PROPORCION = 277 / 379;
+const MONOGRAMA_ALTO = 44;
+const MONOGRAMA_ANCHO = MONOGRAMA_ALTO * MONOGRAMA_PROPORCION;
 
-const ALTO_ENCABEZADO = LOGO_ALTO + 22;
+/** Franja de color sólido que corre de borde a borde en la parte superior. */
+const ALTO_FRANJA = 92;
+
+const NOMBRE_LEGAL = "Eng-Support Corp.";
+const ESLOGAN = "Automation, Control & Digitalization I4.0";
 
 /**
- * El logo se lee del disco una sola vez por instancia. `public/` no entra solo
- * en el paquete de una función serverless: se fuerza desde
+ * Se usa solo el monograma (el símbolo, sin texto) como imagen — el nombre y
+ * el eslogan se dibujan como texto de verdad, no como parte de un PNG.
+ *
+ * `logo-claro.png` incluye el eslogan en un gris pensado para el fondo casi
+ * negro de la interfaz: sobre el azul de esta franja, ese gris pierde casi
+ * todo el contraste y queda ilegible. Dibujando el texto aparte, el color es
+ * el que decide este archivo (blanco puro), no el que traiga el PNG — y de
+ * paso el documento pesa una fracción (91 KB el monograma contra 441 KB del
+ * logo completo).
+ *
+ * Se lee del disco una sola vez por instancia. `public/` no entra solo en el
+ * paquete de una función serverless: se fuerza desde
  * `outputFileTracingIncludes` en next.config.ts. Si aun así no estuviera, el
  * documento se arma igual con el nombre de la empresa en su lugar — un PDF sin
  * logo es un problema menor; uno que no se genera, uno grave.
@@ -45,7 +59,7 @@ const ALTO_ENCABEZADO = LOGO_ALTO + 22;
 let logoCache: Promise<Buffer | null> | undefined;
 
 function cargarLogo(): Promise<Buffer | null> {
-  logoCache ??= readFile(path.join(process.cwd(), "public", "logo-azul.png")).catch(
+  logoCache ??= readFile(path.join(process.cwd(), "public", "monograma-claro.png")).catch(
     (error) => {
       console.warn("No se pudo leer el logo para el PDF:", error);
       return null;
@@ -66,9 +80,10 @@ export async function embeberLogo(doc: PDFDocument): Promise<PDFImage | null> {
 }
 
 /**
- * Encabezado: logo a la izquierda, tipo de documento y empresa a la derecha,
- * y una regla de marca debajo. Devuelve la altura ocupada, para que quien
- * llama siga escribiendo desde ahí.
+ * Encabezado: franja de color de borde a borde, con el monograma + nombre y
+ * eslogan a la izquierda, y el tipo de documento + empresa en blanco a la
+ * derecha. Devuelve la altura ocupada, para que quien llama siga escribiendo
+ * desde ahí.
  */
 export function dibujarEncabezado(
   page: PDFPage,
@@ -77,57 +92,69 @@ export function dibujarEncabezado(
     logo: PDFImage | null;
     tipoDocumento: string;
     empresa: string;
-    nombreEmpresa: string;
   },
 ): number {
   const [ancho, alto] = A4;
-  const topeLogo = alto - MARGEN - LOGO_ALTO;
+  const yFranja = alto - ALTO_FRANJA;
+  const blanco = rgb(1, 1, 1);
+  const blancoSuave = rgb(0.82, 0.87, 0.95);
+
+  page.drawRectangle({
+    x: 0,
+    y: yFranja,
+    width: ancho,
+    height: ALTO_FRANJA,
+    color: COLOR_MARCA,
+  });
+
+  const centroFranja = yFranja + ALTO_FRANJA / 2;
+  let xTexto = MARGEN;
 
   if (opciones.logo) {
     page.drawImage(opciones.logo, {
       x: MARGEN,
-      y: topeLogo,
-      width: LOGO_ANCHO,
-      height: LOGO_ALTO,
+      y: centroFranja - MONOGRAMA_ALTO / 2,
+      width: MONOGRAMA_ANCHO,
+      height: MONOGRAMA_ALTO,
     });
-  } else {
-    page.drawText(opciones.nombreEmpresa, {
-      x: MARGEN,
-      y: topeLogo + LOGO_ALTO / 2 - 6,
-      size: 15,
-      font: fuentes.bold,
-      color: COLOR_MARCA,
-    });
+    xTexto = MARGEN + MONOGRAMA_ANCHO + 14;
   }
 
+  page.drawText(NOMBRE_LEGAL, {
+    x: xTexto,
+    y: centroFranja + 2,
+    size: 15,
+    font: fuentes.bold,
+    color: blanco,
+  });
+  page.drawText(ESLOGAN, {
+    x: xTexto,
+    y: centroFranja - 15,
+    size: 8,
+    font: fuentes.normal,
+    color: blancoSuave,
+  });
+
   const tipo = opciones.tipoDocumento.toUpperCase();
-  const anchoTipo = fuentes.bold.widthOfTextAtSize(tipo, 9);
+  const anchoTipo = fuentes.bold.widthOfTextAtSize(tipo, 10);
   page.drawText(tipo, {
     x: ancho - MARGEN - anchoTipo,
-    y: topeLogo + LOGO_ALTO - 10,
-    size: 9,
+    y: centroFranja + 4,
+    size: 10,
     font: fuentes.bold,
-    color: COLOR_MARCA,
+    color: blanco,
   });
 
   const anchoEmpresa = fuentes.normal.widthOfTextAtSize(opciones.empresa, 9);
   page.drawText(opciones.empresa, {
     x: ancho - MARGEN - anchoEmpresa,
-    y: topeLogo + LOGO_ALTO - 24,
+    y: centroFranja - 12,
     size: 9,
     font: fuentes.normal,
-    color: COLOR_MUTED,
+    color: blancoSuave,
   });
 
-  const yRegla = alto - MARGEN - ALTO_ENCABEZADO + 6;
-  page.drawLine({
-    start: { x: MARGEN, y: yRegla },
-    end: { x: ancho - MARGEN, y: yRegla },
-    thickness: 1.5,
-    color: COLOR_MARCA,
-  });
-
-  return yRegla - 26;
+  return yFranja - 32;
 }
 
 /** Título de sección: una barra corta de marca y el rótulo en versalitas. */
@@ -219,9 +246,6 @@ export function dibujarInsignia(
     color: rgb(1, 1, 1),
   });
 }
-
-const NOMBRE_LEGAL = "Eng-Support Corp.";
-const ESLOGAN = "Automation, Control & Digitalization I4.0";
 
 /**
  * Pie de página, al final de todo — hace falta conocer el total de páginas.

@@ -113,7 +113,6 @@ async function agregarPaginaImagen(
     logo: contexto.logo,
     tipoDocumento: contexto.tipoDocumento,
     empresa: contexto.empresa,
-    nombreEmpresa: contexto.empresa,
   });
 
   let y = dibujarTituloSeccion(page, fuentes.normal, MARGEN, yTrasEncabezado, titulo);
@@ -228,7 +227,6 @@ function agregarPaginaFaltantes(
     logo: contexto.logo,
     tipoDocumento: contexto.tipoDocumento,
     empresa: contexto.empresa,
-    nombreEmpresa: contexto.empresa,
   });
 
   let y = dibujarTituloSeccion(
@@ -291,7 +289,6 @@ export async function generarReportePdf(
 
   let y = dibujarEncabezado(portada, fuentes, {
     ...contexto,
-    nombreEmpresa: reporte.companyName,
   });
 
   portada.drawText(reporte.projectName, {
@@ -495,7 +492,6 @@ export async function generarReporteViaticoPdf(
 
   let y = dibujarEncabezado(portada, fuentes, {
     ...contexto,
-    nombreEmpresa: reporte.companyName,
   });
 
   portada.drawText("Reporte de viáticos", {
