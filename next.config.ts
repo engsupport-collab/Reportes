@@ -21,6 +21,12 @@ const nextConfig: NextConfig = {
    */
   outputFileTracingIncludes: {
     "/*": ["node_modules/sharp/**/*", "node_modules/@img/**/*"],
+    // `public/` no viaja solo dentro del paquete de una función serverless
+    // —Vercel lo sirve aparte, por CDN—, así que `pdf-marca.ts` no lo
+    // encontraría con `readFile` en producción sin este empujón explícito.
+    // Acotado a las dos rutas que arman un PDF, no a todo el sitio.
+    "/api/reportes/[id]/pdf": ["public/logo-azul.png"],
+    "/api/reportes/publico/[token]": ["public/logo-azul.png"],
   },
 
   experimental: {

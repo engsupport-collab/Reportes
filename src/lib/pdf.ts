@@ -1,11 +1,30 @@
 import "server-only";
 
-import { PDFDocument, type PDFFont, type PDFPage, StandardFonts, rgb } from "pdf-lib";
+import {
+  PDFDocument,
+  type PDFFont,
+  type PDFImage,
+  type PDFPage,
+  StandardFonts,
+} from "pdf-lib";
 import sharp from "sharp";
 
 import { tipoServicioLabel, ordenarEtiquetas } from "@/lib/etiquetas";
 import { formatFechaLarga, formatInstante } from "@/lib/fechas";
 import { formatearMonto } from "@/lib/moneda";
+import {
+  A4,
+  COLOR_LINEA,
+  COLOR_MUTED,
+  COLOR_TEXTO,
+  MARGEN,
+  dibujarCampo,
+  dibujarEncabezado,
+  dibujarInsignia,
+  dibujarPies,
+  dibujarTituloSeccion,
+  embeberLogo,
+} from "@/lib/pdf-marca";
 import { leerArchivo } from "@/lib/storage";
 import type { ReporteCompleto } from "@/lib/queries/reports";
 
@@ -26,14 +45,13 @@ import type { ReporteCompleto } from "@/lib/queries/reports";
  * de insertarlas. Es un costo que solo paga quien pide el PDF, no cada
  * petición de la aplicación — por eso aquí sí se justifica, a diferencia de
  * la subida, donde afectaría el arranque en frío de todos los usuarios.
+ *
+ * La parte visual (logo, colores, encabezado, pie) vive en `pdf-marca.ts`.
  */
 
-const A4: [number, number] = [595, 842];
-const MARGEN = 48;
-const COLOR_TEXTO = rgb(0.06, 0.08, 0.11);
-const COLOR_MUTED = rgb(0.4, 0.45, 0.52);
-
 type Adjunto = { id: string; blobUrl: string; fileName: string; mimeType: string };
+
+type Fuentes = { normal: PDFFont; bold: PDFFont };
 
 function envolverTexto(
   texto: string,
@@ -70,9 +88,15 @@ async function comoImagenEmbebible(
   return { bytes: new Uint8Array(png), esJpg: false };
 }
 
+/**
+ * Página con una imagen a página completa (una foto adjunta o la firma),
+ * con su encabezado de marca y el espacio del pie respetado.
+ */
 async function agregarPaginaImagen(
   doc: PDFDocument,
-  font: PDFFont,
+  fuentes: Fuentes,
+  contexto: { logo: PDFImage | null; tipoDocumento: string; empresa: string },
+  paginasPropias: PDFPage[],
   bytes: ArrayBuffer,
   mimeType: string,
   titulo: string,
@@ -82,9 +106,35 @@ async function agregarPaginaImagen(
   const imagen = esJpg ? await doc.embedJpg(datos) : await doc.embedPng(datos);
 
   const page = doc.addPage(A4);
-  const [anchoPagina, altoPagina] = A4;
+  paginasPropias.push(page);
+  const [anchoPagina] = A4;
+
+  const yTrasEncabezado = dibujarEncabezado(page, fuentes, {
+    logo: contexto.logo,
+    tipoDocumento: contexto.tipoDocumento,
+    empresa: contexto.empresa,
+    nombreEmpresa: contexto.empresa,
+  });
+
+  let y = dibujarTituloSeccion(page, fuentes.normal, MARGEN, yTrasEncabezado, titulo);
+
+  if (subtitulo) {
+    page.drawText(subtitulo, {
+      x: MARGEN,
+      y: y + 4,
+      size: 9.5,
+      font: fuentes.normal,
+      color: COLOR_MUTED,
+      maxWidth: anchoPagina - MARGEN * 2,
+    });
+    y -= 12;
+  }
+
+  // Entre el título y el pie: ese es todo el espacio que puede ocupar la foto.
+  const techo = y + 6;
+  const piso = 56;
   const anchoDisponible = anchoPagina - MARGEN * 2;
-  const altoDisponible = altoPagina - MARGEN * 2 - 50; // espacio para el título
+  const altoDisponible = techo - piso;
 
   const escala = Math.min(
     anchoDisponible / imagen.width,
@@ -94,26 +144,9 @@ async function agregarPaginaImagen(
   const w = imagen.width * escala;
   const h = imagen.height * escala;
 
-  page.drawText(titulo, {
-    x: MARGEN,
-    y: altoPagina - MARGEN - 14,
-    size: 12,
-    font,
-    color: COLOR_TEXTO,
-  });
-  if (subtitulo) {
-    page.drawText(subtitulo, {
-      x: MARGEN,
-      y: altoPagina - MARGEN - 30,
-      size: 10,
-      font,
-      color: COLOR_MUTED,
-    });
-  }
-
   page.drawImage(imagen, {
     x: (anchoPagina - w) / 2,
-    y: (altoPagina - 50 - h) / 2,
+    y: piso + (altoDisponible - h) / 2,
     width: w,
     height: h,
   });
@@ -136,7 +169,9 @@ async function fusionarPdf(
 /** Agrega la foto o el PDF de un ítem (viático o adjunto); si no se puede, lo deja listado. */
 async function agregarArchivo(
   doc: PDFDocument,
-  font: PDFFont,
+  fuentes: Fuentes,
+  contexto: { logo: PDFImage | null; tipoDocumento: string; empresa: string },
+  paginasPropias: PDFPage[],
   item: Adjunto,
   titulo: string,
   subtitulo: string | undefined,
@@ -156,7 +191,16 @@ async function agregarArchivo(
 
   if (item.mimeType.startsWith("image/")) {
     try {
-      await agregarPaginaImagen(doc, font, datos, item.mimeType, titulo, subtitulo);
+      await agregarPaginaImagen(
+        doc,
+        fuentes,
+        contexto,
+        paginasPropias,
+        datos,
+        item.mimeType,
+        titulo,
+        subtitulo,
+      );
     } catch {
       sinFusionar.push(item.fileName);
     }
@@ -166,17 +210,61 @@ async function agregarArchivo(
   sinFusionar.push(item.fileName);
 }
 
-function agregarLista(
-  page: PDFPage,
-  font: PDFFont,
-  x: number,
-  y: number,
-  etiqueta: string,
-  valor: string,
-): number {
-  page.drawText(etiqueta, { x, y, size: 9, font, color: COLOR_MUTED });
-  page.drawText(valor, { x, y: y - 14, size: 11, font, color: COLOR_TEXTO });
-  return y - 34;
+/** Página final con lo que no se pudo incluir. Solo se agrega si hace falta. */
+function agregarPaginaFaltantes(
+  doc: PDFDocument,
+  fuentes: Fuentes,
+  contexto: { logo: PDFImage | null; tipoDocumento: string; empresa: string },
+  paginasPropias: PDFPage[],
+  sinFusionar: string[],
+): void {
+  if (sinFusionar.length === 0) return;
+
+  const page = doc.addPage(A4);
+  paginasPropias.push(page);
+  const [ancho] = A4;
+
+  const yTrasEncabezado = dibujarEncabezado(page, fuentes, {
+    logo: contexto.logo,
+    tipoDocumento: contexto.tipoDocumento,
+    empresa: contexto.empresa,
+    nombreEmpresa: contexto.empresa,
+  });
+
+  let y = dibujarTituloSeccion(
+    page,
+    fuentes.normal,
+    MARGEN,
+    yTrasEncabezado,
+    "Archivos no incluidos",
+  );
+
+  page.drawText(
+    "Formato no compatible para fusionar (Word, Excel u otro) o no se pudo leer. Descárguelos por separado desde el reporte.",
+    {
+      x: MARGEN,
+      y,
+      size: 9.5,
+      font: fuentes.normal,
+      color: COLOR_MUTED,
+      maxWidth: ancho - MARGEN * 2,
+      lineHeight: 13,
+    },
+  );
+  y -= 34;
+
+  for (const nombre of sinFusionar) {
+    if (y < 60) break;
+    page.drawText(`• ${nombre}`, {
+      x: MARGEN,
+      y,
+      size: 10,
+      font: fuentes.normal,
+      color: COLOR_TEXTO,
+      maxWidth: ancho - MARGEN * 2,
+    });
+    y -= 16;
+  }
 }
 
 export async function generarReportePdf(
@@ -184,104 +272,138 @@ export async function generarReportePdf(
   adjuntos: Adjunto[],
 ): Promise<Uint8Array> {
   const doc = await PDFDocument.create();
-  const font = await doc.embedFont(StandardFonts.Helvetica);
-  const fontBold = await doc.embedFont(StandardFonts.HelveticaBold);
+  const fuentes: Fuentes = {
+    normal: await doc.embedFont(StandardFonts.Helvetica),
+    bold: await doc.embedFont(StandardFonts.HelveticaBold),
+  };
+  const logo = await embeberLogo(doc);
+  const contexto = {
+    logo,
+    tipoDocumento: "Reporte de servicio",
+    empresa: reporte.companyName,
+  };
+  const paginasPropias: PDFPage[] = [];
 
   // --- Página 1: ficha del reporte ---
   const portada = doc.addPage(A4);
-  const [ancho, alto] = A4;
-  let y = alto - MARGEN;
+  paginasPropias.push(portada);
+  const [ancho] = A4;
+
+  let y = dibujarEncabezado(portada, fuentes, {
+    ...contexto,
+    nombreEmpresa: reporte.companyName,
+  });
 
   portada.drawText(reporte.projectName, {
     x: MARGEN,
     y,
-    size: 18,
-    font: fontBold,
+    size: 19,
+    font: fuentes.bold,
     color: COLOR_TEXTO,
-    maxWidth: ancho - MARGEN * 2,
+    maxWidth: ancho - MARGEN * 2 - 110,
   });
-  y -= 28;
-  portada.drawText(reporte.companyName, {
-    x: MARGEN,
-    y,
-    size: 11,
-    font,
-    color: COLOR_MUTED,
-  });
+
+  const terminado = reporte.status === "terminado";
+  dibujarInsignia(
+    portada,
+    fuentes.bold,
+    ancho - MARGEN - (terminado ? 78 : 84),
+    y + 3,
+    terminado ? "Terminado" : "En proceso",
+    terminado,
+  );
   y -= 34;
 
+  const anchoColumna = (ancho - MARGEN * 2 - 24) / 2;
   const columna1 = MARGEN;
-  const columna2 = MARGEN + (ancho - MARGEN * 2) / 2;
+  const columna2 = MARGEN + anchoColumna + 24;
   const inicioFilas = y;
 
-  y = agregarLista(portada, font, columna1, y, "CLIENTE", reporte.clientName);
-  y = agregarLista(
+  y = dibujarCampo(portada, fuentes, columna1, y, anchoColumna, "Cliente", reporte.clientName);
+  y = dibujarCampo(
     portada,
-    font,
+    fuentes,
     columna1,
     y,
-    "COTIZACIÓN",
+    anchoColumna,
+    "Cotización",
     reporte.quoteNumber ?? "Sin asignar",
   );
-  y = agregarLista(
+  y = dibujarCampo(
     portada,
-    font,
+    fuentes,
     columna1,
     y,
-    "ORDEN DE COMPRA",
+    anchoColumna,
+    "Orden de compra",
     reporte.purchaseOrderNo ?? "Sin asignar",
   );
-  y = agregarLista(
+  y = dibujarCampo(
     portada,
-    font,
+    fuentes,
     columna1,
     y,
-    "FECHA DEL TRABAJO",
+    anchoColumna,
+    "Fecha del trabajo",
     formatFechaLarga(reporte.workDate),
-  );
-  y = agregarLista(
-    portada,
-    font,
-    columna1,
-    y,
-    "ESTADO",
-    reporte.status === "terminado" ? "Terminado" : "En proceso",
   );
 
   let y2 = inicioFilas;
-  const tipo = tipoServicioLabel(reporte.serviceType) ?? "Sin definir";
   const etiquetas = ordenarEtiquetas(reporte.etiquetas)
     .map((e) => e.label)
     .join(", ");
-  y2 = agregarLista(portada, font, columna2, y2, "TIPO DE SERVICIO", tipo);
-  y2 = agregarLista(portada, font, columna2, y2, "ETIQUETAS", etiquetas || "Ninguna");
-  y2 = agregarLista(portada, font, columna2, y2, "CREADO POR", reporte.authorName);
-  y2 = agregarLista(
+  y2 = dibujarCampo(
     portada,
-    font,
+    fuentes,
     columna2,
     y2,
-    "CREADO EL",
+    anchoColumna,
+    "Tipo de servicio",
+    tipoServicioLabel(reporte.serviceType) ?? "Sin definir",
+  );
+  y2 = dibujarCampo(
+    portada,
+    fuentes,
+    columna2,
+    y2,
+    anchoColumna,
+    "Etiquetas",
+    etiquetas || "Ninguna",
+  );
+  y2 = dibujarCampo(
+    portada,
+    fuentes,
+    columna2,
+    y2,
+    anchoColumna,
+    "Creado por",
+    reporte.authorName,
+  );
+  y2 = dibujarCampo(
+    portada,
+    fuentes,
+    columna2,
+    y2,
+    anchoColumna,
+    "Creado el",
     formatInstante(reporte.createdAt),
   );
 
-  y = Math.min(y, y2) - 10;
-
-  portada.drawText("DETALLES DEL TRABAJO", {
-    x: MARGEN,
-    y,
-    size: 9,
-    font,
-    color: COLOR_MUTED,
-  });
-  y -= 18;
+  y = Math.min(y, y2) - 6;
+  y = dibujarTituloSeccion(portada, fuentes.normal, MARGEN, y, "Detalles del trabajo");
 
   const lineasDetalle = reporte.details
-    ? envolverTexto(reporte.details, font, 10.5, ancho - MARGEN * 2)
+    ? envolverTexto(reporte.details, fuentes.normal, 10.5, ancho - MARGEN * 2)
     : ["Sin detalles."];
   for (const linea of lineasDetalle) {
-    if (y < MARGEN + 60) break; // suficiente para el caso normal; el detalle no es el foco del documento
-    portada.drawText(linea, { x: MARGEN, y, size: 10.5, font, color: COLOR_TEXTO });
+    if (y < 60) break; // el detalle no es el foco del documento; lo que no cabe, no corta la página
+    portada.drawText(linea, {
+      x: MARGEN,
+      y,
+      size: 10.5,
+      font: fuentes.normal,
+      color: COLOR_TEXTO,
+    });
     y -= 15;
   }
 
@@ -299,10 +421,12 @@ export async function generarReportePdf(
       try {
         await agregarPaginaImagen(
           doc,
-          fontBold,
+          fuentes,
+          contexto,
+          paginasPropias,
           datosFirma,
           "image/png",
-          "Firma",
+          "Firma de conformidad",
           firmaSubtitulo || undefined,
         );
       } catch {
@@ -315,7 +439,9 @@ export async function generarReportePdf(
   for (const [i, a] of adjuntos.entries()) {
     await agregarArchivo(
       doc,
-      fontBold,
+      fuentes,
+      contexto,
+      paginasPropias,
       a,
       `Adjunto ${i + 1} de ${adjuntos.length}`,
       a.fileName,
@@ -323,34 +449,14 @@ export async function generarReportePdf(
     );
   }
 
-  // --- Página final: lo que no se pudo fusionar ---
-  if (sinFusionar.length > 0) {
-    const notaPage = doc.addPage(A4);
-    let yNota = alto - MARGEN;
-    notaPage.drawText("Archivos no incluidos en este PDF", {
-      x: MARGEN,
-      y: yNota,
-      size: 13,
-      font: fontBold,
-      color: COLOR_TEXTO,
-    });
-    yNota -= 20;
-    notaPage.drawText(
-      "Formato no compatible para fusionar (Word, Excel u otro) o no se pudo leer. Descárguelos por separado desde el reporte.",
-      { x: MARGEN, y: yNota, size: 10, font, color: COLOR_MUTED, maxWidth: ancho - MARGEN * 2 },
-    );
-    yNota -= 26;
-    for (const nombre of sinFusionar) {
-      notaPage.drawText(`• ${nombre}`, {
-        x: MARGEN,
-        y: yNota,
-        size: 10.5,
-        font,
-        color: COLOR_TEXTO,
-      });
-      yNota -= 16;
-    }
-  }
+  agregarPaginaFaltantes(doc, fuentes, contexto, paginasPropias, sinFusionar);
+
+  dibujarPies(
+    doc,
+    fuentes.normal,
+    paginasPropias,
+    `${reporte.companyName} · ${reporte.projectName} · Generado el ${formatInstante(new Date())}`,
+  );
 
   return doc.save();
 }
@@ -376,92 +482,145 @@ export async function generarReporteViaticoPdf(
   gastos: GastoViatico[],
 ): Promise<Uint8Array> {
   const doc = await PDFDocument.create();
-  const font = await doc.embedFont(StandardFonts.Helvetica);
-  const fontBold = await doc.embedFont(StandardFonts.HelveticaBold);
+  const fuentes: Fuentes = {
+    normal: await doc.embedFont(StandardFonts.Helvetica),
+    bold: await doc.embedFont(StandardFonts.HelveticaBold),
+  };
+  const logo = await embeberLogo(doc);
+  const contexto = {
+    logo,
+    tipoDocumento: "Reporte de viáticos",
+    empresa: reporte.companyName,
+  };
+  const paginasPropias: PDFPage[] = [];
 
   const portada = doc.addPage(A4);
-  const [ancho, alto] = A4;
-  let y = alto - MARGEN;
+  paginasPropias.push(portada);
+  const [ancho] = A4;
+
+  let y = dibujarEncabezado(portada, fuentes, {
+    ...contexto,
+    nombreEmpresa: reporte.companyName,
+  });
 
   portada.drawText("Reporte de viáticos", {
     x: MARGEN,
     y,
-    size: 18,
-    font: fontBold,
+    size: 19,
+    font: fuentes.bold,
     color: COLOR_TEXTO,
-    maxWidth: ancho - MARGEN * 2,
+    maxWidth: ancho - MARGEN * 2 - 110,
   });
-  y -= 28;
-  portada.drawText(reporte.companyName, {
-    x: MARGEN,
-    y,
-    size: 11,
-    font,
-    color: COLOR_MUTED,
-  });
+
+  const terminado = reporte.status === "terminado";
+  dibujarInsignia(
+    portada,
+    fuentes.bold,
+    ancho - MARGEN - (terminado ? 78 : 84),
+    y + 3,
+    terminado ? "Terminado" : "En proceso",
+    terminado,
+  );
   y -= 34;
 
   const total = gastos.reduce((suma, g) => suma + (g.amount ?? 0), 0);
-
+  const anchoColumna = (ancho - MARGEN * 2 - 24) / 2;
   const columna1 = MARGEN;
-  const columna2 = MARGEN + (ancho - MARGEN * 2) / 2;
+  const columna2 = MARGEN + anchoColumna + 24;
   const inicioFilas = y;
 
-  y = agregarLista(
+  y = dibujarCampo(
     portada,
-    font,
+    fuentes,
     columna1,
     y,
-    "JUSTIFICA A",
+    anchoColumna,
+    "Justifica a",
     reporte.projectName,
   );
-  y = agregarLista(
+  y = dibujarCampo(
     portada,
-    font,
+    fuentes,
     columna1,
     y,
-    "ESTADO",
-    reporte.status === "terminado" ? "Terminado" : "En proceso",
+    anchoColumna,
+    "Creado por",
+    reporte.authorName,
   );
 
   let y2 = inicioFilas;
-  y2 = agregarLista(portada, font, columna2, y2, "TOTAL", formatearMonto(total, reporte.currency));
-  y2 = agregarLista(portada, font, columna2, y2, "CREADO POR", reporte.authorName);
-  y2 = agregarLista(
+  y2 = dibujarCampo(
     portada,
-    font,
+    fuentes,
     columna2,
     y2,
-    "CREADO EL",
+    anchoColumna,
+    "Total",
+    formatearMonto(total, reporte.currency),
+  );
+  y2 = dibujarCampo(
+    portada,
+    fuentes,
+    columna2,
+    y2,
+    anchoColumna,
+    "Creado el",
     formatInstante(reporte.createdAt),
   );
 
-  y = Math.min(y, y2) - 10;
-
-  portada.drawText("GASTOS", { x: MARGEN, y, size: 9, font, color: COLOR_MUTED });
-  y -= 18;
+  y = Math.min(y, y2) - 6;
+  y = dibujarTituloSeccion(portada, fuentes.normal, MARGEN, y, `Gastos (${gastos.length})`);
 
   for (const g of gastos) {
-    if (y < MARGEN + 40) break;
-    const linea = `${g.concepto ?? "Sin concepto"} — ${
-      g.amount !== null ? formatearMonto(g.amount, reporte.currency) : "Sin monto"
-    }${g.fechaGasto ? ` — ${formatFechaLarga(g.fechaGasto)}` : ""}`;
-    portada.drawText(`• ${linea}`, {
+    if (y < 60) break;
+    const monto =
+      g.amount !== null ? formatearMonto(g.amount, reporte.currency) : "Sin monto";
+    const fecha = g.fechaGasto ? formatFechaLarga(g.fechaGasto) : null;
+
+    portada.drawText(g.concepto ?? "Sin concepto", {
       x: MARGEN,
       y,
       size: 10.5,
-      font,
+      font: fuentes.normal,
       color: COLOR_TEXTO,
-      maxWidth: ancho - MARGEN * 2,
+      maxWidth: ancho - MARGEN * 2 - 130,
     });
-    y -= 16;
+
+    const anchoMonto = fuentes.bold.widthOfTextAtSize(monto, 10.5);
+    portada.drawText(monto, {
+      x: ancho - MARGEN - anchoMonto,
+      y,
+      size: 10.5,
+      font: fuentes.bold,
+      color: COLOR_TEXTO,
+    });
+
+    if (fecha) {
+      portada.drawText(fecha, {
+        x: MARGEN,
+        y: y - 12,
+        size: 8.5,
+        font: fuentes.normal,
+        color: COLOR_MUTED,
+      });
+    }
+
+    y -= fecha ? 26 : 18;
+    portada.drawLine({
+      start: { x: MARGEN, y: y + 8 },
+      end: { x: ancho - MARGEN, y: y + 8 },
+      thickness: 0.5,
+      color: COLOR_LINEA,
+    });
   }
 
   const sinFusionar: string[] = [];
   for (const [i, g] of gastos.entries()) {
     await agregarArchivo(
       doc,
-      fontBold,
+      fuentes,
+      contexto,
+      paginasPropias,
       g,
       `Gasto ${i + 1} de ${gastos.length}`,
       g.concepto ?? undefined,
@@ -469,33 +628,14 @@ export async function generarReporteViaticoPdf(
     );
   }
 
-  if (sinFusionar.length > 0) {
-    const notaPage = doc.addPage(A4);
-    let yNota = alto - MARGEN;
-    notaPage.drawText("Archivos no incluidos en este PDF", {
-      x: MARGEN,
-      y: yNota,
-      size: 13,
-      font: fontBold,
-      color: COLOR_TEXTO,
-    });
-    yNota -= 20;
-    notaPage.drawText(
-      "Formato no compatible para fusionar (Word, Excel u otro) o no se pudo leer. Descárguelos por separado desde el reporte.",
-      { x: MARGEN, y: yNota, size: 10, font, color: COLOR_MUTED, maxWidth: ancho - MARGEN * 2 },
-    );
-    yNota -= 26;
-    for (const nombre of sinFusionar) {
-      notaPage.drawText(`• ${nombre}`, {
-        x: MARGEN,
-        y: yNota,
-        size: 10.5,
-        font,
-        color: COLOR_TEXTO,
-      });
-      yNota -= 16;
-    }
-  }
+  agregarPaginaFaltantes(doc, fuentes, contexto, paginasPropias, sinFusionar);
+
+  dibujarPies(
+    doc,
+    fuentes.normal,
+    paginasPropias,
+    `${reporte.companyName} · Viáticos · ${reporte.projectName} · Generado el ${formatInstante(new Date())}`,
+  );
 
   return doc.save();
 }
