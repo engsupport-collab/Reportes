@@ -16,8 +16,8 @@ export default async function NotFound() {
   const t = await getTranslations("notFound");
 
   return (
-    <div className="flex min-h-svh flex-col items-center justify-center gap-8 bg-bg px-6 text-center">
-      <Logotipo alto={64} />
+    <div className="flex min-h-svh w-full flex-col items-center justify-center gap-8 bg-bg px-6 text-center">
+      <Logotipo alto={77} />
       <div className="space-y-3">
         <p className="font-mono text-sm font-semibold tracking-widest text-muted">
           404
