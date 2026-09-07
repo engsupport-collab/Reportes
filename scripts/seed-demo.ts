@@ -15,7 +15,7 @@ import { eq } from "drizzle-orm";
 
 import { crearClienteScript } from "./db-cliente";
 import { anunciar, cargarCredenciales } from "./entorno";
-import { reportTags, reports, userCompanies, users } from "../src/db/schema";
+import { clients, reportTags, reports, userCompanies, users } from "../src/db/schema";
 import { ETIQUETAS_TRABAJO, TIPOS_SERVICIO } from "../src/lib/etiquetas";
 import { parseFechaISO } from "../src/lib/fechas";
 import { hashPassword } from "../src/lib/password";
@@ -109,6 +109,26 @@ async function main() {
     .limit(1);
 
   if (!admin) throw new Error("No hay ningún admin. Corre antes npm run seed:admin.");
+
+  // --- Clientes ---
+  //
+  // Los reportes guardan el nombre del cliente como texto suelto, pero una
+  // cotización lo referencia por clave foránea: sin filas aquí no se puede
+  // crear ninguna, y `test:numeracion` se niega a correr. Se crean en las dos
+  // empresas porque cada una lleva su propia cartera.
+  await db
+    .insert(clients)
+    .values(
+      ["corp", "saas"].flatMap((companyId) =>
+        CLIENTES.map((name) => ({
+          id: `demo-${companyId}-${name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`,
+          companyId,
+          name,
+          createdBy: admin.id,
+        })),
+      ),
+    )
+    .onConflictDoNothing();
 
   // --- Reportes ---
   const ahora = Date.now();
