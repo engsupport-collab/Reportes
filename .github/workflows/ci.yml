@@ -1,0 +1,81 @@
+name: CI
+
+# El objetivo no es solo "que corran las pruebas": es demostrar, en cada push,
+# que la base se puede reconstruir entera desde cero — migraciones y semillas
+# incluidas — sin depender de la instancia real de Cloud SQL. Si esto pasa en
+# verde, cualquiera puede levantar el proyecto con un PostgreSQL vacío.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  pruebas:
+    runs-on: ubuntu-latest
+
+    services:
+      # Misma versión mayor que producción (Cloud SQL PostgreSQL 16): una
+      # prueba contra otra versión puede pasar por diferencias del motor y no
+      # por el código.
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: reportes_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      # Conmutador de `src/db/index.ts`: con esto se conecta directo, sin el
+      # conector de Cloud SQL y sin credenciales de Google en el repositorio.
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/reportes_test
+      # Valores de prueba, no secretos: esta base se destruye al terminar el
+      # trabajo y nunca contiene datos reales.
+      SESSION_SECRET: secreto-solo-para-ci-de-treinta-y-dos-o-mas
+      SEED_ADMIN_USERNAME: admin
+      SEED_ADMIN_PASSWORD: admin-de-prueba-ci
+      SEED_ADMIN_FULLNAME: Administrador CI
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Tipos
+        run: npx tsc --noEmit
+
+      - name: Lint
+        run: npx eslint .
+
+      # A partir de aquí, todo corre contra una base recién creada y vacía.
+      - name: Migraciones
+        run: npm run db:migrate
+
+      - name: Semilla del administrador
+        run: npm run seed:admin
+
+      - name: Semilla de datos de prueba
+        run: npm run seed:demo
+
+      # `test:filtros` comprueba explícitamente que haya reportes en las dos
+      # empresas, así que falla si las semillas no dejaron datos — no puede
+      # pasar en vano contra una base vacía.
+      - name: Numeración de cotizaciones
+        run: npm run test:numeracion
+
+      - name: Filtros de reportes
+        run: npm run test:filtros
+
+      - name: Bloqueo por fuerza bruta
+        run: npm run test:rate-limit

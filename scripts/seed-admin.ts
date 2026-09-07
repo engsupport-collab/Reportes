@@ -17,23 +17,19 @@ config({ path: ".env.local" });
 import { eq } from "drizzle-orm";
 
 import { crearClienteScript } from "./db-cliente";
+import { anunciar, cargarCredenciales } from "./entorno";
 import { users } from "../src/db/schema";
 import { PASSWORD_MIN_LENGTH, hashPassword } from "../src/lib/password";
 
 async function main() {
-  const instanceConnectionName = process.env.DB_INSTANCE_CONNECTION_NAME;
-  const user = process.env.DB_USER;
-  const password_ = process.env.DB_PASSWORD;
-  const database = process.env.DB_NAME;
+  // Por `cargarCredenciales` y no leyendo process.env a mano: así este script
+  // también funciona contra una base directa (`DATABASE_URL`), que es como lo
+  // levanta CI, sin una segunda versión del mismo código.
+  const credenciales = cargarCredenciales(process.argv);
   const username = process.env.SEED_ADMIN_USERNAME?.trim();
   const password = process.env.SEED_ADMIN_PASSWORD;
   const fullName = process.env.SEED_ADMIN_FULLNAME?.trim() || "Administrador";
 
-  if (!instanceConnectionName || !user || !password_ || !database) {
-    throw new Error(
-      "Faltan DB_INSTANCE_CONNECTION_NAME, DB_USER, DB_PASSWORD o DB_NAME. Copia .env.example a .env.local y complétalo.",
-    );
-  }
   if (!username || !password) {
     throw new Error(
       "Faltan SEED_ADMIN_USERNAME o SEED_ADMIN_PASSWORD en .env.local.",
@@ -45,14 +41,8 @@ async function main() {
     );
   }
 
-  const { db, cerrar } = await crearClienteScript({
-    instanceConnectionName,
-    user,
-    password: password_,
-    database,
-    origen: ".env.local",
-    esProduccion: false,
-  });
+  anunciar(credenciales);
+  const { db, cerrar } = await crearClienteScript(credenciales);
 
   const existente = await db
     .select({ id: users.id })

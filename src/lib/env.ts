@@ -18,16 +18,28 @@ const envSchema = z.object({
   TURSO_DATABASE_URL: z.string().optional(),
   TURSO_AUTH_TOKEN: z.string().optional(),
 
+  /**
+   * Conexión directa por cadena, para una base que se alcanza sin el conector
+   * de Google: el PostgreSQL efímero que levanta CI en cada ejecución.
+   *
+   * Es el conmutador entre los dos modos de `src/db/index.ts`, y la elección
+   * es explícita: si está definida se usa, y si no se usa Cloud SQL. No es un
+   * plan B que se active cuando Cloud SQL falle — un mecanismo que cambia solo
+   * ante un error acaba escondiendo justo el error que hay que ver.
+   */
+  DATABASE_URL: z.string().optional(),
+
   // Cloud SQL (PostgreSQL). `DB_INSTANCE_CONNECTION_NAME` es el identificador
   // "proyecto:región:instancia" que usa el conector oficial de Google
   // (`@google-cloud/cloud-sql-connector`) para abrir el túnel autenticado —
   // no es un host/puerto tradicional, así que no hay DB_HOST ni DB_PORT.
-  DB_INSTANCE_CONNECTION_NAME: z
-    .string()
-    .min(1, "Falta DB_INSTANCE_CONNECTION_NAME"),
-  DB_USER: z.string().min(1, "Falta DB_USER"),
-  DB_PASSWORD: z.string().min(1, "Falta DB_PASSWORD"),
-  DB_NAME: z.string().min(1, "Falta DB_NAME"),
+  //
+  // Son opcionales en el esquema pero obligatorias en la práctica: sin
+  // DATABASE_URL, la comprobación de más abajo las exige las cuatro.
+  DB_INSTANCE_CONNECTION_NAME: z.string().optional(),
+  DB_USER: z.string().optional(),
+  DB_PASSWORD: z.string().optional(),
+  DB_NAME: z.string().optional(),
   // Contenido completo del JSON de la cuenta de servicio, como texto — no una
   // ruta de archivo. Hace falta en Vercel, que no tiene sistema de archivos
   // persistente donde apuntar `GOOGLE_APPLICATION_CREDENTIALS`. En desarrollo
@@ -79,7 +91,28 @@ const envSchema = z.object({
     .string()
     .email("GMAIL_SENDER_EMAIL debe ser un correo válido")
     .optional(),
-});
+})
+  /**
+   * Un modo de conexión u otro, pero completo.
+   *
+   * Sin esto, faltar `DB_PASSWORD` no daría un error de configuración sino una
+   * conexión que se intenta y falla más adelante, con un mensaje del driver
+   * que no menciona ninguna variable.
+   */
+  .refine(
+    (v) =>
+      Boolean(v.DATABASE_URL) ||
+      Boolean(
+        v.DB_INSTANCE_CONNECTION_NAME && v.DB_USER && v.DB_PASSWORD && v.DB_NAME,
+      ),
+    {
+      message:
+        "Falta cómo conectarse a la base: define DATABASE_URL (conexión directa) " +
+        "o las cuatro de Cloud SQL (DB_INSTANCE_CONNECTION_NAME, DB_USER, " +
+        "DB_PASSWORD, DB_NAME).",
+      path: ["DATABASE_URL"],
+    },
+  );
 
 function loadEnv() {
   const parsed = envSchema.safeParse(process.env);

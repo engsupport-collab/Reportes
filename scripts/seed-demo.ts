@@ -14,6 +14,7 @@ config({ path: ".env.local" });
 import { eq } from "drizzle-orm";
 
 import { crearClienteScript } from "./db-cliente";
+import { anunciar, cargarCredenciales } from "./entorno";
 import { reportTags, reports, userCompanies, users } from "../src/db/schema";
 import { ETIQUETAS_TRABAJO, TIPOS_SERVICIO } from "../src/lib/etiquetas";
 import { parseFechaISO } from "../src/lib/fechas";
@@ -56,14 +57,16 @@ function elegir<T>(lista: T[], i: number): T {
 async function main() {
   const cantidad = Number(process.argv[2]) || 10;
 
-  const { db, cerrar } = await crearClienteScript({
-    instanceConnectionName: process.env.DB_INSTANCE_CONNECTION_NAME!,
-    user: process.env.DB_USER!,
-    password: process.env.DB_PASSWORD!,
-    database: process.env.DB_NAME!,
-    origen: ".env.local",
-    esProduccion: false,
-  });
+  // Por `cargarCredenciales` y no leyendo process.env a mano: así este script
+  // también funciona contra una base directa (`DATABASE_URL`), que es como lo
+  // levanta CI, sin una segunda versión del mismo código.
+  const credenciales = cargarCredenciales(process.argv);
+  if (credenciales.esProduccion) {
+    throw new Error("seed:demo no se ejecuta contra producción.");
+  }
+  anunciar(credenciales);
+
+  const { db, cerrar } = await crearClienteScript(credenciales);
 
   // --- Empleado de prueba ---
   let [empleado] = await db

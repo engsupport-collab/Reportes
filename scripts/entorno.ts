@@ -27,6 +27,12 @@ import { config } from "dotenv";
  */
 
 export type Credenciales = {
+  /**
+   * Conexión directa por cadena. Cuando viene, manda sobre todo lo demás y no
+   * se toca Cloud SQL: es el PostgreSQL efímero que levanta CI en cada
+   * ejecución, alcanzable sin conector ni credenciales de Google.
+   */
+  connectionString?: string;
   instanceConnectionName: string;
   user: string;
   password: string;
@@ -46,6 +52,21 @@ const VARIABLES = [
 export function cargarCredenciales(argv: string[]): Credenciales {
   const usaProd = argv.includes("--prod");
   const archivo = usaProd ? ".env.prod" : ".env.local";
+
+  // Conexión directa: es el modo de CI y de cualquiera que levante un
+  // PostgreSQL propio. Se comprueba antes que nada porque en ese caso no hay
+  // ni archivo .env ni credenciales de Google que exigir.
+  if (process.env.DATABASE_URL) {
+    return {
+      connectionString: process.env.DATABASE_URL,
+      instanceConnectionName: "",
+      user: "",
+      password: "",
+      database: process.env.DATABASE_URL.split("/").pop() ?? "",
+      origen: "DATABASE_URL (conexión directa)",
+      esProduccion: false,
+    };
+  }
 
   // Se anota antes de cargar el archivo: si ya venían exportadas, esas mandan
   // (dotenv no sobrescribe) y hay que decirlo, porque no coincidirían con lo
@@ -114,7 +135,11 @@ export function cargarCredenciales(argv: string[]): Credenciales {
 /** Cabecera común: contra qué base se va a trabajar, antes de tocar nada. */
 export function anunciar(cred: Credenciales): void {
   console.log("");
-  console.log(`  INSTANCIA:     ${cred.instanceConnectionName}`);
+  if (cred.connectionString) {
+    console.log("  CONEXIÓN:      directa (sin Cloud SQL)");
+  } else {
+    console.log(`  INSTANCIA:     ${cred.instanceConnectionName}`);
+  }
   console.log(`  BASE DE DATOS: ${cred.database}`);
   console.log(`  Credenciales:  ${cred.origen}`);
   if (cred.esProduccion) console.log("  *** PRODUCCIÓN ***");
