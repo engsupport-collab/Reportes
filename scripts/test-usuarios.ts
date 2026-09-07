@@ -18,6 +18,7 @@ config({ path: ".env.local" });
 import { and, eq } from "drizzle-orm";
 
 import { crearClienteScript } from "./db-cliente";
+import { cargarCredenciales } from "./entorno";
 import { userCompanies, users } from "../src/db/schema";
 import { hashPassword } from "../src/lib/password";
 
@@ -31,14 +32,15 @@ function comprobar(descripcion: string, condicion: boolean, detalle = "") {
 }
 
 async function main() {
-  const { db, cerrar } = await crearClienteScript({
-    instanceConnectionName: process.env.DB_INSTANCE_CONNECTION_NAME!,
-    user: process.env.DB_USER!,
-    password: process.env.DB_PASSWORD!,
-    database: process.env.DB_NAME!,
-    origen: ".env.local",
-    esProduccion: false,
-  });
+  // Por `cargarCredenciales` y no leyendo process.env a mano: así esta prueba
+  // corre igual contra Cloud SQL en local que contra el PostgreSQL efímero de
+  // CI, sin una segunda versión del mismo código.
+  const credenciales = cargarCredenciales(process.argv);
+  if (credenciales.esProduccion) {
+    throw new Error("Esta prueba crea y borra usuarios. No corre contra producción.");
+  }
+
+  const { db, cerrar } = await crearClienteScript(credenciales);
 
   // Dos empleados de prueba, ambos con acceso a "corp", para comprobar que
   // tocar el acceso de uno no afecta al otro.

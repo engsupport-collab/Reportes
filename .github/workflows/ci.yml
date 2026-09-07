@@ -79,3 +79,11 @@ jobs:
 
       - name: Bloqueo por fuerza bruta
         run: npm run test:rate-limit
+
+      - name: Accesos de usuarios entre empresas
+        run: npm run test:usuarios
+
+      # Las tres pruebas restantes (acceso, adjuntos, firma) piden un servidor
+      # HTTP levantado y por eso no están aquí. Cubren control de acceso, que
+      # es lo más delicado del sistema, así que hoy siguen dependiendo de que
+      # alguien las corra a mano: es el hueco conocido de esta tubería.
