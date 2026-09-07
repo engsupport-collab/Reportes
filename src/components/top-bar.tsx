@@ -181,8 +181,14 @@ export function TopBar({
   const inicial = user.fullName.trim().charAt(0).toUpperCase();
   const qActual = pathname === destino ? (searchParams.get("q") ?? "") : "";
 
+  // Un elemento con `hijos` no es una página en sí (ver NavItem): buscarlo
+  // debe ofrecer sus hijos, no un href que no lleva a ningún lado.
   const destinos: Destino[] = [
-    ...nav.map((n) => ({ href: n.href, label: n.label })),
+    ...nav.flatMap((n) =>
+      n.hijos
+        ? n.hijos.map((h) => ({ href: h.href, label: `${n.label} — ${h.label}` }))
+        : [{ href: n.href, label: n.label }],
+    ),
     { href: "/perfil", label: t("nav.miPerfil") },
   ];
 

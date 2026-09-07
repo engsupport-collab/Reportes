@@ -535,5 +535,10 @@
     "anterior": "Previous",
     "siguiente": "Next",
     "pagina": "Page {actual} of {total}"
+  },
+  "notFound": {
+    "titulo": "This page doesn't exist",
+    "texto": "The link may be mistyped, or the page may have moved.",
+    "boton": "Back to home"
   }
 }
