@@ -17,7 +17,7 @@ export default async function NotFound() {
 
   return (
     <div className="flex min-h-svh flex-col items-center justify-center gap-8 bg-bg px-6 text-center">
-      <Logotipo alto={32} />
+      <Logotipo alto={64} />
       <div className="space-y-3">
         <p className="font-mono text-sm font-semibold tracking-widest text-muted">
           404
