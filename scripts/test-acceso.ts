@@ -1,5 +1,5 @@
 /**
- * Prueba de control de acceso, por HTTP contra el servidor de desarrollo.
+ * Prueba de control de acceso, por HTTP contra el servidor.
  *
  *   npm run dev          (en otra terminal)
  *   npm run test:acceso
@@ -8,6 +8,22 @@
  * haría un navegador. Es la única forma de comprobar de verdad que un empleado
  * no llega al reporte de otro: revisar el código no basta, y hacerlo a mano en
  * el navegador no es repetible.
+ *
+ * **Por qué mira el contenido y no el código HTTP.** Estas páginas empiezan a
+ * transmitirse antes de saber cómo terminan: el esqueleto de `loading.tsx`
+ * sale primero, con un 200 ya enviado, y solo después el árbol descubre que el
+ * reporte no es de quien lo pide y llama a `notFound()`. Para entonces la
+ * cabecera ya viajó y no se puede cambiar. Comprobar el código daría 200 en
+ * casos que están correctamente bloqueados — es decir, un rojo que no
+ * corresponde a ningún problema real.
+ *
+ * Lo que sí distingue un caso de otro es el cuerpo: si el nombre del proyecto
+ * aparece, el usuario está viendo el reporte; si no aparece, no lo está
+ * viendo. Cada marcador que se usa aquí está medido contra un control que
+ * demuestra que discrimina — no se usa `/admin/reportes` como señal de
+ * redirección, por ejemplo, porque también sale en el menú lateral de
+ * cualquier página del admin, y habría hecho pasar la prueba por la razón
+ * equivocada.
  */
 import { config } from "dotenv";
 
@@ -16,6 +32,7 @@ config({ path: ".env.local" });
 import { and, eq } from "drizzle-orm";
 
 import { crearClienteScript } from "./db-cliente";
+import { cargarCredenciales } from "./entorno";
 import { reports, users } from "../src/db/schema";
 import { SESSION_COOKIE, signSession } from "../src/lib/session";
 
@@ -35,18 +52,26 @@ async function pedir(ruta: string, cookie?: string) {
     headers: cookie ? { cookie: `${SESSION_COOKIE}=${cookie}` } : {},
     redirect: "manual",
   });
-  return { status: res.status, location: res.headers.get("location") ?? "" };
+  return {
+    status: res.status,
+    location: res.headers.get("location") ?? "",
+    texto: await res.text(),
+  };
 }
 
+/**
+ * Marca que Next.js deja en el cuerpo cuando la redirección ocurre ya
+ * empezada la transmisión. Medido contra un control: no aparece en una página
+ * que se resuelve sin redirigir.
+ */
+const MARCA_REDIRECCION = "NEXT_REDIRECT";
+
 async function main() {
-  const { db, cerrar } = await crearClienteScript({
-    instanceConnectionName: process.env.DB_INSTANCE_CONNECTION_NAME!,
-    user: process.env.DB_USER!,
-    password: process.env.DB_PASSWORD!,
-    database: process.env.DB_NAME!,
-    origen: ".env.local",
-    esProduccion: false,
-  });
+  // Por `cargarCredenciales` y no leyendo process.env a mano: así esta prueba
+  // corre igual contra Cloud SQL en local que contra el PostgreSQL efímero de
+  // CI.
+  const credenciales = cargarCredenciales(process.argv);
+  const { db, cerrar } = await crearClienteScript(credenciales);
 
   const [admin] = await db
     .select()
@@ -63,13 +88,15 @@ async function main() {
     throw new Error("Faltan usuarios. Corre npm run seed:admin y npm run seed:demo.");
   }
 
+  // Se trae el nombre del proyecto, no solo el id: es el marcador con el que
+  // se distingue "ve el reporte" de "no lo ve".
   const [reporteAdmin] = await db
-    .select({ id: reports.id })
+    .select({ id: reports.id, projectName: reports.projectName })
     .from(reports)
     .where(eq(reports.authorId, admin.id))
     .limit(1);
   const [reporteEmpleado] = await db
-    .select({ id: reports.id })
+    .select({ id: reports.id, projectName: reports.projectName })
     .from(reports)
     .where(and(eq(reports.authorId, empleado.id)))
     .limit(1);
@@ -90,7 +117,7 @@ async function main() {
 
   // Un reporte del propio empleado, pero en la OTRA empresa.
   const [reporteOtraEmpresa] = await db
-    .select({ id: reports.id })
+    .select({ id: reports.id, projectName: reports.projectName })
     .from(reports)
     .where(
       and(
@@ -137,21 +164,28 @@ async function main() {
 
   console.log("\nEmpleado\n");
 
+  // Este es el contraste que da sentido a los dos siguientes: si el nombre del
+  // proyecto propio tampoco apareciera, "no aparece el ajeno" no probaría
+  // nada — podría ser que no aparezca ningún nombre nunca.
   r = await pedir(`/reportes/${reporteEmpleado.id}`, cookieEmpleado);
-  comprobar("puede ver su propio reporte", r.status === 200, `${r.status}`);
+  comprobar(
+    "SÍ ve el contenido de su propio reporte",
+    r.texto.includes(reporteEmpleado.projectName),
+    `busca "${reporteEmpleado.projectName}"`,
+  );
 
   r = await pedir(`/reportes/${reporteAdmin.id}`, cookieEmpleado);
   comprobar(
-    "NO puede ver el reporte de otra persona",
-    r.status === 404,
-    `${r.status}`,
+    "NO ve el contenido del reporte de otra persona",
+    !r.texto.includes(reporteAdmin.projectName),
+    `no debe aparecer "${reporteAdmin.projectName}"`,
   );
 
   r = await pedir(`/reportes/${reporteAdmin.id}/editar`, cookieEmpleado);
   comprobar(
-    "NO puede abrir la edición del reporte ajeno",
-    r.status === 404,
-    `${r.status}`,
+    "NO ve el contenido al abrir la edición del reporte ajeno",
+    !r.texto.includes(reporteAdmin.projectName),
+    `no debe aparecer "${reporteAdmin.projectName}"`,
   );
 
   r = await pedir("/admin", cookieEmpleado);
@@ -214,11 +248,14 @@ async function main() {
   );
 
   // "Mis reportes" es un concepto de empleado. El admin usa /admin/reportes.
+  // Se comprueba por la marca de redirección y no por "aparece
+  // /admin/reportes": esa cadena sale también en el menú lateral de cualquier
+  // página del admin, así que daría verde aunque no hubiera redirigido nada.
   r = await pedir("/reportes", cookieAdmin);
   comprobar(
     "/reportes lo redirige a /admin/reportes, no intenta resolver una empresa activa",
-    r.status === 307 && r.location.includes("/admin/reportes"),
-    `${r.status} -> ${r.location}`,
+    r.texto.includes(MARCA_REDIRECCION) && r.texto.includes("/admin/reportes"),
+    `${r.status}, ¿redirige? ${r.texto.includes(MARCA_REDIRECCION)}`,
   );
 
   // El filtro de empresa en la lista global es una URL, no una sesión: pasar
@@ -244,8 +281,8 @@ async function main() {
     r = await pedir(`/reportes/${reporteOtraEmpresa.id}`, cookieEmpleado);
     comprobar(
       `estando en "${empresaActiva}" NO ve su propio reporte de "${otraEmpresa}"`,
-      r.status === 404,
-      `${r.status}`,
+      !r.texto.includes(reporteOtraEmpresa.projectName),
+      `no debe aparecer "${reporteOtraEmpresa.projectName}"`,
     );
 
     // El admin no tiene empresa activa: ve las dos siempre. Este es el punto
@@ -289,11 +326,14 @@ async function main() {
     role: "empleado",
     empresa: "empresa-inexistente",
   });
+  // "/empresas" sí sirve como marcador aquí: medido contra un control, no
+  // aparece cuando el empleado tiene una empresa válida y la página se
+  // resuelve sin redirigir.
   r = await pedir("/reportes", cookieEmpresaAjena);
   comprobar(
     "una empresa inexistente en el token manda al selector",
-    r.status === 307 && r.location.includes("/empresas"),
-    `${r.status} -> ${r.location}`,
+    r.texto.includes(MARCA_REDIRECCION) && r.texto.includes("/empresas"),
+    `${r.status}, ¿redirige? ${r.texto.includes(MARCA_REDIRECCION)}`,
   );
 
   console.log(

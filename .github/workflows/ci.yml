@@ -83,7 +83,22 @@ jobs:
       - name: Accesos de usuarios entre empresas
         run: npm run test:usuarios
 
-      # Las tres pruebas restantes (acceso, adjuntos, firma) piden un servidor
-      # HTTP levantado y por eso no están aquí. Cubren control de acceso, que
-      # es lo más delicado del sistema, así que hoy siguen dependiendo de que
-      # alguien las corra a mano: es el hueco conocido de esta tubería.
+      - name: Compilar la aplicación
+        run: npm run build
+
+      # El servidor se levanta y la prueba corre en el mismo paso: un proceso
+      # en segundo plano lanzado en un paso anterior no es algo con lo que
+      # convenga contar entre pasos distintos.
+      - name: Control de acceso (con el servidor levantado)
+        run: |
+          npm start &
+          for i in $(seq 1 60); do
+            curl -sf http://localhost:3000/login > /dev/null && break
+            sleep 2
+          done
+          curl -sf http://localhost:3000/login > /dev/null
+          npm run test:acceso
+
+      # Quedan fuera `test:adjuntos` y `test:firma`: además del servidor
+      # necesitan subir archivos reales, y en CI no hay bucket configurado
+      # (`storage.ts` cae al modo local). Es el hueco conocido que queda.
