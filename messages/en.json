@@ -443,6 +443,7 @@
     "ingresaCorreoCliente": "The client email is missing."
   },
   "estadosCotizacion": {
+    "elaborar": "To draft",
     "pendiente_autorizacion": "Pending authorization",
     "en_curso": "In progress",
     "finalizada": "Completed",

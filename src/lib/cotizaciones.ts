@@ -10,7 +10,10 @@
  * lo que se guarda en la base y nunca se traduce.
  */
 
+// El orden es el que se ve en los desplegables: sigue el recorrido real de una
+// cotización, de lo más temprano a lo más tardío.
 export const ESTADOS_COTIZACION = [
+  "elaborar",
   "pendiente_autorizacion",
   "en_curso",
   "finalizada",
@@ -31,8 +34,13 @@ export type EstadoCotizacion = (typeof ESTADOS_COTIZACION)[number];
  * permiso interno. Ninguna cotización nace aquí — el estado por defecto es
  * "en curso" — y que la haya creado un técnico se marca con `revisada`, no
  * con el estado. Ver el comentario de `quotes.status` en el esquema.
+ *
+ * "Elaborar" también cuenta como activa, por el mismo motivo: marca que la
+ * cotización todavía está por redactar, pero el trabajo en campo puede haber
+ * arrancado igual, y el técnico necesita poder colgarle su reporte.
  */
 export const ESTADOS_ACTIVOS = [
+  "elaborar",
   "pendiente_autorizacion",
   "en_curso",
 ] as const satisfies readonly EstadoCotizacion[];

@@ -443,6 +443,7 @@
     "ingresaCorreoCliente": "Falta el correo del cliente."
   },
   "estadosCotizacion": {
+    "elaborar": "Elaborar",
     "pendiente_autorizacion": "Pendiente por autorización",
     "en_curso": "En curso",
     "finalizada": "Finalizada",
