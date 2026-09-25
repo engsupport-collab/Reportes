@@ -16,6 +16,7 @@ export const ESTADOS_COTIZACION = [
   "elaborar",
   "pendiente_autorizacion",
   "en_curso",
+  "facturar",
   "finalizada",
   "cancelada",
 ] as const;
@@ -38,11 +39,17 @@ export type EstadoCotizacion = (typeof ESTADOS_COTIZACION)[number];
  * "Elaborar" también cuenta como activa, por el mismo motivo: marca que la
  * cotización todavía está por redactar, pero el trabajo en campo puede haber
  * arrancado igual, y el técnico necesita poder colgarle su reporte.
+ *
+ * "Facturar" cierra la lista de activas: el trabajo ya terminó y lo que falta
+ * es cobrarlo, pero todavía puede aparecer un reporte tardío de ese mismo
+ * trabajo. Solo deja de estar disponible cuando la cotización se da por
+ * finalizada o se cancela.
  */
 export const ESTADOS_ACTIVOS = [
   "elaborar",
   "pendiente_autorizacion",
   "en_curso",
+  "facturar",
 ] as const satisfies readonly EstadoCotizacion[];
 
 export function esEstadoCotizacion(valor: string): valor is EstadoCotizacion {
