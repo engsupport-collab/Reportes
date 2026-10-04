@@ -30,6 +30,8 @@ Decirlo en cuanto se sabe vale más que defender la estimación.
 | Retraso de red para ver un esqueleto | Si retienes la respuesta entera, Next no tiene nada que transmitir y no hay fallback | Retrasar **dentro** de la página (`await new Promise(...)` en el componente) |
 | `MutationObserver` sobre un nodo reemplazado | Dice "no se tocó" justo cuando el subárbol se destruyó entero | Comparar identidad del nodo (`n === guardado`), no mutaciones |
 | Medir justo tras desplegar | Arranque en frío de la función infla la primera visita | Separar frío de caliente, y decir cuál es cuál |
+| Escribir en un formulario recién cargado | La hidratación devuelve el campo a su valor original y lo tecleado cae en medio del texto viejo | `waitUntil: "networkidle"`, y comprobar que el campo quedó vacío antes de escribir |
+| WebKit contra el build local | El build de producción marca la cookie de sesión como `Secure`, y WebKit no la guarda sobre `http://localhost`: el login "funciona" y vuelve al login | Poner la cookie a mano en el contexto, sin `secure`. Chromium no avisa de esto: sí la guarda |
 
 ---
 
@@ -108,6 +110,10 @@ pantalla de error.
 
 Una funcionalidad no está hecha hasta que se ve funcionando en producción.
 
+**Desde la entrega (2026-09-07) producción tiene datos reales del cliente, y un
+push a `main` es un despliegue:** Vercel lo publica solo un par de minutos
+después. No hay un paso manual que sirva de freno.
+
 1. `npx tsc --noEmit` y `npx eslint .` — borrar `tsconfig.tsbuildinfo` antes si
    se tocaron los `messages/*.json`, o `tsc` reporta claves obsoletas.
 2. `npm run build` — que la tabla de rutas no cambie sin querer.
@@ -116,12 +122,15 @@ Una funcionalidad no está hecha hasta que se ve funcionando en producción.
    `npx -y -p playwright node <ruta>`.
 4. Commit, push a `main`.
 5. Migrar producción si cambió el esquema.
-6. `npx vercel --prod --yes --scope engsupport`, y comprobar `● Ready`.
-7. Verificar en https://reportes-eight.vercel.app/ y **limpiar los datos de
-   prueba** de la base real.
+6. Comprobar que el despliegue terminó bien. Lo anota `vercel[bot]` en el
+   propio commit: `gh api repos/engsupport-collab/Reportes/commits/<sha>/status`.
+7. Verificar en https://reportes.engsupports.com.co **sin crear cuentas ni
+   datos de prueba**. Lo que necesite datos se prueba en desarrollo o en el
+   PostgreSQL de CI; contra producción, solo lectura — por ejemplo, armar en
+   local el PDF de un reporte real con el código nuevo.
 
-Comprobar en producción cuesta consumir números de cotización: la secuencia no
-retrocede. Es el precio correcto, pero conviene avisarlo.
+Por eso ya no se crean cotizaciones de prueba ahí: la secuencia no retrocede, y
+el número gastado sería uno del cliente.
 
 ---
 
@@ -151,3 +160,25 @@ que ya se aprendió leyendo:
   positivo.
 - Registrar el manejador de diálogos **antes** del clic: Playwright descarta un
   `confirm()` sin manejador y la acción se cancela en silencio.
+
+---
+
+## 9. El texto de una prueba no es el texto de un formulario
+
+El primer reporte real (2026-10-04) no se pudo descargar ni enviar por correo.
+Su detalle tenía saltos de línea; todos los PDF de prueba se habían generado
+con texto de una sola línea escrito en el código.
+
+- Un `<textarea>` manda los saltos de línea como CR+LF. Las fuentes estándar
+  de `pdf-lib` solo saben dibujar 218 caracteres, y con cualquier otro —el CR,
+  un tabulador, un emoji— no dejan un hueco: lanzan, y no hay documento.
+- Todo texto que va a un PDF pasa por `src/lib/pdf-texto.ts`. Nadie llama a
+  `drawText` ni a `widthOfTextAtSize` directamente; `npm run test:pdf` lo
+  comprueba, y de paso prueba los 1,1 millones de caracteres de Unicode.
+- El cliente usa solo celulares. Un dato de prueba realista es lo que sale de
+  un teléfono: varios renglones, comillas tipográficas, emojis, nombres que no
+  caben en un renglón, fotos de varios megas con la orientación en EXIF. Un PDF
+  generado con "aaa" no prueba nada.
+- Un carácter especial no se escribe en el código: se pone por su número
+  (`String.fromCodePoint(0x202f)`). Varios son invisibles o idénticos a otros,
+  y un separador de línea Unicode dentro de una expresión regular ni compila.
