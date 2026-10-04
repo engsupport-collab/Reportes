@@ -5,6 +5,8 @@ import path from "node:path";
 
 import { type PDFDocument, type PDFFont, type PDFImage, type PDFPage, rgb } from "pdf-lib";
 
+import { anchoDeTexto, dibujarTexto } from "@/lib/pdf-texto";
+
 /**
  * Identidad visual de los PDF: logo, colores y las piezas que se repiten en
  * todas las páginas (encabezado, pie, títulos de sección, insignias).
@@ -120,14 +122,14 @@ export function dibujarEncabezado(
     xTexto = MARGEN + MONOGRAMA_ANCHO + 14;
   }
 
-  page.drawText(NOMBRE_LEGAL, {
+  dibujarTexto(page, NOMBRE_LEGAL, {
     x: xTexto,
     y: centroFranja + 2,
     size: 15,
     font: fuentes.bold,
     color: blanco,
   });
-  page.drawText(ESLOGAN, {
+  dibujarTexto(page, ESLOGAN, {
     x: xTexto,
     y: centroFranja - 15,
     size: 8,
@@ -136,8 +138,8 @@ export function dibujarEncabezado(
   });
 
   const tipo = opciones.tipoDocumento.toUpperCase();
-  const anchoTipo = fuentes.bold.widthOfTextAtSize(tipo, 10);
-  page.drawText(tipo, {
+  const anchoTipo = anchoDeTexto(fuentes.bold, tipo, 10);
+  dibujarTexto(page, tipo, {
     x: ancho - MARGEN - anchoTipo,
     y: centroFranja + 4,
     size: 10,
@@ -145,8 +147,8 @@ export function dibujarEncabezado(
     color: blanco,
   });
 
-  const anchoEmpresa = fuentes.normal.widthOfTextAtSize(opciones.empresa, 9);
-  page.drawText(opciones.empresa, {
+  const anchoEmpresa = anchoDeTexto(fuentes.normal, opciones.empresa, 9);
+  dibujarTexto(page, opciones.empresa, {
     x: ancho - MARGEN - anchoEmpresa,
     y: centroFranja - 12,
     size: 9,
@@ -172,7 +174,7 @@ export function dibujarTituloSeccion(
     height: 9,
     color: COLOR_MARCA,
   });
-  page.drawText(texto.toUpperCase(), {
+  dibujarTexto(page, texto.toUpperCase(), {
     x: x + 9,
     y,
     size: 8.5,
@@ -196,14 +198,14 @@ export function dibujarCampo(
   etiqueta: string,
   valor: string,
 ): number {
-  page.drawText(etiqueta.toUpperCase(), {
+  dibujarTexto(page, etiqueta.toUpperCase(), {
     x,
     y,
     size: 7.5,
     font: fuentes.normal,
     color: COLOR_MUTED,
   });
-  page.drawText(valor, {
+  dibujarTexto(page, valor, {
     x,
     y: y - 14,
     size: 10.5,
@@ -230,7 +232,7 @@ export function dibujarInsignia(
   terminado: boolean,
 ): void {
   const tamano = 8.5;
-  const anchoTexto = font.widthOfTextAtSize(texto.toUpperCase(), tamano);
+  const anchoTexto = anchoDeTexto(font, texto.toUpperCase(), tamano);
   page.drawRectangle({
     x,
     y: y - 4,
@@ -238,7 +240,7 @@ export function dibujarInsignia(
     height: 17,
     color: terminado ? COLOR_TERMINADO : COLOR_PROCESO,
   });
-  page.drawText(texto.toUpperCase(), {
+  dibujarTexto(page, texto.toUpperCase(), {
     x: x + 8,
     y,
     size: tamano,
@@ -285,15 +287,15 @@ export function dibujarPies(
       color: COLOR_LINEA,
     });
 
-    page.drawText(NOMBRE_LEGAL, {
+    dibujarTexto(page, NOMBRE_LEGAL, {
       x: MARGEN,
       y: 34,
       size: 8,
       font: fuentes.bold,
       color: COLOR_MARCA,
     });
-    const anchoNombre = fuentes.bold.widthOfTextAtSize(NOMBRE_LEGAL, 8);
-    page.drawText(`  ·  ${ESLOGAN}`, {
+    const anchoNombre = anchoDeTexto(fuentes.bold, NOMBRE_LEGAL, 8);
+    dibujarTexto(page, `  ·  ${ESLOGAN}`, {
       x: MARGEN + anchoNombre,
       y: 34,
       size: 8,
@@ -302,8 +304,8 @@ export function dibujarPies(
     });
 
     const numero = `Página ${indice + 1} de ${total}`;
-    const anchoNumero = fuentes.normal.widthOfTextAtSize(numero, 8);
-    page.drawText(numero, {
+    const anchoNumero = anchoDeTexto(fuentes.normal, numero, 8);
+    dibujarTexto(page, numero, {
       x: width - MARGEN - anchoNumero,
       y: 34,
       size: 8,
@@ -311,7 +313,7 @@ export function dibujarPies(
       color: COLOR_MUTED,
     });
 
-    page.drawText(aviso, {
+    dibujarTexto(page, aviso, {
       x: MARGEN,
       y: 22,
       size: 7,

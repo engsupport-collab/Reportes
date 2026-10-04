@@ -58,6 +58,12 @@ jobs:
       - name: Lint
         run: npx eslint .
 
+      # No usa la base: arma los reportes en memoria y lee el PDF que sale.
+      # Reproduce el primer reporte real, que no se pudo descargar ni enviar
+      # por un salto de línea de formulario.
+      - name: Texto de los PDF
+        run: npm run test:pdf
+
       # A partir de aquí, todo corre contra una base recién creada y vacía.
       - name: Migraciones
         run: npm run db:migrate

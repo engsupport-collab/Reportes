@@ -25,6 +25,7 @@ import {
   dibujarTituloSeccion,
   embeberLogo,
 } from "@/lib/pdf-marca";
+import { anchoDeTexto, dibujarTexto, envolverTexto } from "@/lib/pdf-texto";
 import { leerArchivo } from "@/lib/storage";
 import type { ReporteCompleto } from "@/lib/queries/reports";
 
@@ -47,34 +48,21 @@ import type { ReporteCompleto } from "@/lib/queries/reports";
  * la subida, donde afectaría el arranque en frío de todos los usuarios.
  *
  * La parte visual (logo, colores, encabezado, pie) vive en `pdf-marca.ts`.
+ *
+ * Ningún texto se dibuja ni se mide llamando a la librería directamente: pasa
+ * por `pdf-texto.ts`, que lo deja en lo que la fuente sabe dibujar. Un solo
+ * carácter fuera de ese repertorio no deja un hueco, tumba el documento.
  */
 
 type Adjunto = { id: string; blobUrl: string; fileName: string; mimeType: string };
 
 type Fuentes = { normal: PDFFont; bold: PDFFont };
 
-function envolverTexto(
-  texto: string,
-  font: PDFFont,
-  tamano: number,
-  anchoMaximo: number,
-): string[] {
-  const lineas: string[] = [];
-  for (const parrafo of texto.split("\n")) {
-    let actual = "";
-    for (const palabra of parrafo.split(" ")) {
-      const candidata = actual ? `${actual} ${palabra}` : palabra;
-      if (font.widthOfTextAtSize(candidata, tamano) > anchoMaximo && actual) {
-        lineas.push(actual);
-        actual = palabra;
-      } else {
-        actual = candidata;
-      }
-    }
-    lineas.push(actual);
-  }
-  return lineas;
-}
+/** Por debajo de esta altura empieza el pie de página: ahí no se escribe. */
+const PISO_TEXTO = 60;
+
+const TAMANO_TITULO = 19;
+const INTERLINEADO_TITULO = 24;
 
 /** Convierte a PNG o JPG si hace falta: PDF solo admite esos dos formatos de imagen. */
 async function comoImagenEmbebible(
@@ -118,7 +106,7 @@ async function agregarPaginaImagen(
   let y = dibujarTituloSeccion(page, fuentes.normal, MARGEN, yTrasEncabezado, titulo);
 
   if (subtitulo) {
-    page.drawText(subtitulo, {
+    dibujarTexto(page, subtitulo, {
       x: MARGEN,
       y: y + 4,
       size: 9.5,
@@ -237,7 +225,8 @@ function agregarPaginaFaltantes(
     "Archivos no incluidos",
   );
 
-  page.drawText(
+  dibujarTexto(
+    page,
     "Formato no compatible para fusionar (Word, Excel u otro) o no se pudo leer. Descárguelos por separado desde el reporte.",
     {
       x: MARGEN,
@@ -252,8 +241,8 @@ function agregarPaginaFaltantes(
   y -= 34;
 
   for (const nombre of sinFusionar) {
-    if (y < 60) break;
-    page.drawText(`• ${nombre}`, {
+    if (y < PISO_TEXTO) break;
+    dibujarTexto(page, `• ${nombre}`, {
       x: MARGEN,
       y,
       size: 10,
@@ -291,14 +280,25 @@ export async function generarReportePdf(
     ...contexto,
   });
 
-  portada.drawText(reporte.projectName, {
-    x: MARGEN,
-    y,
-    size: 19,
-    font: fuentes.bold,
-    color: COLOR_TEXTO,
-    maxWidth: ancho - MARGEN * 2 - 110,
-  });
+  // El nombre del proyecto se parte aquí, y no con `maxWidth`, para saber
+  // cuántos renglones ocupó: la ficha empieza debajo del último. Bajando
+  // siempre lo de un renglón, un nombre largo quedaba escrito encima del
+  // cliente.
+  const lineasTitulo = envolverTexto(
+    reporte.projectName,
+    fuentes.bold,
+    TAMANO_TITULO,
+    ancho - MARGEN * 2 - 110,
+  );
+  for (const [i, linea] of lineasTitulo.entries()) {
+    dibujarTexto(portada, linea, {
+      x: MARGEN,
+      y: y - i * INTERLINEADO_TITULO,
+      size: TAMANO_TITULO,
+      font: fuentes.bold,
+      color: COLOR_TEXTO,
+    });
+  }
 
   const terminado = reporte.status === "terminado";
   dibujarInsignia(
@@ -309,7 +309,7 @@ export async function generarReportePdf(
     terminado ? "Terminado" : "En proceso",
     terminado,
   );
-  y -= 34;
+  y -= 34 + (lineasTitulo.length - 1) * INTERLINEADO_TITULO;
 
   const anchoColumna = (ancho - MARGEN * 2 - 24) / 2;
   const columna1 = MARGEN;
@@ -392,9 +392,25 @@ export async function generarReportePdf(
   const lineasDetalle = reporte.details
     ? envolverTexto(reporte.details, fuentes.normal, 10.5, ancho - MARGEN * 2)
     : ["Sin detalles."];
+  // Lo que no cabe en la hoja sigue en la siguiente. Cortarlo ahí dejaba al
+  // cliente con un reporte incompleto sin que nadie se enterara.
+  let pagina = portada;
   for (const linea of lineasDetalle) {
-    if (y < 60) break; // el detalle no es el foco del documento; lo que no cabe, no corta la página
-    portada.drawText(linea, {
+    if (y < PISO_TEXTO) {
+      // Un renglón en blanco no abre hoja: quedaría una continuación vacía.
+      if (!linea) continue;
+      pagina = doc.addPage(A4);
+      paginasPropias.push(pagina);
+      y = dibujarEncabezado(pagina, fuentes, contexto);
+      y = dibujarTituloSeccion(
+        pagina,
+        fuentes.normal,
+        MARGEN,
+        y,
+        "Detalles del trabajo (continuación)",
+      );
+    }
+    dibujarTexto(pagina, linea, {
       x: MARGEN,
       y,
       size: 10.5,
@@ -494,10 +510,10 @@ export async function generarReporteViaticoPdf(
     ...contexto,
   });
 
-  portada.drawText("Reporte de viáticos", {
+  dibujarTexto(portada, "Reporte de viáticos", {
     x: MARGEN,
     y,
-    size: 19,
+    size: TAMANO_TITULO,
     font: fuentes.bold,
     color: COLOR_TEXTO,
     maxWidth: ancho - MARGEN * 2 - 110,
@@ -563,12 +579,12 @@ export async function generarReporteViaticoPdf(
   y = dibujarTituloSeccion(portada, fuentes.normal, MARGEN, y, `Gastos (${gastos.length})`);
 
   for (const g of gastos) {
-    if (y < 60) break;
+    if (y < PISO_TEXTO) break;
     const monto =
       g.amount !== null ? formatearMonto(g.amount, reporte.currency) : "Sin monto";
     const fecha = g.fechaGasto ? formatFechaLarga(g.fechaGasto) : null;
 
-    portada.drawText(g.concepto ?? "Sin concepto", {
+    dibujarTexto(portada, g.concepto ?? "Sin concepto", {
       x: MARGEN,
       y,
       size: 10.5,
@@ -577,8 +593,8 @@ export async function generarReporteViaticoPdf(
       maxWidth: ancho - MARGEN * 2 - 130,
     });
 
-    const anchoMonto = fuentes.bold.widthOfTextAtSize(monto, 10.5);
-    portada.drawText(monto, {
+    const anchoMonto = anchoDeTexto(fuentes.bold, monto, 10.5);
+    dibujarTexto(portada, monto, {
       x: ancho - MARGEN - anchoMonto,
       y,
       size: 10.5,
@@ -587,7 +603,7 @@ export async function generarReporteViaticoPdf(
     });
 
     if (fecha) {
-      portada.drawText(fecha, {
+      dibujarTexto(portada, fecha, {
         x: MARGEN,
         y: y - 12,
         size: 8.5,
