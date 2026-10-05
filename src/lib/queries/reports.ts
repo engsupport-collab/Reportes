@@ -12,7 +12,8 @@ import {
   users,
 } from "@/db/schema";
 import type { TipoServicio } from "@/lib/etiquetas";
-import type { ReportStatus } from "@/lib/roles";
+import { leerMetadata } from "@/lib/eventos-reporte";
+import type { ReportEventType, ReportStatus } from "@/lib/roles";
 
 /**
  * Consultas de reportes.
@@ -439,33 +440,41 @@ export async function obtenerReporte(id: string) {
 
 export type EventoEstadoReporte = {
   id: string;
-  tipo: "finalizado" | "reabierto";
+  tipo: ReportEventType;
   /** Null si la cuenta de quien hizo el evento ya no existe. */
   userName: string | null;
   /** Solo tiene contenido en los eventos "reabierto". */
   motivo: string | null;
+  /** Los datos propios del evento: a qué correo se envió, de cuál a cuál se corrigió. */
+  datos: Record<string, string>;
   createdAt: Date;
 };
 
 /**
- * Historial de cierres y reaperturas de un reporte, del más antiguo al más
- * reciente — se lee como una línea de tiempo, no como una lista de "últimas
- * novedades".
+ * Historial de un reporte —cierres, reaperturas y envíos al cliente—, del más
+ * antiguo al más reciente: se lee como una línea de tiempo, no como una lista
+ * de "últimas novedades".
  */
 export async function listarEventosDeReporte(
   reportId: string,
 ): Promise<EventoEstadoReporte[]> {
-  return db
+  const filas = await db
     .select({
       id: reportEvents.id,
       tipo: reportEvents.tipo,
       userName: users.fullName,
       motivo: reportEvents.motivo,
+      metadata: reportEvents.metadata,
       createdAt: reportEvents.createdAt,
     })
     .from(reportEvents)
     .leftJoin(users, eq(users.id, reportEvents.userId))
     .where(eq(reportEvents.reportId, reportId))
     .orderBy(reportEvents.createdAt);
+
+  return filas.map(({ metadata, ...evento }) => ({
+    ...evento,
+    datos: leerMetadata(metadata),
+  }));
 }
 

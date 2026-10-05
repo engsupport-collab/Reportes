@@ -6,7 +6,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { db } from "@/db";
-import { reportEvents, reportTags, reports } from "@/db/schema";
+import { reportTags, reports } from "@/db/schema";
 import { obtenerCotizacionActivaDeEmpresa } from "@/actions/quotes";
 import {
   puedeAccederAReporte,
@@ -15,6 +15,7 @@ import {
   requireAdmin,
 } from "@/lib/auth-guard";
 import { enviarReporteAlCliente } from "@/lib/correo-reporte";
+import { registrarEvento } from "@/lib/eventos-reporte";
 import { listarEmpresas } from "@/lib/queries/companies";
 import { obtenerCotizacion } from "@/lib/queries/quotes";
 import { obtenerReporte } from "@/lib/queries/reports";
@@ -26,27 +27,6 @@ import {
   reporteSchema,
   reporteViaticoSchema,
 } from "@/lib/validation";
-
-/**
- * Registra un evento en la bitácora del reporte (`report_events`). Se llama
- * DESPUÉS del `UPDATE` que cambia el estado, nunca antes ni en su lugar: son
- * dos escrituras separadas porque son dos cosas separadas — el estado actual
- * del reporte, y la historia de cómo llegó ahí.
- */
-async function registrarEvento(datos: {
-  reportId: string;
-  tipo: "finalizado" | "reabierto";
-  userId: string;
-  motivo?: string | null;
-}) {
-  await db.insert(reportEvents).values({
-    id: crypto.randomUUID(),
-    reportId: datos.reportId,
-    tipo: datos.tipo,
-    userId: datos.userId,
-    motivo: datos.motivo ?? null,
-  });
-}
 
 export type ReporteState = { error?: string };
 
@@ -314,6 +294,44 @@ export async function actualizarReporteAction(
 export type FinalizarState = { error?: string };
 
 /**
+ * Manda el reporte al cliente y deja el intento anotado en el historial,
+ * haya salido o no. Sin esa anotación, cuando alguien dice "el correo nunca
+ * llegó" no hay forma de saber si se intentó, a qué dirección, ni por qué
+ * falló.
+ */
+async function enviarYAnotar(
+  reportId: string,
+  userId: string,
+  correo: string,
+  reporte: { signatureName: string | null; clientName: string; projectName: string },
+): Promise<boolean> {
+  const resultado = await enviarReporteAlCliente({
+    reportId,
+    correo,
+    nombreFirmante: reporte.signatureName ?? reporte.clientName,
+    proyecto: reporte.projectName,
+  });
+
+  if (resultado.ok) {
+    await registrarEvento({
+      reportId,
+      tipo: "correo_enviado",
+      userId,
+      metadata: { para: correo },
+    });
+  } else {
+    await registrarEvento({
+      reportId,
+      tipo: "correo_fallido",
+      userId,
+      metadata: { para: correo, causa: resultado.causa },
+    });
+  }
+
+  return resultado.ok;
+}
+
+/**
  * Marca un reporte de servicio como terminado y se lo manda al cliente.
  *
  * Es el ÚNICO punto del sistema desde el que sale el reporte hacia el cliente.
@@ -372,12 +390,7 @@ export async function finalizarReporteAction(
     await registrarEvento({ reportId: id, tipo: "finalizado", userId: user.id });
   }
 
-  const enviado = await enviarReporteAlCliente({
-    reportId: id,
-    correo: parsed.data,
-    nombreFirmante: reporte.signatureName ?? reporte.clientName,
-    proyecto: reporte.projectName,
-  });
+  const enviado = await enviarYAnotar(id, user.id, parsed.data, reporte);
 
   if (!enviado) {
     // Aquí NO se revalida, y es deliberado. Al revalidar, la pantalla se
@@ -386,6 +399,10 @@ export async function finalizarReporteAction(
     // saber que el correo no salió. Sin revalidar, la pantalla se queda como
     // está y el aviso se lee. Volver a pulsar el mismo botón reintenta el
     // envío — el reporte ya está terminado, así que solo se repite el correo.
+    //
+    // Si la pantalla se recarga antes de reintentar, el aviso no se pierde:
+    // el intento fallido quedó en el historial, y la sección de firma ofrece
+    // corregir el correo y reenviar.
     return { error: t("terminadoSinCorreo") };
   }
 
@@ -394,6 +411,46 @@ export async function finalizarReporteAction(
   // Terminado y enviado: el técnico ya no tiene nada que hacer en esta
   // pantalla, y lo siguiente casi siempre es el próximo trabajo.
   redirect("/reportes/nuevo");
+}
+
+export type ReenviarState = { error?: string; ok?: string };
+
+/**
+ * Vuelve a mandar al cliente un reporte que ya está terminado.
+ *
+ * Existe porque, una vez terminado, el botón de finalizar desaparece de la
+ * pantalla: si el correo no había salido —o salió a una dirección mal
+ * escrita—, la única forma de mandarlo era que un administrador reabriera el
+ * reporte y lo volvieran a cerrar. Reenviar no cambia nada del reporte: solo
+ * repite el correo, a la dirección que tenga la firma en ese momento.
+ */
+export async function reenviarCorreoAction(id: string): Promise<ReenviarState> {
+  const { user, reporte } = await cargarConPermiso(id);
+  const t = await getTranslations("validacion");
+
+  if (!reporte || reporte.type !== "servicio") {
+    return { error: t("reporteNoExiste") };
+  }
+  // Mientras está abierto no se manda: puede estar a medias, y para eso está
+  // el botón de terminar.
+  if (!reporteBloqueado(reporte)) {
+    return { error: t("soloTerminadoSeEnvia") };
+  }
+
+  const parsed = correoClienteSchema(t).safeParse(reporte.signatureEmail ?? "");
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? t("ingresaCorreoCliente") };
+  }
+
+  const enviado = await enviarYAnotar(id, user.id, parsed.data, reporte);
+
+  // Se revalida salga o no: el intento ya quedó en el historial y la pantalla
+  // tiene que mostrarlo.
+  revalidarListas(id);
+
+  return enviado
+    ? { ok: t("correoReenviado", { correo: parsed.data }) }
+    : { error: t("correoNoSalio") };
 }
 
 /**

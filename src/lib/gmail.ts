@@ -27,8 +27,30 @@ import { env } from "@/lib/env";
 
 const AMBITO = "https://www.googleapis.com/auth/gmail.send";
 const URL_TOKEN = "https://oauth2.googleapis.com/token";
-const URL_ENVIO = "https://gmail.googleapis.com/gmail/v1/users/me/messages/send";
-const TIEMPO_MAXIMO_MS = 10_000;
+
+/**
+ * El punto de subida de Gmail, no el de JSON. Al de JSON el mensaje hay que
+ * mandárselo codificado en base64 dentro de un campo de texto —encima del
+ * base64 que ya lleva el adjunto por dentro—, con lo que un PDF de 4 MB se
+ * vuelve una petición de casi 7; la documentación de Gmail reserva ese punto
+ * para peticiones sin contenido adjunto. Por aquí el mensaje viaja tal cual.
+ */
+const URL_ENVIO =
+  "https://gmail.googleapis.com/upload/gmail/v1/users/me/messages/send?uploadType=media";
+
+const TIEMPO_TOKEN_MS = 10_000;
+/** Subir varios megas tarda más que pedir un token. */
+const TIEMPO_ENVIO_MS = 30_000;
+
+/**
+ * Si el correo salió y, si no, por qué — en pocas palabras y sin datos
+ * sensibles: queda anotado en el historial del reporte, que es lo único que se
+ * puede consultar cuando alguien avisa de que un correo no llegó.
+ */
+export type ResultadoEnvio = { ok: true } | { ok: false; causa: string };
+
+/** Un fallo del que ya se sabe la causa que hay que anotar. */
+class FalloDeCorreo extends Error {}
 
 /**
  * La clave privada se importa una sola vez por instancia. Parsear el PEM en
@@ -72,7 +94,7 @@ async function obtenerAccessToken(): Promise<string> {
 
   const respuesta = await fetch(URL_TOKEN, {
     method: "POST",
-    signal: AbortSignal.timeout(TIEMPO_MAXIMO_MS),
+    signal: AbortSignal.timeout(TIEMPO_TOKEN_MS),
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
       grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
@@ -81,13 +103,16 @@ async function obtenerAccessToken(): Promise<string> {
   });
 
   if (!respuesta.ok) {
-    throw new Error(
-      `Google rechazó la solicitud de token (HTTP ${respuesta.status}): ${await respuesta.text()}`,
+    console.warn(
+      "Google rechazó la solicitud de token (HTTP %d): %s",
+      respuesta.status,
+      await respuesta.text(),
     );
+    throw new FalloDeCorreo(`autorización de Google: HTTP ${respuesta.status}`);
   }
 
   const datos = (await respuesta.json()) as { access_token?: string };
-  if (!datos.access_token) throw new Error("Google no devolvió access_token.");
+  if (!datos.access_token) throw new FalloDeCorreo("autorización de Google: sin token");
   return datos.access_token;
 }
 
@@ -96,15 +121,6 @@ function base64Envuelto(datos: Uint8Array | string): string {
   const buffer =
     typeof datos === "string" ? Buffer.from(datos, "utf8") : Buffer.from(datos);
   return buffer.toString("base64").replace(/.{76}/g, "$&\r\n");
-}
-
-/** base64url sin relleno: el formato que pide Gmail para el mensaje completo. */
-function base64Url(texto: string): string {
-  return Buffer.from(texto, "utf8")
-    .toString("base64")
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/, "");
 }
 
 /**
@@ -170,29 +186,27 @@ export async function enviarCorreoConAdjunto(opciones: {
   pdf: Uint8Array;
   nombreArchivo: string;
   nombreRemitente: string;
-}): Promise<boolean> {
+}): Promise<ResultadoEnvio> {
   try {
     const accessToken = await obtenerAccessToken();
 
-    const raw = base64Url(
-      construirMensaje({
-        de: `"${opciones.nombreRemitente}" <${env.GMAIL_SENDER_EMAIL}>`,
-        para: opciones.para,
-        asunto: opciones.asunto,
-        cuerpo: opciones.cuerpo,
-        pdf: opciones.pdf,
-        nombreArchivo: opciones.nombreArchivo,
-      }),
-    );
+    const mensaje = construirMensaje({
+      de: `"${opciones.nombreRemitente}" <${env.GMAIL_SENDER_EMAIL}>`,
+      para: opciones.para,
+      asunto: opciones.asunto,
+      cuerpo: opciones.cuerpo,
+      pdf: opciones.pdf,
+      nombreArchivo: opciones.nombreArchivo,
+    });
 
     const respuesta = await fetch(URL_ENVIO, {
       method: "POST",
-      signal: AbortSignal.timeout(TIEMPO_MAXIMO_MS),
+      signal: AbortSignal.timeout(TIEMPO_ENVIO_MS),
       headers: {
         Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
+        "Content-Type": "message/rfc822",
       },
-      body: JSON.stringify({ raw }),
+      body: mensaje,
     });
 
     if (!respuesta.ok) {
@@ -201,12 +215,14 @@ export async function enviarCorreoConAdjunto(opciones: {
         respuesta.status,
         await respuesta.text(),
       );
-      return false;
+      return { ok: false, causa: `Gmail: HTTP ${respuesta.status}` };
     }
 
-    return true;
+    return { ok: true };
   } catch (error) {
     console.warn("No se pudo enviar el correo por Gmail:", error);
-    return false;
+    if (error instanceof FalloDeCorreo) return { ok: false, causa: error.message };
+    const agotado = error instanceof Error && error.name === "TimeoutError";
+    return { ok: false, causa: agotado ? "tiempo agotado" : "sin respuesta de Google" };
   }
 }

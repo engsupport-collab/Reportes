@@ -251,7 +251,11 @@
     "eventoPorYCuando": "por {nombre} · {fecha}",
     "usuarioEliminado": "uma conta já excluída",
     "motivoLabel": "Motivo",
-    "resumenServicioAviso": "Este relatório de serviço foi redigido por outro técnico. Você só vê este resumo para se situar; para ver a sua própria despesa, entre na aba Despesas."
+    "resumenServicioAviso": "Este relatório de serviço foi redigido por outro técnico. Você só vê este resumo para se situar; para ver a sua própria despesa, entre na aba Despesas.",
+    "eventoCorreoEnviado": "E-mail enviado para {correo}",
+    "eventoCorreoFallido": "O e-mail para {correo} não saiu",
+    "eventoCorreoCorregido": "E-mail de quem assina corrigido: de {de} para {a}",
+    "detalleTecnico": "Detalhe técnico: {detalle}"
   },
   "filtros": {
     "tipoServicio": "Tipo de serviço",
@@ -345,7 +349,16 @@
     "guardarFirma": "Salvar assinatura",
     "errorGenerarFirma": "Não foi possível gerar a assinatura. Tente novamente.",
     "errorDibujaFirma": "Desenhe a assinatura antes de salvar.",
-    "sinFirmarBloqueado": "Este relatório ficou concluído sem assinatura."
+    "sinFirmarBloqueado": "Este relatório ficou concluído sem assinatura.",
+    "corregirCorreo": "Corrigir e-mail",
+    "guardarCorreo": "Salvar e-mail",
+    "cancelar": "Cancelar",
+    "sinCorreo": "Sem e-mail registrado",
+    "reenviar": "Reenviar o relatório por e-mail",
+    "reenviando": "Enviando…",
+    "enviadoA": "Enviado para {correo} em {fecha}",
+    "noSalioA": "O último envio para {correo} não saiu ({fecha}). Confira o e-mail e envie de novo.",
+    "sinConexion": "Não foi possível concluir: a conexão caiu. Tente de novo."
   },
   "reportActions": {
     "confirmTerminado": "Este relatório não tem nenhum anexo.\n\nVocê pode marcá-lo como concluído mesmo assim, mas ele ficará sinalizado como incompleto —para você e para o administrador— até que envie o documento.\n\nMarcar como concluído?",
@@ -363,7 +376,8 @@
     "motivoEjemplo": "Por exemplo: faltavam fotos, assinatura ilegível, erro nas despesas…",
     "reabriendo": "Reabrindo…",
     "confirmarReabrir": "Confirmar reabertura",
-    "cancelar": "Cancelar"
+    "cancelar": "Cancelar",
+    "sinConfirmar": "A confirmação não chegou: a conexão caiu. Recarregue a página para ver como ficou o relatório antes de tentar de novo."
   },
   "analiticasPage": {
     "titulo": "Análises · {empresa}",
@@ -439,12 +453,17 @@
     "firmaDemasiadoGrande": "A assinatura é muito grande.",
     "firmaFormatoInvalido": "O formato da assinatura não é válido.",
     "firmaGuardada": "Assinatura salva.",
-    "terminadoSinCorreo": "O relatório ficou concluído, mas o e-mail não saiu. Pressione o botão de novo para tentar enviar outra vez.",
+    "terminadoSinCorreo": "O relatório ficou concluído, mas o e-mail não saiu. Pressione o botão de novo para tentar outra vez; se o e-mail estiver errado, corrija-o na seção de assinatura.",
     "firmaAntesDeTerminar": "Assine o relatório antes de concluí-lo: o e-mail do cliente vem da assinatura.",
     "numeroCotizacionEnUso": "Esse número de cotação já está em uso. Escolha outro.",
     "reporteTerminadoBloqueado": "Este relatório está concluído. Um administrador precisa reabri-lo antes de poder alterá-lo.",
     "motivoReaperturaLargo": "O motivo não pode ter mais de 500 caracteres.",
-    "ingresaCorreoCliente": "Falta o e-mail do cliente."
+    "ingresaCorreoCliente": "Falta o e-mail do cliente.",
+    "soloTerminadoSeEnvia": "O relatório é enviado ao ser marcado como concluído. Ainda está em andamento.",
+    "correoReenviado": "Relatório enviado para {correo}.",
+    "correoNoSalio": "O e-mail não saiu. Confira se o endereço está correto e tente de novo em instantes.",
+    "correoCorregido": "E-mail atualizado.",
+    "correoSinCambios": "O e-mail já era esse."
   },
   "estadosCotizacion": {
     "elaborar": "A elaborar",

@@ -251,7 +251,11 @@
     "eventoPorYCuando": "por {nombre} · {fecha}",
     "usuarioEliminado": "una cuenta ya eliminada",
     "motivoLabel": "Motivo",
-    "resumenServicioAviso": "Este reporte de servicio lo redactó otro técnico. Solo ves este resumen para ubicarte; para ver tu propio gasto, entra a la pestaña Viáticos."
+    "resumenServicioAviso": "Este reporte de servicio lo redactó otro técnico. Solo ves este resumen para ubicarte; para ver tu propio gasto, entra a la pestaña Viáticos.",
+    "eventoCorreoEnviado": "Correo enviado a {correo}",
+    "eventoCorreoFallido": "El correo a {correo} no salió",
+    "eventoCorreoCorregido": "Correo de quien firma corregido: de {de} a {a}",
+    "detalleTecnico": "Detalle técnico: {detalle}"
   },
   "filtros": {
     "tipoServicio": "Tipo de servicio",
@@ -345,7 +349,16 @@
     "guardarFirma": "Guardar firma",
     "errorGenerarFirma": "No se pudo generar la firma. Intenta de nuevo.",
     "errorDibujaFirma": "Dibuja la firma antes de guardar.",
-    "sinFirmarBloqueado": "Este reporte quedó terminado sin firma."
+    "sinFirmarBloqueado": "Este reporte quedó terminado sin firma.",
+    "corregirCorreo": "Corregir correo",
+    "guardarCorreo": "Guardar correo",
+    "cancelar": "Cancelar",
+    "sinCorreo": "Sin correo registrado",
+    "reenviar": "Reenviar el reporte por correo",
+    "reenviando": "Enviando…",
+    "enviadoA": "Enviado a {correo} el {fecha}",
+    "noSalioA": "El último envío a {correo} no salió ({fecha}). Revisa el correo y vuelve a enviarlo.",
+    "sinConexion": "No se pudo completar: se cortó la conexión. Vuelve a intentarlo."
   },
   "reportActions": {
     "confirmTerminado": "Este reporte no tiene ningún archivo adjunto.\n\nPuedes marcarlo como terminado igual, pero va a quedar señalado como incompleto —para ti y para el administrador— hasta que subas el documento.\n\n¿Marcar como terminado?",
@@ -363,7 +376,8 @@
     "motivoEjemplo": "Por ejemplo: faltaban fotografías, firma ilegible, error en viáticos…",
     "reabriendo": "Reabriendo…",
     "confirmarReabrir": "Confirmar reapertura",
-    "cancelar": "Cancelar"
+    "cancelar": "Cancelar",
+    "sinConfirmar": "No llegó la confirmación: se cortó la conexión. Recarga la página para ver cómo quedó el reporte antes de volver a intentarlo."
   },
   "analiticasPage": {
     "titulo": "Analíticas · {empresa}",
@@ -439,12 +453,17 @@
     "firmaDemasiadoGrande": "La firma es demasiado grande.",
     "firmaFormatoInvalido": "El formato de la firma no es válido.",
     "firmaGuardada": "Firma guardada.",
-    "terminadoSinCorreo": "El reporte quedó terminado, pero el correo no salió. Vuelve a pulsar el botón para reintentar el envío.",
+    "terminadoSinCorreo": "El reporte quedó terminado, pero el correo no salió. Vuelve a pulsar el botón para reintentar; si el correo está mal escrito, corrígelo en la sección de firma.",
     "firmaAntesDeTerminar": "Firma el reporte antes de terminarlo: el correo del cliente se toma de la firma.",
     "numeroCotizacionEnUso": "Ese número de cotización ya está en uso. Elige otro.",
     "reporteTerminadoBloqueado": "Este reporte está terminado. Un administrador tiene que reabrirlo antes de poder cambiarlo.",
     "motivoReaperturaLargo": "El motivo no puede superar los 500 caracteres.",
-    "ingresaCorreoCliente": "Falta el correo del cliente."
+    "ingresaCorreoCliente": "Falta el correo del cliente.",
+    "soloTerminadoSeEnvia": "El reporte se envía al marcarlo como terminado. Todavía está en proceso.",
+    "correoReenviado": "Reporte enviado a {correo}.",
+    "correoNoSalio": "El correo no salió. Revisa que la dirección esté bien escrita y vuelve a intentarlo en un momento.",
+    "correoCorregido": "Correo actualizado.",
+    "correoSinCambios": "El correo ya era ese."
   },
   "estadosCotizacion": {
     "elaborar": "Elaborar",

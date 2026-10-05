@@ -251,7 +251,11 @@
     "eventoPorYCuando": "by {nombre} · {fecha}",
     "usuarioEliminado": "a deleted account",
     "motivoLabel": "Reason",
-    "resumenServicioAviso": "This service report was written by another technician. You only see this summary to get your bearings; to see your own expense, go to the Expenses tab."
+    "resumenServicioAviso": "This service report was written by another technician. You only see this summary to get your bearings; to see your own expense, go to the Expenses tab.",
+    "eventoCorreoEnviado": "Email sent to {correo}",
+    "eventoCorreoFallido": "The email to {correo} did not go out",
+    "eventoCorreoCorregido": "Signer email corrected: from {de} to {a}",
+    "detalleTecnico": "Technical detail: {detalle}"
   },
   "filtros": {
     "tipoServicio": "Service type",
@@ -345,7 +349,16 @@
     "guardarFirma": "Save signature",
     "errorGenerarFirma": "Couldn't generate the signature. Try again.",
     "errorDibujaFirma": "Draw the signature before saving.",
-    "sinFirmarBloqueado": "This report was completed without a signature."
+    "sinFirmarBloqueado": "This report was completed without a signature.",
+    "corregirCorreo": "Fix email",
+    "guardarCorreo": "Save email",
+    "cancelar": "Cancel",
+    "sinCorreo": "No email on file",
+    "reenviar": "Resend the report by email",
+    "reenviando": "Sending…",
+    "enviadoA": "Sent to {correo} on {fecha}",
+    "noSalioA": "The last send to {correo} did not go out ({fecha}). Check the address and send it again.",
+    "sinConexion": "Could not complete: the connection dropped. Try again."
   },
   "reportActions": {
     "confirmTerminado": "This report has no attachments.\n\nYou can still mark it as completed, but it will stay flagged as incomplete —for you and for the administrator— until you upload the document.\n\nMark as completed?",
@@ -363,7 +376,8 @@
     "motivoEjemplo": "For example: missing photos, illegible signature, expense error…",
     "reabriendo": "Reopening…",
     "confirmarReabrir": "Confirm reopening",
-    "cancelar": "Cancel"
+    "cancelar": "Cancel",
+    "sinConfirmar": "No confirmation arrived: the connection dropped. Reload the page to see the state of the report before trying again."
   },
   "analiticasPage": {
     "titulo": "Analytics · {empresa}",
@@ -439,12 +453,17 @@
     "firmaDemasiadoGrande": "The signature is too large.",
     "firmaFormatoInvalido": "The signature format isn't valid.",
     "firmaGuardada": "Signature saved.",
-    "terminadoSinCorreo": "The report was marked as completed, but the email didn't go out. Press the button again to retry sending it.",
+    "terminadoSinCorreo": "The report was marked as completed, but the email didn't go out. Press the button again to retry; if the address is misspelled, fix it in the signature section.",
     "firmaAntesDeTerminar": "Sign the report before finishing it: the client's email comes from the signature.",
     "numeroCotizacionEnUso": "That quote number is already taken. Choose another one.",
     "reporteTerminadoBloqueado": "This report is completed. An administrator has to reopen it before it can be changed.",
     "motivoReaperturaLargo": "The reason cannot be longer than 500 characters.",
-    "ingresaCorreoCliente": "The client email is missing."
+    "ingresaCorreoCliente": "The client email is missing.",
+    "soloTerminadoSeEnvia": "The report is sent when it is marked as completed. It is still in progress.",
+    "correoReenviado": "Report sent to {correo}.",
+    "correoNoSalio": "The email did not go out. Check that the address is spelled correctly and try again in a moment.",
+    "correoCorregido": "Email updated.",
+    "correoSinCambios": "That was already the email."
   },
   "estadosCotizacion": {
     "elaborar": "To draft",

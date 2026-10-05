@@ -21,12 +21,22 @@ export const REPORT_STATUSES = ["en_proceso", "terminado"] as const;
 export type ReportStatus = (typeof REPORT_STATUSES)[number];
 
 /**
- * Catálogo de la bitácora de eventos de un reporte (`report_events`). Hoy
- * solo se registran estos dos, pero la tabla no está pensada solo para
- * ellos — es una bitácora de auditoría genérica, y añadir un tercer tipo de
- * evento el día que haga falta es agregar un valor aquí, no rediseñar nada.
+ * Catálogo de la bitácora de eventos de un reporte (`report_events`): una
+ * bitácora de auditoría genérica, donde añadir un tipo de evento es agregar un
+ * valor aquí, no rediseñar nada. La columna es texto libre en la base, así que
+ * un tipo nuevo no pide migración.
+ *
+ * Los tres de correo existen porque el envío al cliente no dejaba rastro: si
+ * el correo no salía, no había forma de saber después si se intentó, a qué
+ * dirección ni por qué falló.
  */
-export const REPORT_EVENT_TYPES = ["finalizado", "reabierto"] as const;
+export const REPORT_EVENT_TYPES = [
+  "finalizado",
+  "reabierto",
+  "correo_enviado",
+  "correo_fallido",
+  "correo_corregido",
+] as const;
 export type ReportEventType = (typeof REPORT_EVENT_TYPES)[number];
 
 /** Ruta de inicio según el rol, tras iniciar sesión. */

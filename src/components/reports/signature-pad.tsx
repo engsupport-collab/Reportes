@@ -256,6 +256,19 @@ export function SignaturePad({
     return new File([blob], "firma.png", { type: "image/png" });
   }
 
+  /**
+   * Una petición que no llega —sin señal— no devuelve un error: lanza, y dentro
+   * de una transición eso tumba la pantalla si no se atrapa. Con el cliente
+   * delante esperando a firmar, se dice aquí y se deja reintentar.
+   */
+  async function enviar(formData: FormData): Promise<FirmaState> {
+    try {
+      return await action({}, formData);
+    } catch {
+      return { error: t("sinConexion") };
+    }
+  }
+
   function guardar(formData: FormData) {
     if (modo === "escribir") {
       // La fuente se lee de la vista previa en lugar de nombrarla aquí: es la
@@ -272,7 +285,7 @@ export function SignaturePad({
           return;
         }
         formData.set("firma", archivoFirma(blob));
-        setEstado(await action({}, formData));
+        setEstado(await enviar(formData));
       });
       return;
     }
@@ -290,7 +303,7 @@ export function SignaturePad({
       }
       formData.set("firma", archivoFirma(blob));
       startTransition(async () => {
-        setEstado(await action({}, formData));
+        setEstado(await enviar(formData));
       });
     }, "image/png");
   }

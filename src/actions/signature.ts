@@ -12,9 +12,10 @@ import {
   reporteBloqueado,
   requireAccesoReportes,
 } from "@/lib/auth-guard";
+import { registrarEvento } from "@/lib/eventos-reporte";
 import { obtenerReporte } from "@/lib/queries/reports";
 import { borrarArchivo, guardarArchivo } from "@/lib/storage";
-import { firmaSchema } from "@/lib/validation";
+import { correoClienteSchema, firmaSchema } from "@/lib/validation";
 
 export type FirmaState = { error?: string; ok?: string };
 
@@ -106,6 +107,67 @@ export async function firmarReporteAction(
   revalidatePath(`/reportes/${reportId}`);
 
   return { ok: t("firmaGuardada") };
+}
+
+export type CorreoFirmaState = { error?: string; ok?: string };
+
+/**
+ * Corrige el correo de quien firmó, sin tocar la firma.
+ *
+ * El correo se escribe una sola vez, al firmar, y es a donde se manda el
+ * reporte. Si quedaba mal escrito la única salida era "volver a firmar", que
+ * borra la firma: había que pedirle al cliente que firmara de nuevo por una
+ * letra equivocada, y con el reporte terminado ni eso.
+ *
+ * Se permite también con el reporte terminado, a diferencia del resto de sus
+ * datos. No es parte de lo que el cliente firmó —es la dirección de entrega—,
+ * y es justo terminado cuando se descubre que el correo no llegó. Cada cambio
+ * queda en el historial con el valor anterior, el nuevo y quién lo hizo.
+ */
+export async function corregirCorreoFirmaAction(
+  reportId: string,
+  _prevState: CorreoFirmaState,
+  formData: FormData,
+): Promise<CorreoFirmaState> {
+  const user = await requireAccesoReportes();
+  const [reporte, t] = await Promise.all([
+    obtenerReporte(reportId),
+    getTranslations("validacion"),
+  ]);
+
+  if (!reporte || reporte.type !== "servicio" || !puedeAccederAReporte(user, reporte)) {
+    return { error: t("reporteNoExiste") };
+  }
+  // Sin firma no hay correo que corregir: se escribe al firmar.
+  if (!reporte.signatureUrl) {
+    return { error: t("firmaAntesDeTerminar") };
+  }
+
+  const parsed = correoClienteSchema(t).safeParse(formData.get("signatureEmail"));
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? t("revisaLosDatos") };
+  }
+
+  const anterior = reporte.signatureEmail ?? "";
+  if (parsed.data === anterior) return { ok: t("correoSinCambios") };
+
+  // Solo la dirección. `updatedAt` y `updatedBy` no se tocan: marcan cuándo se
+  // editó el contenido del reporte, y esto no lo es — su rastro es el evento.
+  await db
+    .update(reports)
+    .set({ signatureEmail: parsed.data })
+    .where(eq(reports.id, reportId));
+
+  await registrarEvento({
+    reportId,
+    tipo: "correo_corregido",
+    userId: user.id,
+    metadata: { de: anterior, a: parsed.data },
+  });
+
+  revalidatePath(`/reportes/${reportId}`);
+
+  return { ok: t("correoCorregido") };
 }
 
 export async function borrarFirmaAction(reportId: string) {

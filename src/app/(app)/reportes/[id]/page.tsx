@@ -12,8 +12,13 @@ import {
   eliminarReporteAction,
   finalizarReporteAction,
   reabrirReporteAction,
+  reenviarCorreoAction,
 } from "@/actions/reports";
-import { borrarFirmaAction, firmarReporteAction } from "@/actions/signature";
+import {
+  borrarFirmaAction,
+  corregirCorreoFirmaAction,
+  firmarReporteAction,
+} from "@/actions/signature";
 import {
   agregarViaticoAction,
   eliminarViaticoAction,
@@ -525,6 +530,20 @@ export default async function DetalleReportePage({ params, searchParams }: Param
   // qué, y eso es tan "de este servicio" como su firma o sus adjuntos.
   const eventos = resumenSolamente ? [] : await listarEventosDeReporte(reporte.id);
 
+  // Cómo terminó el último intento de mandarle el reporte al cliente. Sale del
+  // historial y no de una columna aparte: así no hay dos sitios que puedan
+  // decir cosas distintas.
+  const ultimoIntento = eventos.findLast(
+    (e) => e.tipo === "correo_enviado" || e.tipo === "correo_fallido",
+  );
+  const ultimoEnvio = ultimoIntento
+    ? {
+        salio: ultimoIntento.tipo === "correo_enviado",
+        correo: ultimoIntento.datos.para ?? "",
+        fecha: formatInstante(ultimoIntento.createdAt),
+      }
+    : null;
+
   return (
     <>
       <Saludo nombreCompleto={user.fullName} />
@@ -730,9 +749,13 @@ export default async function DetalleReportePage({ params, searchParams }: Param
                 firmadoEl={
                   reporte.signedAt ? formatInstante(reporte.signedAt) : null
                 }
+                correo={reporte.signatureEmail}
+                ultimoEnvio={ultimoEnvio}
                 nombrePorDefecto={reporte.clientName}
                 onFirmar={firmarReporteAction.bind(null, reporte.id)}
                 onBorrar={borrarFirmaAction.bind(null, reporte.id)}
+                onCorregirCorreo={corregirCorreoFirmaAction.bind(null, reporte.id)}
+                onReenviar={reenviarCorreoAction.bind(null, reporte.id)}
                 soloLectura={bloqueado}
               />
             </div>

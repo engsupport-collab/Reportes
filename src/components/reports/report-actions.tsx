@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
+import { unstable_rethrow } from "next/navigation";
 import { useTranslations } from "next-intl";
 
 import type { FinalizarState, ReabrirState } from "@/actions/reports";
@@ -29,7 +30,17 @@ export function FinalizarReporte({
 }) {
   const t = useTranslations("reportActions");
   const [state, formAction, pendiente] = useActionState<FinalizarState, FormData>(
-    () => action(),
+    async () => {
+      try {
+        return await action();
+      } catch (error) {
+        // Terminar bien acaba en una redirección, que por dentro también es
+        // una excepción: esa se deja pasar. Cualquier otra es que la petición
+        // no llegó o no volvió — en campo, casi siempre un corte de señal.
+        unstable_rethrow(error);
+        return { error: t("sinConfirmar") };
+      }
+    },
     {},
   );
 

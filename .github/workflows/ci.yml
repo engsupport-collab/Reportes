@@ -69,6 +69,11 @@ jobs:
       - name: Archivos que se aceptan al subir
         run: npm run test:archivos
 
+      # No envía nada ni habla con Google: reemplaza `fetch` y comprueba cómo se
+      # arma el mensaje, por dónde se manda y qué queda dicho cuando falla.
+      - name: Correo con el reporte adjunto
+        run: npm run test:correo
+
       # A partir de aquí, todo corre contra una base recién creada y vacía.
       - name: Migraciones
         run: npm run db:migrate
