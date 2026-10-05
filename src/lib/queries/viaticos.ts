@@ -95,12 +95,3 @@ export async function listarViaticosParaPdf(reportId: string) {
     .where(eq(reportViaticos.reportId, reportId))
     .orderBy(asc(reportViaticos.uploadedAt));
 }
-
-export async function contarViaticos(reportId: string): Promise<number> {
-  const filas = await db
-    .select({ id: reportViaticos.id })
-    .from(reportViaticos)
-    .where(eq(reportViaticos.reportId, reportId));
-
-  return filas.length;
-}

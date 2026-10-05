@@ -6,27 +6,19 @@ import { revalidatePath } from "next/cache";
 
 import { db } from "@/db";
 import { reportViaticos } from "@/db/schema";
-import {
-  esImagen,
-  extensionDe,
-  sanearNombre,
-  validarArchivo,
-} from "@/lib/archivos";
-import { contenidoCoincide } from "@/lib/archivos-firma";
+import { aceptarArchivo, aceptarMiniatura } from "@/lib/archivo-subido";
+import { esImagen } from "@/lib/archivos";
 import {
   puedeAccederAReporte,
   reporteBloqueado,
   requireAccesoReportes,
 } from "@/lib/auth-guard";
 import { obtenerReporte } from "@/lib/queries/reports";
-import { contarViaticos, obtenerViaticoConDueno } from "@/lib/queries/viaticos";
+import { obtenerViaticoConDueno } from "@/lib/queries/viaticos";
 import { borrarArchivo, guardarArchivo } from "@/lib/storage";
 import { gastoViaticoSchema } from "@/lib/validation";
 
 export type ViaticoState = { error?: string; ok?: string };
-
-/** Igual que el máximo de adjuntos: acota cuántas filas puede crear una sola petición. */
-const MAX_VIATICOS_POR_REPORTE = 30;
 
 /**
  * Agregar o borrar un gasto cambia el total que se ve en dos sitios: el
@@ -75,45 +67,25 @@ export async function agregarViaticoAction(
     return { error: t("seleccionaFoto") };
   }
 
-  const yaHay = await contarViaticos(reportId);
-  if (yaHay >= MAX_VIATICOS_POR_REPORTE) {
-    return { error: t("maximoViaticos", { max: MAX_VIATICOS_POR_REPORTE }) };
-  }
+  // Tamaño y contenido real, igual que un adjunto: una foto entra por lo que
+  // es, no por cómo se llama.
+  const aceptado = await aceptarArchivo(archivo);
+  if (!aceptado.ok) return { error: aceptado.error };
 
-  const validacion = validarArchivo({
-    name: archivo.name,
-    type: archivo.type,
-    size: archivo.size,
-  });
-  if (!validacion.ok) return { error: validacion.error };
-
-  const datos = await archivo.arrayBuffer();
-  if (!contenidoCoincide(datos, archivo.type)) {
-    return { error: t("contenidoNoCoincide", { nombre: archivo.name }) };
-  }
-
+  const { datos, mimeType, extension, fileName, sizeBytes } = aceptado.archivo;
   const { concepto, fechaGasto, amount } = parsed.data;
 
-  const extension = extensionDe(archivo.name);
-  const blobUrl = await guardarArchivo(datos, {
-    contentType: archivo.type,
-    extension,
-  });
+  const blobUrl = await guardarArchivo(datos, { contentType: mimeType, extension });
 
   let thumbnailUrl: string | null = null;
-  const miniatura = formData.get("miniatura");
-  if (
-    miniatura instanceof File &&
-    miniatura.size > 0 &&
-    esImagen(archivo.type)
-  ) {
-    const datosMini = await miniatura.arrayBuffer();
-    if (contenidoCoincide(datosMini, "image/webp")) {
-      thumbnailUrl = await guardarArchivo(datosMini, {
-        contentType: "image/webp",
-        extension: ".webp",
-      });
-    }
+  const miniatura = esImagen(mimeType)
+    ? await aceptarMiniatura(formData.get("miniatura"))
+    : null;
+  if (miniatura) {
+    thumbnailUrl = await guardarArchivo(miniatura.datos, {
+      contentType: miniatura.mimeType,
+      extension: miniatura.extension,
+    });
   }
 
   await db.insert(reportViaticos).values({
@@ -123,9 +95,9 @@ export async function agregarViaticoAction(
     fechaGasto,
     blobUrl,
     thumbnailUrl,
-    fileName: sanearNombre(archivo.name),
-    mimeType: archivo.type,
-    sizeBytes: archivo.size,
+    fileName,
+    mimeType,
+    sizeBytes,
     amount,
   });
 

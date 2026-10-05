@@ -234,7 +234,6 @@
     "ultimaEdicion": "Última edición: {fecha}",
     "modificadoAdmin": " · modificado por un administrador",
     "archivosAdjuntos": "Archivos adjuntos",
-    "deTotal": "{count} de {max}",
     "viaticosEnlazados": "Reportes de viáticos",
     "viaticosTitulo": "Reporte de viáticos",
     "justificaA": "Justifica a {proyecto}",
@@ -290,12 +289,19 @@
     "confirmEliminar": "¿Eliminar \"{nombre}\"?",
     "eliminar": "Eliminar",
     "sinArchivos": "Todavía no hay archivos en este reporte.",
-    "limiteArchivos": "Solo puedes subir {restantes} archivo(s) más en este reporte.",
-    "maximoArchivos": "Este reporte ya tiene el máximo de {max} archivos.",
     "preparando": "Preparando archivos…",
     "subiendo": "Subiendo…",
-    "elegirArchivos": "Elegir archivos",
-    "ayudaArchivos": "PDF, imágenes y documentos · hasta {tamano} cada uno · quedan {restantes}"
+    "elegirArchivos": "Elegir fotos o archivos",
+    "ayudaArchivos": "Fotos, PDF y documentos · las fotos se reducen solas · documentos de hasta {tamano}",
+    "progreso": "Subiendo {actual} de {total}…",
+    "enEspera": "En espera",
+    "subidos": "{count, plural, one {1 archivo subido.} other {# archivos subidos.}}",
+    "fallidos": "{count, plural, one {1 archivo no se pudo subir.} other {# archivos no se pudieron subir.}}",
+    "reintentar": "Reintentar",
+    "quitar": "Quitar",
+    "errorConexion": "No se pudo subir: se cortó la conexión. Vuelve a intentarlo.",
+    "errorFormato": "El teléfono guardó esta foto en un formato que aquí no se puede abrir. Tómala de nuevo con la cámara desde este botón, o conviértela a JPG.",
+    "errorTamano": "Esta foto no se pudo reducir y pesa más de {tamano}."
   },
   "viaticosForm": {
     "sinViaticos": "Todavía no hay gastos en este reporte.",
@@ -424,8 +430,6 @@
     "ingresaMonto": "Ingresa el monto",
     "montoInvalido": "El monto no es un número válido",
     "seleccionaFoto": "Selecciona una foto o archivo del gasto.",
-    "maximoViaticos": "Un reporte admite hasta {max} gastos.",
-    "contenidoNoCoincide": "El contenido de \"{nombre}\" no corresponde a su extensión.",
     "gastoAgregado": "Gasto agregado.",
     "ingresaNombreFirmante": "Escribe el nombre de quien firma",
     "ingresaCorreoFirmante": "Ingresa el correo de quien firma",
@@ -542,5 +546,12 @@
     "titulo": "Esta página no existe",
     "texto": "Puede que el enlace esté mal escrito o que la página se haya movido.",
     "boton": "Volver al inicio"
+  },
+  "errorPage": {
+    "titulo": "Algo no salió bien",
+    "texto": "La página no se pudo mostrar. Lo que ya habías guardado no se perdió. Puede ser un corte de señal: vuelve a intentarlo.",
+    "reintentar": "Reintentar",
+    "inicio": "Ir al inicio",
+    "codigo": "Código para soporte: {codigo}"
   }
 }

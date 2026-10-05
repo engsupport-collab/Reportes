@@ -234,7 +234,6 @@
     "ultimaEdicion": "Última edição: {fecha}",
     "modificadoAdmin": " · modificado por um administrador",
     "archivosAdjuntos": "Anexos",
-    "deTotal": "{count} de {max}",
     "viaticosEnlazados": "Relatórios de despesas",
     "viaticosTitulo": "Relatório de despesas",
     "justificaA": "Justifica {proyecto}",
@@ -290,12 +289,19 @@
     "confirmEliminar": "Excluir \"{nombre}\"?",
     "eliminar": "Excluir",
     "sinArchivos": "Ainda não há arquivos neste relatório.",
-    "limiteArchivos": "Você só pode enviar mais {restantes} arquivo(s) neste relatório.",
-    "maximoArchivos": "Este relatório já tem o máximo de {max} arquivos.",
     "preparando": "Preparando arquivos…",
     "subiendo": "Enviando…",
-    "elegirArchivos": "Escolher arquivos",
-    "ayudaArchivos": "PDF, imagens e documentos · até {tamano} cada · faltam {restantes}"
+    "elegirArchivos": "Escolher fotos ou arquivos",
+    "ayudaArchivos": "Fotos, PDF e documentos · as fotos são reduzidas automaticamente · documentos de até {tamano}",
+    "progreso": "Enviando {actual} de {total}…",
+    "enEspera": "Em espera",
+    "subidos": "{count, plural, one {1 arquivo enviado.} other {# arquivos enviados.}}",
+    "fallidos": "{count, plural, one {1 arquivo não pôde ser enviado.} other {# arquivos não puderam ser enviados.}}",
+    "reintentar": "Tentar de novo",
+    "quitar": "Remover",
+    "errorConexion": "Não foi possível enviar: a conexão caiu. Tente de novo.",
+    "errorFormato": "O telefone salvou esta foto num formato que não pode ser aberto aqui. Tire a foto de novo com a câmera por este botão, ou converta para JPG.",
+    "errorTamano": "Não foi possível reduzir esta foto e ela pesa mais de {tamano}."
   },
   "viaticosForm": {
     "sinViaticos": "Ainda não há despesas neste relatório.",
@@ -424,8 +430,6 @@
     "ingresaMonto": "Digite o valor",
     "montoInvalido": "O valor não é um número válido",
     "seleccionaFoto": "Selecione uma foto ou arquivo da despesa.",
-    "maximoViaticos": "Um relatório admite até {max} despesas.",
-    "contenidoNoCoincide": "O conteúdo de \"{nombre}\" não corresponde à sua extensão.",
     "gastoAgregado": "Despesa adicionada.",
     "ingresaNombreFirmante": "Digite o nome de quem assina",
     "ingresaCorreoFirmante": "Digite o e-mail de quem assina",
@@ -542,5 +546,12 @@
     "titulo": "Esta página não existe",
     "texto": "O link pode estar errado, ou a página pode ter sido movida.",
     "boton": "Voltar ao início"
+  },
+  "errorPage": {
+    "titulo": "Algo não deu certo",
+    "texto": "A página não pôde ser exibida. O que você já tinha salvado não foi perdido. Pode ser uma queda de sinal: tente de novo.",
+    "reintentar": "Tentar de novo",
+    "inicio": "Ir para o início",
+    "codigo": "Código para suporte: {codigo}"
   }
 }

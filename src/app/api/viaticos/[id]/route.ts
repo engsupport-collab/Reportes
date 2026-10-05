@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 
 import { esImagen } from "@/lib/archivos";
+import { tipoRealDeImagen } from "@/lib/archivos-firma";
 import { getCurrentUser, puedeAccederAReporte } from "@/lib/auth-guard";
 import { obtenerViaticoConDueno } from "@/lib/queries/viaticos";
 import { leerArchivo } from "@/lib/storage";
@@ -41,8 +42,12 @@ export async function GET(
     return NextResponse.json({ error: "No encontrado" }, { status: 404 });
   }
 
+  // La miniatura se sirve con el tipo que de verdad tiene: las de antes son
+  // WebP y las de ahora JPEG, y ese dato no está guardado en la base.
   const contentType =
-    quiereMiniatura && viatico.thumbnailUrl ? "image/webp" : viatico.mimeType;
+    quiereMiniatura && viatico.thumbnailUrl
+      ? (tipoRealDeImagen(datos) ?? "application/octet-stream")
+      : viatico.mimeType;
 
   const enLinea = esImagen(contentType) || contentType === "application/pdf";
 

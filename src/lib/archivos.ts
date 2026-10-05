@@ -32,17 +32,36 @@ export const TIPOS_PERMITIDOS: Record<string, string[]> = {
 export const EXTENSIONES_PERMITIDAS = Object.values(TIPOS_PERMITIDOS).flat();
 
 /**
+ * Lo que ofrece el selector de archivos del teléfono.
+ *
+ * Las fotos van como `image/*` y no extensión por extensión, por dos motivos.
+ * El iPhone guarda en HEIC, que casi nada fuera de Apple sabe abrir, y Safari
+ * decide qué entregar según esta lista: con `.heic` en ella, desde Safari 17
+ * puede incluso convertir a HEIC una foto que era JPEG. Pidiendo imágenes en
+ * general entrega JPEG. Y como toda foto se vuelve a guardar en JPEG antes de
+ * subirla (`imagen-cliente.ts`), sirve cualquier imagen que el navegador
+ * pueda abrir, no solo tres formatos.
+ */
+export const ACEPTAR_EN_SELECTOR = [
+  "image/*",
+  ...EXTENSIONES_PERMITIDAS.filter((ext) => !ext.match(/^\.(jpe?g|png|webp|heic)$/)),
+].join(",");
+
+/**
  * 4 MB por archivo.
  *
  * El límite no es arbitrario: en Vercel, el cuerpo de una petición a una
- * función no puede pasar de 4,5 MB, y la subida viaja por ahí. Las fotos se
- * reducen en el navegador antes de enviarse, así que en la práctica pesan unos
- * cientos de kilobytes; el límite solo lo tocan los PDF grandes. Si más
+ * función no puede pasar de 4,5 MB, y la subida viaja por ahí. Por eso cada
+ * archivo viaja en su propia petición. Las fotos se reducen en el navegador
+ * antes de enviarse, así que este límite se les mide ya reducidas —pesan unos
+ * cientos de kilobytes— y nunca sobre la original, que en un teléfono actual
+ * lo pasa casi siempre. En la práctica solo lo tocan los PDF grandes. Si más
  * adelante hacen falta archivos mayores, hay que pasar a subida directa del
- * navegador a Blob, que evita ese límite.
+ * navegador al almacenamiento, que evita ese límite.
+ *
+ * No hay tope de cuántos archivos lleva un reporte.
  */
 export const MAX_BYTES = 4 * 1024 * 1024;
-export const MAX_ARCHIVOS_POR_REPORTE = 10;
 
 /** Lado mayor al que se reduce una foto antes de subirla. */
 export const LADO_MAXIMO = 1600;
@@ -56,6 +75,17 @@ export function esImagen(mimeType: string): boolean {
 export function extensionDe(nombre: string): string {
   const punto = nombre.lastIndexOf(".");
   return punto === -1 ? "" : nombre.slice(punto).toLowerCase();
+}
+
+/**
+ * ¿Es una foto, según el navegador? Mira también la extensión: hay
+ * selectores de archivos que entregan un HEIC sin decir de qué tipo es.
+ */
+export function pareceFoto(archivo: { name: string; type: string }): boolean {
+  return (
+    esImagen(archivo.type) ||
+    /^\.(jpe?g|png|webp|heic|heif|gif|bmp)$/.test(extensionDe(archivo.name))
+  );
 }
 
 /**

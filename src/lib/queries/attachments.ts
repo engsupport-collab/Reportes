@@ -88,12 +88,3 @@ export async function listarAdjuntosParaPdf(reportId: string) {
     .where(eq(attachments.reportId, reportId))
     .orderBy(asc(attachments.uploadedAt));
 }
-
-export async function contarAdjuntos(reportId: string): Promise<number> {
-  const filas = await db
-    .select({ id: attachments.id })
-    .from(attachments)
-    .where(eq(attachments.reportId, reportId));
-
-  return filas.length;
-}

@@ -61,8 +61,13 @@ jobs:
       # No usa la base: arma los reportes en memoria y lee el PDF que sale.
       # Reproduce el primer reporte real, que no se pudo descargar ni enviar
       # por un salto de línea de formulario.
-      - name: Texto de los PDF
+      - name: Texto y fotos de los PDF
         run: npm run test:pdf
+
+      # Tampoco usa la base: qué archivos acepta el servidor al subirlos, y como
+      # qué los guarda. Incluye lo que mandaba Safari: un PNG llamado .webp.
+      - name: Archivos que se aceptan al subir
+        run: npm run test:archivos
 
       # A partir de aquí, todo corre contra una base recién creada y vacía.
       - name: Migraciones

@@ -35,7 +35,6 @@ import {
 import { SignatureBlock } from "@/components/reports/signature-block";
 import { ViaticoList } from "@/components/reports/viatico-list";
 import { ViaticoUploader } from "@/components/reports/viatico-uploader";
-import { MAX_ARCHIVOS_POR_REPORTE } from "@/lib/archivos";
 import { Saludo } from "@/components/saludo";
 import {
   puedeAccederAReporte,
@@ -702,9 +701,8 @@ export default async function DetalleReportePage({ params, searchParams }: Param
                 <h3 className="text-sm font-semibold text-text">
                   {t("archivosAdjuntos")}
                 </h3>
-                <span className="text-xs text-muted">
-                  {t("deTotal", { count: adjuntos.length, max: MAX_ARCHIVOS_POR_REPORTE })}
-                </span>
+                {/* Solo cuántos hay: un reporte lleva los archivos que haga falta. */}
+                <span className="text-xs text-muted">{adjuntos.length}</span>
               </div>
 
               <div className="space-y-4">
@@ -718,7 +716,6 @@ export default async function DetalleReportePage({ params, searchParams }: Param
                 ) : (
                   <AttachmentUploader
                     action={subirAdjuntosAction.bind(null, reporte.id)}
-                    restantes={MAX_ARCHIVOS_POR_REPORTE - adjuntos.length}
                   />
                 )}
               </div>

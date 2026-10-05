@@ -234,7 +234,6 @@
     "ultimaEdicion": "Last edited: {fecha}",
     "modificadoAdmin": " · edited by an administrator",
     "archivosAdjuntos": "Attachments",
-    "deTotal": "{count} of {max}",
     "viaticosEnlazados": "Expense reports",
     "viaticosTitulo": "Expense report",
     "justificaA": "Justifies {proyecto}",
@@ -290,12 +289,19 @@
     "confirmEliminar": "Delete \"{nombre}\"?",
     "eliminar": "Delete",
     "sinArchivos": "No files on this report yet.",
-    "limiteArchivos": "You can only upload {restantes} more file(s) on this report.",
-    "maximoArchivos": "This report already has the maximum of {max} files.",
     "preparando": "Preparing files…",
     "subiendo": "Uploading…",
-    "elegirArchivos": "Choose files",
-    "ayudaArchivos": "PDF, images and documents · up to {tamano} each · {restantes} left"
+    "elegirArchivos": "Choose photos or files",
+    "ayudaArchivos": "Photos, PDFs and documents · photos are resized automatically · documents up to {tamano}",
+    "progreso": "Uploading {actual} of {total}…",
+    "enEspera": "Waiting",
+    "subidos": "{count, plural, one {1 file uploaded.} other {# files uploaded.}}",
+    "fallidos": "{count, plural, one {1 file could not be uploaded.} other {# files could not be uploaded.}}",
+    "reintentar": "Retry",
+    "quitar": "Remove",
+    "errorConexion": "Upload failed: the connection dropped. Try again.",
+    "errorFormato": "The phone saved this photo in a format that can't be opened here. Take it again with the camera from this button, or convert it to JPG.",
+    "errorTamano": "This photo could not be resized and is larger than {tamano}."
   },
   "viaticosForm": {
     "sinViaticos": "No expenses on this report yet.",
@@ -424,8 +430,6 @@
     "ingresaMonto": "Enter the amount",
     "montoInvalido": "The amount isn't a valid number",
     "seleccionaFoto": "Select a photo or file for the expense.",
-    "maximoViaticos": "A report allows up to {max} expenses.",
-    "contenidoNoCoincide": "The content of \"{nombre}\" doesn't match its extension.",
     "gastoAgregado": "Expense added.",
     "ingresaNombreFirmante": "Enter the signer's name",
     "ingresaCorreoFirmante": "Enter the signer's email",
@@ -542,5 +546,12 @@
     "titulo": "This page doesn't exist",
     "texto": "The link may be mistyped, or the page may have moved.",
     "boton": "Back to home"
+  },
+  "errorPage": {
+    "titulo": "Something went wrong",
+    "texto": "The page could not be displayed. What you had already saved was not lost. It may be a connection drop: try again.",
+    "reintentar": "Try again",
+    "inicio": "Go to home",
+    "codigo": "Support code: {codigo}"
   }
 }

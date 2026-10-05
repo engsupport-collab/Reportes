@@ -4,8 +4,14 @@ import { useRef, useState, useTransition } from "react";
 import { useTranslations } from "next-intl";
 
 import type { ViaticoState } from "@/actions/viaticos";
-import { EXTENSIONES_PERMITIDAS, validarArchivo } from "@/lib/archivos";
-import { prepararArchivo } from "@/lib/imagen-cliente";
+import {
+  ACEPTAR_EN_SELECTOR,
+  MAX_BYTES,
+  formatearTamano,
+  pareceFoto,
+  validarArchivo,
+} from "@/lib/archivos";
+import { FotoNoProcesable, prepararArchivo } from "@/lib/imagen-cliente";
 import { aValorInput } from "@/lib/fechas";
 import type { Moneda } from "@/lib/moneda";
 
@@ -32,6 +38,7 @@ export function ViaticoUploader({
   const inputRef = useRef<HTMLInputElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
   const t = useTranslations("viaticosForm");
+  const tAdjuntos = useTranslations("adjuntos");
 
   const ocupado = procesando || pendiente;
 
@@ -39,7 +46,9 @@ export function ViaticoUploader({
     const elegido = e.target.files?.[0] ?? null;
     setEstado({});
 
-    if (elegido) {
+    // Un documento se sube tal cual y se valida tal cual. Una foto no: se
+    // reduce antes de enviarla, así que su tamaño de ahora no es el que viaja.
+    if (elegido && !pareceFoto(elegido)) {
       const v = validarArchivo(elegido);
       if (!v.ok) {
         setEstado({ error: v.error });
@@ -74,17 +83,31 @@ export function ViaticoUploader({
       formData.append("concepto", campo("concepto"));
       formData.append("fechaGasto", campo("fechaGasto"));
       formData.append("amount", campo("amount"));
+    } catch (error) {
+      setEstado({
+        error:
+          error instanceof FotoNoProcesable && error.motivo === "tamano"
+            ? tAdjuntos("errorTamano", { tamano: formatearTamano(MAX_BYTES) })
+            : tAdjuntos("errorFormato"),
+      });
+      return;
     } finally {
       setProcesando(false);
     }
 
     startTransition(async () => {
-      const resultado = await action({}, formData);
-      setEstado(resultado);
-      if (!resultado.error) {
-        setArchivo(null);
-        if (inputRef.current) inputRef.current.value = "";
-        formRef.current?.reset();
+      // Una petición que no llega —sin señal— no devuelve un error: lanza, y
+      // dentro de una transición eso tumba la página si no se atrapa aquí.
+      try {
+        const resultado = await action({}, formData);
+        setEstado(resultado);
+        if (!resultado.error) {
+          setArchivo(null);
+          if (inputRef.current) inputRef.current.value = "";
+          formRef.current?.reset();
+        }
+      } catch {
+        setEstado({ error: tAdjuntos("errorConexion") });
       }
     });
   }
@@ -145,7 +168,7 @@ export function ViaticoUploader({
             ref={inputRef}
             id="viatico-archivo"
             type="file"
-            accept={EXTENSIONES_PERMITIDAS.join(",")}
+            accept={ACEPTAR_EN_SELECTOR}
             onChange={alElegir}
             disabled={ocupado}
             className="block w-full text-sm text-muted file:mr-3 file:rounded-lg file:border-0 file:bg-surface-muted file:px-3 file:py-2 file:text-sm file:font-medium file:text-text"

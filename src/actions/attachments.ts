@@ -5,25 +5,29 @@ import { revalidatePath } from "next/cache";
 
 import { db } from "@/db";
 import { attachments } from "@/db/schema";
-import {
-  MAX_ARCHIVOS_POR_REPORTE,
-  esImagen,
-  extensionDe,
-  sanearNombre,
-  validarArchivo,
-} from "@/lib/archivos";
-import { contenidoCoincide } from "@/lib/archivos-firma";
+import { aceptarArchivo, aceptarMiniatura } from "@/lib/archivo-subido";
+import { esImagen } from "@/lib/archivos";
 import {
   puedeAccederAReporte,
   reporteBloqueado,
   requireAccesoReportes,
 } from "@/lib/auth-guard";
-import { contarAdjuntos, obtenerAdjuntoConDueno } from "@/lib/queries/attachments";
+import { obtenerAdjuntoConDueno } from "@/lib/queries/attachments";
 import { obtenerReporte } from "@/lib/queries/reports";
 import { borrarArchivo, guardarArchivo } from "@/lib/storage";
 
 export type AdjuntoState = { error?: string; ok?: string };
 
+/**
+ * Sube archivos a un reporte de servicio.
+ *
+ * El navegador manda uno por petición (ver `attachment-uploader.tsx`): así
+ * ninguna petición se acerca al tope de 4,5 MB de Vercel por muchas fotos que
+ * se elijan a la vez, y si una falla —se cae la señal a mitad— las demás ya
+ * quedaron guardadas y solo se reintenta esa.
+ *
+ * No hay tope de cuántos archivos lleva un reporte.
+ */
 export async function subirAdjuntosAction(
   reportId: string,
   _prevState: AdjuntoState,
@@ -50,53 +54,26 @@ export async function subirAdjuntosAction(
     return { error: "Selecciona al menos un archivo." };
   }
 
-  const yaHay = await contarAdjuntos(reportId);
-  if (yaHay + archivos.length > MAX_ARCHIVOS_POR_REPORTE) {
-    return {
-      error: `Un reporte admite hasta ${MAX_ARCHIVOS_POR_REPORTE} archivos. Ya tiene ${yaHay}.`,
-    };
-  }
-
   const miniaturas = formData.getAll("miniaturas");
 
   for (const [i, archivo] of archivos.entries()) {
-    // Primera comprobación: tamaño, tipo declarado y extensión.
-    const validacion = validarArchivo({
-      name: archivo.name,
-      type: archivo.type,
-      size: archivo.size,
-    });
-    if (!validacion.ok) return { error: validacion.error };
+    // Tamaño, y sobre todo contenido: qué es de verdad el archivo. El tipo lo
+    // declara el navegador y se puede falsificar; los primeros bytes, no.
+    const aceptado = await aceptarArchivo(archivo);
+    if (!aceptado.ok) return { error: aceptado.error };
 
-    const datos = await archivo.arrayBuffer();
-
-    // Segunda comprobación, la que de verdad importa: el contenido real. El
-    // tipo lo declara el navegador y se puede falsificar; los primeros bytes,
-    // no. Aquí es donde un ejecutable renombrado a .pdf queda fuera.
-    if (!contenidoCoincide(datos, archivo.type)) {
-      return {
-        error: `El contenido de "${archivo.name}" no corresponde a su extensión.`,
-      };
-    }
-
-    const extension = extensionDe(archivo.name);
-    const blobUrl = await guardarArchivo(datos, {
-      contentType: archivo.type,
-      extension,
-    });
+    const { datos, mimeType, extension, fileName, sizeBytes } = aceptado.archivo;
+    const blobUrl = await guardarArchivo(datos, { contentType: mimeType, extension });
 
     // La miniatura la genera el navegador junto al archivo. Si falta, no pasa
     // nada: la lista muestra un icono en su lugar.
     let thumbnailUrl: string | null = null;
-    const miniatura = miniaturas[i];
-    if (miniatura instanceof File && miniatura.size > 0 && esImagen(archivo.type)) {
-      const datosMini = await miniatura.arrayBuffer();
-      if (contenidoCoincide(datosMini, "image/webp")) {
-        thumbnailUrl = await guardarArchivo(datosMini, {
-          contentType: "image/webp",
-          extension: ".webp",
-        });
-      }
+    const miniatura = esImagen(mimeType) ? await aceptarMiniatura(miniaturas[i]) : null;
+    if (miniatura) {
+      thumbnailUrl = await guardarArchivo(miniatura.datos, {
+        contentType: miniatura.mimeType,
+        extension: miniatura.extension,
+      });
     }
 
     await db.insert(attachments).values({
@@ -104,9 +81,9 @@ export async function subirAdjuntosAction(
       reportId,
       blobUrl,
       thumbnailUrl,
-      fileName: sanearNombre(archivo.name),
-      mimeType: archivo.type,
-      sizeBytes: archivo.size,
+      fileName,
+      mimeType,
+      sizeBytes,
     });
   }
 
