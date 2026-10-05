@@ -222,3 +222,32 @@ y ninguna se veía en un navegador de escritorio.
 - **Las pruebas de navegador van en WebKit y en Chromium, con pantalla de
   teléfono**, y con archivos como los de un teléfono: una foto de más de 4 MB
   tomada de lado, un PNG, un WebP, varios a la vez, y la señal cortada a mitad.
+
+---
+
+## 11. El documento es del cliente, no de la pantalla
+
+Al día siguiente el cliente generó un reporte de la LLC, para un proyecto de
+Estados Unidos, y los títulos le salieron en español.
+
+- **El idioma de lo que sale hacia afuera lo decide a quién va, no quién lo
+  genera.** El PDF y su correo van en el idioma de la empresa del reporte
+  (`pdf-idioma.ts`): LLC en inglés, SAS en español. El mismo reporte se arma
+  desde la descarga, el enlace público y el correo, y dos de los tres no
+  tienen una pantalla con idioma.
+- **Para saber si quedó algo sin traducir, se compara, no se enumera.** El
+  mismo reporte en los dos idiomas: lo único igual en ambos puede ser lo que
+  alguien escribió a mano y la marca. Cualquier otro texto repetido es un
+  rótulo olvidado. Una lista de "lo que debe decir en inglés" solo encuentra
+  lo que uno ya recordó.
+- **Lo que cierra un documento se mide antes de dibujarlo.** Las firmas van al
+  final y sin gastar hoja: a la última foto se le pide dejarles sitio, y solo
+  abren hoja propia si lo último es un PDF adjunto o ya no caben.
+- **Una dirección de correo no se escribe en un repositorio público.** La
+  copia a administración sale del dominio del remitente; `GMAIL_CC_EMAIL` la
+  cambia o, vacía, la apaga — así va en desarrollo, donde una prueba no tiene
+  por qué llegarle a la empresa.
+- **Lo que el cliente va a ver se le enseña antes de subirlo**: muestras del
+  PDF con datos inventados, en cada idioma y en cada caso (con fotos, sin
+  fotos, sin firmar). Y antes del push, el PDF de un reporte real armado en
+  local con el código nuevo, solo lectura.
