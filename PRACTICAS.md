@@ -20,6 +20,10 @@ al de después. El remontaje del marco llevaba ahí desde siempre.
 para la fase 1 y el reloj no se movió; el ahorro real estaba en otro sitio.
 Decirlo en cuanto se sabe vale más que defender la estimación.
 
+**Lo mismo para lo que "no existe".** Afirmé dos veces que un reporte no tenía
+tope de archivos; había uno de 10, a un `grep` de distancia. Antes de decir
+que algo no está en el código, se busca.
+
 ### Trampas de medición que ya mordieron
 
 | Trampa | Síntoma | Qué hacer |
@@ -182,3 +186,39 @@ con texto de una sola línea escrito en el código.
 - Un carácter especial no se escribe en el código: se pone por su número
   (`String.fromCodePoint(0x202f)`). Varios son invisibles o idénticos a otros,
   y un separador de línea Unicode dentro de una expresión regular ni compila.
+
+---
+
+## 10. Lo que el teléfono manda, y lo que sale hacia afuera
+
+Del mismo día. Subir fotos desde un iPhone fallaba de cuatro formas distintas,
+y ninguna se veía en un navegador de escritorio.
+
+- **Lo que devuelve el navegador se comprueba, no se supone.** Safari no sabe
+  escribir WebP: `canvas.toBlob(…, "image/webp")` devuelve un PNG sin avisar.
+  El código lo etiquetaba como WebP y el servidor lo rechazaba. Se mira
+  `blob.type`; y en el servidor una foto entra por lo que es
+  (`tipoRealDeImagen`), no por cómo se llama.
+- **Un límite se mide sobre lo que viaja.** El tope de 4 MB se comparaba con la
+  foto original, antes de reducirla: casi todas lo pasaban.
+- **Un límite se pone donde está de verdad.** El tope no es "cuántas fotos":
+  es cuánto pesa una petición (4,5 MB en Vercel, de entrada y de salida). Así
+  que cada archivo sube en su propia petición, y el peso del PDF se reparte
+  entre sus fotos (`pdf-adjuntos.ts`) en vez de limitar cuántas caben.
+- **Una petición que no llega no devuelve un error: lanza.** Y dentro de una
+  transición, lo que nadie atrapa tumba la página. Toda llamada a una acción
+  del servidor desde un botón va con su `catch` y dice qué pasó junto al
+  botón. Si la acción puede redirigir, el `catch` empieza por
+  `unstable_rethrow(error)`. Las pantallas `error.tsx` son la red, no el plan.
+- **Un teléfono no gira los píxeles de una foto**: anota el giro en EXIF. Lo
+  que la incruste tal cual (un PDF) la muestra acostada.
+- **Lo que sale hacia afuera deja rastro.** El correo al cliente no dejaba
+  ninguno: no se podía saber si se intentó, a quién ni por qué falló. Cada
+  intento es ahora un evento del reporte, con su causa.
+- **Probar el correo sin mandarlo.** `npm run test:correo` reemplaza `fetch`.
+  Para el recorrido en el navegador, un doble dentro del servidor local
+  (`NODE_OPTIONS="--require doble.cjs" npm start`) que conteste por Google:
+  así el único correo real es el que se decide mandar.
+- **Las pruebas de navegador van en WebKit y en Chromium, con pantalla de
+  teléfono**, y con archivos como los de un teléfono: una foto de más de 4 MB
+  tomada de lado, un PNG, un WebP, varios a la vez, y la señal cortada a mitad.
