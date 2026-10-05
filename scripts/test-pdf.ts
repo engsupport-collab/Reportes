@@ -1,32 +1,36 @@
 /**
- * Prueba del texto de los PDF.
+ * Prueba de los PDF: su texto y sus fotos.
  *
  *   npm run test:pdf
  *
- * No toca la base ni el almacenamiento: arma reportes en memoria, genera el PDF
- * de verdad y lee lo que quedó dibujado en él.
+ * No toca la base: arma reportes en memoria, genera el PDF de verdad y lee lo
+ * que quedó dentro — qué texto, dónde, y qué fotos a qué tamaño. Las fotos de
+ * prueba se escriben en la carpeta local de archivos y se borran al terminar.
  *
  * Reproduce el primer reporte real del sistema (2026-10-04), que no se pudo
  * descargar ni enviar por correo: su detalle venía de un `<textarea>`, con los
  * saltos de línea como CR+LF, y el generador solo sabía de LF. Hasta entonces
  * el PDF se había probado con texto de una línea escrito en el código — que es
- * justo el caso que nunca falló.
+ * justo el caso que nunca falló. Su foto, además, salía acostada y entera.
  *
  * Los caracteres especiales van por su número (`c(0x202f)`) y no escritos:
  * muchos son invisibles o idénticos a otros, y escritos aquí no se sabría qué
  * se está probando.
  */
-import { readdir, readFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import { config } from "dotenv";
 import {
   PDFArray,
   PDFDocument,
+  PDFName,
+  type PDFNumber,
   PDFRawStream,
   StandardFonts,
   decodePDFRawStream,
 } from "pdf-lib";
+import sharp from "sharp";
 
 import type { ReporteCompleto } from "../src/lib/queries/reports";
 
@@ -118,6 +122,456 @@ async function trazosDelPdf(bytes: Uint8Array): Promise<Trazo[][]> {
 const PISO_DEL_CONTENIDO = 60;
 const sobreElPie = (trazo: Trazo) => trazo.y >= PISO_DEL_CONTENIDO;
 
+/** Genera el PDF. Si no se genera, lo anota como fallo y devuelve null. */
+async function generarBytes(
+  descripcion: string,
+  armar: () => Promise<Uint8Array>,
+): Promise<Uint8Array | null> {
+  try {
+    const t0 = performance.now();
+    const bytes = await armar();
+    const cabecera = new TextDecoder("latin1").decode(bytes.slice(0, 5));
+    comprobar(
+      `${descripcion}: se genera`,
+      cabecera === "%PDF-",
+      `${bytes.length} bytes, ${Math.round(performance.now() - t0)} ms`,
+    );
+    return bytes;
+  } catch (error) {
+    comprobar(
+      `${descripcion}: se genera`,
+      false,
+      error instanceof Error ? error.message : String(error),
+    );
+    return null;
+  }
+}
+
+/** Genera el PDF y lee lo que tiene dibujado. */
+async function generar(
+  descripcion: string,
+  armar: () => Promise<Uint8Array>,
+): Promise<Trazo[][] | null> {
+  const bytes = await generarBytes(descripcion, armar);
+  return bytes ? trazosDelPdf(bytes) : null;
+}
+
+/** Una foto incrustada en el PDF: sus dimensiones y el JPEG tal como quedó dentro. */
+type FotoEnPdf = { ancho: number; alto: number; jpeg: Uint8Array };
+
+/** Las fotos (JPEG) de un PDF, en el orden en que entraron. El logo y la firma son PNG y no cuentan. */
+async function fotosDelPdf(bytes: Uint8Array): Promise<FotoEnPdf[]> {
+  const doc = await PDFDocument.load(bytes);
+  const fotos: FotoEnPdf[] = [];
+
+  for (const [, objeto] of doc.context.enumerateIndirectObjects()) {
+    if (!(objeto instanceof PDFRawStream)) continue;
+    const dic = objeto.dict;
+    if (dic.get(PDFName.of("Subtype")) !== PDFName.of("Image")) continue;
+    if (dic.get(PDFName.of("Filter")) !== PDFName.of("DCTDecode")) continue;
+    fotos.push({
+      ancho: (dic.get(PDFName.of("Width")) as PDFNumber).asNumber(),
+      alto: (dic.get(PDFName.of("Height")) as PDFNumber).asNumber(),
+      jpeg: objeto.contents,
+    });
+  }
+
+  return fotos;
+}
+
+/** Color medio de un recuadro de una imagen. */
+async function colorEn(
+  imagen: Uint8Array,
+  izquierda: number,
+  arriba: number,
+): Promise<{ r: number; g: number; b: number }> {
+  const { data } = await sharp(imagen)
+    .extract({ left: izquierda, top: arriba, width: 20, height: 20 })
+    .removeAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  const suma = [0, 0, 0];
+  for (let i = 0; i < data.length; i += 3) {
+    suma[0]! += data[i]!;
+    suma[1]! += data[i + 1]!;
+    suma[2]! += data[i + 2]!;
+  }
+  const pixeles = data.length / 3;
+  return { r: suma[0]! / pixeles, g: suma[1]! / pixeles, b: suma[2]! / pixeles };
+}
+
+// --- Archivos de prueba ------------------------------------------------------
+//
+// El generador lee los adjuntos del almacenamiento. Sin bucket configurado ese
+// almacenamiento es la carpeta `.uploads`, así que las fotos de prueba se
+// escriben ahí con un prefijo propio y se borran al terminar.
+
+const CARPETA_LOCAL = path.join(process.cwd(), ".uploads");
+const archivosDePrueba: string[] = [];
+
+async function guardarDePrueba(nombre: string, datos: Uint8Array): Promise<string> {
+  await mkdir(CARPETA_LOCAL, { recursive: true });
+  const archivo = `prueba-pdf-${nombre}`;
+  await writeFile(path.join(CARPETA_LOCAL, archivo), datos);
+  archivosDePrueba.push(archivo);
+  return `local:${archivo}`;
+}
+
+async function borrarArchivosDePrueba(): Promise<void> {
+  for (const archivo of archivosDePrueba) {
+    await rm(path.join(CARPETA_LOCAL, archivo), { force: true });
+  }
+}
+
+/**
+ * Una "foto": ruido suavizado, que pesa parecido a una foto real de campo.
+ * Un color liso pesaría casi nada y no pondría a prueba ningún límite.
+ */
+function texturaDeFoto(ancho: number, alto: number) {
+  return sharp({
+    create: {
+      width: ancho,
+      height: alto,
+      channels: 3,
+      background: { r: 128, g: 128, b: 128 },
+      noise: { type: "gaussian", mean: 128, sigma: 60 },
+    },
+  }).blur(2);
+}
+
+const ROJO = { r: 230, g: 20, b: 20 };
+type Color = { r: number; g: number; b: number };
+const esRojo = (color: Color) => color.r > 180 && color.g < 90 && color.b < 90;
+const esBlanco = (color: Color) => color.r > 235 && color.g > 235 && color.b > 235;
+
+/**
+ * Fotos y archivos dentro del PDF.
+ *
+ * Lo que el primer reporte real dejó al descubierto, además del texto: la foto
+ * salía acostada y a su tamaño original, de modo que con tres el documento ya
+ * no se podía descargar ni enviar.
+ */
+async function comprobarFotos() {
+  const { generarReportePdf, generarReporteViaticoPdf } = await import("../src/lib/pdf");
+  const { PESO_MAXIMO_PDF } = await import("../src/lib/pdf-adjuntos");
+  /** Vercel no entrega una respuesta de más de 4,5 MB: de ahí para arriba, el PDF no se descarga. */
+  const TOPE_DE_VERCEL = 4.5 * 1024 * 1024;
+  const mb = (bytes: number) => `${(bytes / 1024 / 1024).toFixed(2)} MB`;
+
+  console.log("\nFoto tomada con el teléfono de lado\n");
+
+  // Como la guarda un teléfono: los píxeles acostados (4032 x 3024) y una nota
+  // en los metadatos que dice "gírame a la derecha" (orientación 6). La esquina
+  // superior izquierda de lo guardado va pintada de rojo: con la foto derecha,
+  // ese rojo queda arriba a la derecha.
+  const acostada = await texturaDeFoto(4032, 3024)
+    .composite([
+      {
+        input: { create: { width: 700, height: 700, channels: 3, background: ROJO } },
+        left: 0,
+        top: 0,
+      },
+    ])
+    .jpeg({ quality: 88 })
+    .withMetadata({ orientation: 6 })
+    .toBuffer();
+  const metaAcostada = await sharp(acostada).metadata();
+  comprobar(
+    "la foto de prueba es como la de un teléfono: 12 megapíxeles, acostada, con el giro anotado",
+    metaAcostada.width === 4032 && metaAcostada.height === 3024 && metaAcostada.orientation === 6,
+    `${mb(acostada.length)}`,
+  );
+
+  const refAcostada = await guardarDePrueba("acostada.jpg", acostada);
+  const conAcostada = await generarBytes("un reporte con esa foto", () =>
+    generarReportePdf(reporte(), [
+      { id: "f1", blobUrl: refAcostada, fileName: "IMG_0001.jpg", mimeType: "image/jpeg" },
+    ]),
+  );
+  if (conAcostada) {
+    const [foto, ...otras] = await fotosDelPdf(conAcostada);
+    comprobar("el PDF lleva esa foto, y solo esa", Boolean(foto) && otras.length === 0);
+    if (foto) {
+      comprobar(
+        "queda de pie y con el lado mayor en 1600 px",
+        foto.ancho === 1200 && foto.alto === 1600,
+        `${foto.ancho} x ${foto.alto}`,
+      );
+      comprobar(
+        "girada hacia el lado correcto: lo rojo quedó arriba a la derecha",
+        esRojo(await colorEn(foto.jpeg, foto.ancho - 120, 100)),
+      );
+      comprobar(
+        "contraste: arriba a la izquierda no hay rojo",
+        !esRojo(await colorEn(foto.jpeg, 100, 100)),
+      );
+      comprobar(
+        "dentro del PDF pesa una fracción de la original",
+        foto.jpeg.length < acostada.length / 3,
+        `${mb(foto.jpeg.length)} de ${mb(acostada.length)}`,
+      );
+    }
+  }
+
+  console.log("\nCada archivo entra por lo que es, no por cómo se llama\n");
+
+  const transparente = await sharp({
+    create: { width: 900, height: 600, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } },
+  })
+    .composite([
+      {
+        input: { create: { width: 300, height: 300, channels: 4, background: { ...ROJO, alpha: 1 } } },
+        left: 0,
+        top: 0,
+      },
+    ])
+    .png()
+    .toBuffer();
+  const webp = await texturaDeFoto(1200, 900).webp({ quality: 80 }).toBuffer();
+  const yaLista = await texturaDeFoto(800, 600).jpeg({ quality: 82 }).toBuffer();
+  const danada = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(3000, 7)]);
+  const word = Buffer.concat([Buffer.from([0x50, 0x4b, 0x03, 0x04]), Buffer.alloc(3000, 1)]);
+  const plano = await PDFDocument.create();
+  plano.addPage([400, 300]);
+  plano.addPage([400, 300]);
+  const pdfAdjunto = await plano.save();
+
+  const variados = [
+    { id: "v1", fileName: "captura.png", mimeType: "image/png", datos: transparente },
+    { id: "v2", fileName: "foto.webp", mimeType: "image/webp", datos: webp },
+    // Lo que mandaba Safari: un PNG con nombre y etiqueta de WebP.
+    { id: "v3", fileName: "IMG_3041.webp", mimeType: "image/webp", datos: transparente },
+    { id: "v4", fileName: "pequena.jpg", mimeType: "image/jpeg", datos: yaLista },
+    { id: "v5", fileName: "danada.jpg", mimeType: "image/jpeg", datos: danada },
+    {
+      id: "v6",
+      fileName: "informe.docx",
+      mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      datos: word,
+    },
+    { id: "v7", fileName: "plano.pdf", mimeType: "application/pdf", datos: pdfAdjunto },
+  ];
+  const adjuntosVariados: { id: string; fileName: string; mimeType: string; blobUrl: string }[] = [];
+  for (const { datos, ...resto } of variados) {
+    adjuntosVariados.push({ ...resto, blobUrl: await guardarDePrueba(resto.fileName, datos) });
+  }
+
+  const conVariados = await generarBytes("un reporte con PNG, WebP, JPEG, un archivo dañado, un Word y un PDF", () =>
+    generarReportePdf(reporte(), adjuntosVariados),
+  );
+  if (conVariados) {
+    const fotos = await fotosDelPdf(conVariados);
+    const paginas = await trazosDelPdf(conVariados);
+    const noIncluidos = paginas.at(-1)!.map((t) => t.texto);
+
+    comprobar("entran las cuatro imágenes", fotos.length === 4, `${fotos.length}`);
+    if (fotos.length === 4) {
+      comprobar(
+        "el PNG con nombre de WebP entra igual que el PNG bien nombrado",
+        fotos[0]!.ancho === 900 && fotos[2]!.ancho === 900 && fotos[2]!.alto === 600,
+      );
+      comprobar(
+        "lo transparente queda blanco, no negro",
+        esBlanco(await colorEn(fotos[0]!.jpeg, 600, 400)) &&
+          esRojo(await colorEn(fotos[0]!.jpeg, 100, 100)),
+      );
+      comprobar(
+        "una foto que ya está reducida y derecha entra tal cual, sin volver a comprimirla",
+        Buffer.compare(fotos[3]!.jpeg, yaLista) === 0,
+      );
+    }
+    comprobar(
+      "el PDF adjunto queda fusionado: portada, 4 fotos, sus 2 páginas y la de no incluidos",
+      paginas.length === 8,
+      `${paginas.length} páginas`,
+    );
+    comprobar(
+      "el archivo dañado y el Word se listan como no incluidos, y nada más",
+      noIncluidos.includes("ARCHIVOS NO INCLUIDOS") &&
+        iguales(
+          noIncluidos.filter((t) => t.startsWith("• ")),
+          ["• danada.jpg", "• informe.docx"],
+        ),
+      noIncluidos.filter((t) => t.startsWith("• ")).join(", "),
+    );
+  }
+
+  console.log("\nSin tope de fotos: el que tiene tope es el documento\n");
+
+  const tipica = await texturaDeFoto(1600, 1200).jpeg({ quality: 88 }).toBuffer();
+  const refTipica = await guardarDePrueba("tipica.jpg", tipica);
+  const fotosIguales = (cuantas: number) =>
+    Array.from({ length: cuantas }, (_, i) => ({
+      id: `m${i}`,
+      blobUrl: refTipica,
+      fileName: `foto-${String(i + 1).padStart(3, "0")}.jpg`,
+      mimeType: "image/jpeg",
+    }));
+  const ladoMayor = (fotos: FotoEnPdf[]) => Math.max(...fotos.map((f) => Math.max(f.ancho, f.alto)));
+
+  comprobar(
+    "la foto de prueba pesa como una real ya reducida por la aplicación",
+    tipica.length > 200 * 1024 && tipica.length < 450 * 1024,
+    mb(tipica.length),
+  );
+  comprobar(
+    "contraste: 40 de esas, sin reducir, no caben en lo que Vercel entrega",
+    40 * tipica.length > TOPE_DE_VERCEL,
+    mb(40 * tipica.length),
+  );
+
+  const con3 = await generarBytes("un reporte con 3 fotos", () =>
+    generarReportePdf(reporte(), fotosIguales(3)),
+  );
+  if (con3) {
+    const fotos = await fotosDelPdf(con3);
+    comprobar(
+      "van las 3 a calidad completa, sin tocar",
+      fotos.length === 3 && fotos.every((f) => Buffer.compare(f.jpeg, tipica) === 0),
+    );
+  }
+
+  const pesoPorFoto: number[] = [];
+  for (const cuantas of [16, 40, 150]) {
+    const pdf = await generarBytes(`un reporte con ${cuantas} fotos`, () =>
+      generarReportePdf(reporte(), fotosIguales(cuantas)),
+    );
+    if (!pdf) continue;
+    const fotos = await fotosDelPdf(pdf);
+    pesoPorFoto.push(fotos.reduce((suma, f) => suma + f.jpeg.length, 0) / fotos.length);
+    comprobar(
+      `${cuantas} fotos: están todas`,
+      fotos.length === cuantas,
+      `${fotos.length} de ${cuantas}`,
+    );
+    comprobar(
+      `${cuantas} fotos: el documento se puede descargar y enviar`,
+      pdf.length <= PESO_MAXIMO_PDF + 200 * 1024 && pdf.length < TOPE_DE_VERCEL,
+      mb(pdf.length),
+    );
+    comprobar(
+      `${cuantas} fotos: aprovecha el espacio que hay, no se queda corta de más`,
+      pdf.length > PESO_MAXIMO_PDF / 2,
+      mb(pdf.length),
+    );
+    comprobar(
+      `${cuantas} fotos: van reducidas, pero no a menos de lo que se lee`,
+      fotos.every((f) => f.jpeg.length < tipica.length) && ladoMayor(fotos) >= 480,
+      `lado mayor ${ladoMayor(fotos)} px, ${Math.round(pesoPorFoto.at(-1)! / 1024)} KB cada una`,
+    );
+  }
+  comprobar(
+    "a más fotos, menos pesa cada una",
+    pesoPorFoto.length === 3 &&
+      pesoPorFoto[1]! < pesoPorFoto[0]! &&
+      pesoPorFoto[2]! < pesoPorFoto[1]!,
+  );
+
+  // El caso de cientos de fotos, sin generarlas: el mismo reparto con un
+  // presupuesto que ni al tamaño mínimo alcanza para todas.
+  const { leerAdjuntos, prepararAdjuntos } = await import("../src/lib/pdf-adjuntos");
+  const APRETADO = 150 * 1024;
+  const repartidas = await prepararAdjuntos(await leerAdjuntos(fotosIguales(30)), APRETADO);
+  const dentro = repartidas.flatMap((a) => (a.clase === "foto" ? [a.jpeg] : []));
+  const fuera = repartidas.filter((a) => a.clase === "fuera").length;
+  comprobar(
+    "si ni al mínimo caben todas, entran las que caben y las demás se listan: ninguna desaparece",
+    dentro.length > 0 && fuera > 0 && dentro.length + fuera === 30,
+    `${dentro.length} dentro + ${fuera} listadas`,
+  );
+  comprobar(
+    "y lo que entra respeta el presupuesto",
+    dentro.reduce((suma, f) => suma + f.length, 0) <= APRETADO,
+  );
+
+  console.log("\nUn PDF adjunto no se puede reducir\n");
+
+  const ruido = await sharp({
+    create: {
+      width: 1500,
+      height: 1100,
+      channels: 3,
+      background: { r: 128, g: 128, b: 128 },
+      noise: { type: "gaussian", mean: 128, sigma: 70 },
+    },
+  })
+    .jpeg({ quality: 93 })
+    .toBuffer();
+  const escaneado = await PDFDocument.create();
+  escaneado.addPage([600, 440]).drawImage(await escaneado.embedJpg(ruido), {
+    x: 0,
+    y: 0,
+    width: 600,
+    height: 440,
+  });
+  const pdfPesado = await escaneado.save();
+  const refPesado = await guardarDePrueba("escaneado.pdf", pdfPesado);
+  comprobar(
+    "contraste: tres copias del PDF de prueba, juntas, pesan más que todo el documento",
+    3 * pdfPesado.length > PESO_MAXIMO_PDF,
+    `${mb(pdfPesado.length)} cada una`,
+  );
+
+  const conPdfs = await generarBytes("un reporte con 3 PDF pesados y 5 fotos", () =>
+    generarReportePdf(reporte(), [
+      ...[1, 2, 3].map((n) => ({
+        id: `p${n}`,
+        blobUrl: refPesado,
+        fileName: `escaneado-${n}.pdf`,
+        mimeType: "application/pdf",
+      })),
+      ...fotosIguales(5),
+    ]),
+  );
+  if (conPdfs) {
+    const textos = (await trazosDelPdf(conPdfs)).flat().map((t) => t.texto);
+    const fotos = await fotosDelPdf(conPdfs);
+    const fuera = textos.filter((t) => t.startsWith("• escaneado-"));
+    comprobar("el documento se puede descargar", conPdfs.length < TOPE_DE_VERCEL, mb(conPdfs.length));
+    comprobar(
+      "entran los PDF que caben, en orden, y el que no cabe se lista",
+      fuera.length >= 1 && fuera.length < 3 && fuera.at(-1) === "• escaneado-3.pdf",
+      fuera.join(", "),
+    );
+    // El PDF adjunto trae su propia imagen: se descuenta al contar las fotos.
+    const delReporte = fotos.length - (3 - fuera.length);
+    comprobar("las 5 fotos están, reducidas para dejarles sitio", delReporte === 5, `${delReporte}`);
+  }
+
+  console.log("\nViáticos con muchos gastos\n");
+
+  const gastos = Array.from({ length: 45 }, (_, i) => ({
+    id: `g${i}`,
+    blobUrl: refTipica,
+    fileName: `recibo-${i + 1}.jpg`,
+    mimeType: "image/jpeg",
+    concepto: `Gasto de prueba ${String(i + 1).padStart(2, "0")}`,
+    fechaGasto: new Date("2026-10-04T12:00:00Z"),
+    amount: 1000 * (i + 1),
+  }));
+  const viaticos = await generarBytes("un reporte de viáticos con 45 gastos", () =>
+    generarReporteViaticoPdf(reporte({ type: "viaticos" }), gastos),
+  );
+  if (viaticos) {
+    const paginas = await trazosDelPdf(viaticos);
+    const conceptos = paginas
+      .flat()
+      .filter((t) => t.texto.startsWith("Gasto de prueba ") && t.tamano === 10.5)
+      .map((t) => t.texto);
+    comprobar(
+      "la lista trae los 45 gastos, en orden: no se corta al final de la hoja",
+      iguales(conceptos, gastos.map((g) => g.concepto)),
+      `${conceptos.length} de 45`,
+    );
+    comprobar(
+      "sigue en otra hoja, que lo dice",
+      paginas.some((p) => p.some((t) => t.texto === "GASTOS (45) (CONTINUACIÓN)")),
+    );
+    comprobar("lleva los 45 recibos", (await fotosDelPdf(viaticos)).length === 45);
+    comprobar("y se puede descargar", viaticos.length < TOPE_DE_VERCEL, mb(viaticos.length));
+  }
+}
+
 // --- El reporte de prueba ---------------------------------------------------
 //
 // Mismo perfil que el que falló, sin copiar un dato del cliente: un nombre de
@@ -185,26 +639,6 @@ async function main() {
   /** El ancho del detalle: una hoja A4 menos sus dos márgenes. */
   const ANCHO = 499;
   const TAMANO = 10.5;
-
-  /** Genera y lee el PDF. Si no se genera, lo anota como fallo y devuelve null. */
-  async function generar(
-    descripcion: string,
-    armar: () => Promise<Uint8Array>,
-  ): Promise<Trazo[][] | null> {
-    try {
-      const bytes = await armar();
-      const cabecera = new TextDecoder("latin1").decode(bytes.slice(0, 5));
-      comprobar(`${descripcion}: se genera`, cabecera === "%PDF-", `${bytes.length} bytes`);
-      return await trazosDelPdf(bytes);
-    } catch (error) {
-      comprobar(
-        `${descripcion}: se genera`,
-        false,
-        error instanceof Error ? error.message : String(error),
-      );
-      return null;
-    }
-  }
 
   console.log("\nLo que falló en producción\n");
 
@@ -624,6 +1058,36 @@ async function main() {
     );
     comprobar("el gasto sin concepto lo dice", textos.includes("Sin concepto"));
   }
+
+  try {
+    await comprobarFotos();
+  } finally {
+    await borrarArchivosDePrueba();
+  }
+
+  console.log("\nNombre con el que se descarga\n");
+
+  const { nombreDelPdf, sanearNombre } = await import("../src/lib/archivos");
+  comprobar(
+    "las tildes se le quitan a la letra, no se cambia la letra por un guion",
+    nombreDelPdf("Soporte Técnico  Línea 2 – Ñandú") === "reporte-soporte-tecnico-linea-2-nandu.pdf",
+    nombreDelPdf("Soporte Técnico  Línea 2 – Ñandú"),
+  );
+  const nombreRaro = nombreDelPdf(`${c(0x1f44d)} Planta ${c(0x4e2d)} / fase 1`);
+  comprobar(
+    "cualquier nombre de proyecto da un nombre que cabe en una cabecera HTTP",
+    /^reporte-[a-z0-9-]+\.pdf$/.test(nombreRaro) && nombreRaro.length <= 100,
+    nombreRaro,
+  );
+  comprobar(
+    "un nombre sin nada aprovechable no deja el archivo sin nombre",
+    nombreDelPdf(c(0x1f44d)) === "reporte-servicio.pdf",
+  );
+  comprobar(
+    "el nombre de un adjunto pierde los caracteres de control y las rutas",
+    sanearNombre(`..${c(0x00)}foto${c(0x1f)}/de\\obra${c(0x7f)}.jpg`) === "foto_de_obra.jpg",
+    JSON.stringify(sanearNombre(`..${c(0x00)}foto${c(0x1f)}/de\\obra${c(0x7f)}.jpg`)),
+  );
 
   console.log("\nNadie dibuja texto por fuera de pdf-texto.ts\n");
 

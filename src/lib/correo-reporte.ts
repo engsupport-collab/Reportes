@@ -1,5 +1,6 @@
 import "server-only";
 
+import { nombreDelPdf } from "./archivos";
 import { env } from "./env";
 import { firmarEnlacePublico } from "./enlace-firma";
 import { correoConfigurado, enviarCorreoConAdjunto } from "./gmail";
@@ -52,9 +53,7 @@ export async function enviarReporteAlCliente(datos: {
     const adjuntos = await listarAdjuntosParaPdf(datos.reportId);
     const pdf = await generarReportePdf(reporte, adjuntos);
 
-    const nombreArchivo = `reporte-${datos.proyecto
-      .replace(/[^a-z0-9]+/gi, "-")
-      .toLowerCase()}.pdf`;
+    const nombreArchivo = nombreDelPdf(datos.proyecto);
 
     // Sin APP_URL no hay forma de armar una URL absoluta, y un enlace relativo
     // dentro de un correo no lleva a ningún lado. El adjunto va igual.

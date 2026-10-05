@@ -7,11 +7,18 @@ import {
   type PDFPage,
   StandardFonts,
 } from "pdf-lib";
-import sharp from "sharp";
 
 import { tipoServicioLabel, ordenarEtiquetas } from "@/lib/etiquetas";
 import { formatFechaLarga, formatInstante } from "@/lib/fechas";
 import { formatearMonto } from "@/lib/moneda";
+import {
+  type Adjunto,
+  type AdjuntoLeido,
+  type AdjuntoPreparado,
+  PESO_MAXIMO_PDF,
+  leerAdjuntos,
+  prepararAdjuntos,
+} from "@/lib/pdf-adjuntos";
 import {
   A4,
   COLOR_LINEA,
@@ -40,23 +47,18 @@ import type { ReporteCompleto } from "@/lib/queries/reports";
  * esos quedan solo listados por nombre, con la aclaración de que hay que
  * descargarlos aparte.
  *
- * `sharp` se usa únicamente aquí, no en la subida de archivos: PDF no
- * admite WebP como formato de imagen embebida (la mayoría de las fotos se
- * guardan así, ver `imagen-cliente.ts`), así que hay que convertirlas antes
- * de insertarlas. Es un costo que solo paga quien pide el PDF, no cada
- * petición de la aplicación — por eso aquí sí se justifica, a diferencia de
- * la subida, donde afectaría el arranque en frío de todos los usuarios.
- *
- * La parte visual (logo, colores, encabezado, pie) vive en `pdf-marca.ts`.
+ * Cómo entra cada archivo —enderezado, reducido y sin pasarse del peso que el
+ * documento puede tener— lo decide `pdf-adjuntos.ts`. La parte visual (logo,
+ * colores, encabezado, pie) vive en `pdf-marca.ts`.
  *
  * Ningún texto se dibuja ni se mide llamando a la librería directamente: pasa
  * por `pdf-texto.ts`, que lo deja en lo que la fuente sabe dibujar. Un solo
  * carácter fuera de ese repertorio no deja un hueco, tumba el documento.
  */
 
-type Adjunto = { id: string; blobUrl: string; fileName: string; mimeType: string };
-
 type Fuentes = { normal: PDFFont; bold: PDFFont };
+
+type Contexto = { logo: PDFImage | null; tipoDocumento: string; empresa: string };
 
 /** Por debajo de esta altura empieza el pie de página: ahí no se escribe. */
 const PISO_TEXTO = 60;
@@ -64,44 +66,73 @@ const PISO_TEXTO = 60;
 const TAMANO_TITULO = 19;
 const INTERLINEADO_TITULO = 24;
 
-/** Convierte a PNG o JPG si hace falta: PDF solo admite esos dos formatos de imagen. */
-async function comoImagenEmbebible(
-  bytes: ArrayBuffer,
-  mimeType: string,
-): Promise<{ bytes: Uint8Array; esJpg: boolean }> {
-  if (mimeType === "image/jpeg") return { bytes: new Uint8Array(bytes), esJpg: true };
-  if (mimeType === "image/png") return { bytes: new Uint8Array(bytes), esJpg: false };
+/**
+ * Lo que pesa el documento antes de sumarle ningún archivo: el logo, las
+ * páginas de texto y lo que la librería añade alrededor de cada imagen.
+ */
+const PESO_BASE = 200 * 1024;
 
-  const png = await sharp(Buffer.from(bytes)).rotate().png().toBuffer();
-  return { bytes: new Uint8Array(png), esJpg: false };
+/**
+ * Tope real. El presupuesto se calcula sobre los archivos, y un PDF adjunto
+ * puede pesar algo distinto una vez copiado: si el documento ya armado supera
+ * esto, se vuelve a armar con menos presupuesto antes que entregar algo que
+ * Vercel va a rechazar.
+ */
+const PESO_QUE_NO_SE_ENTREGA = 4.4 * 1024 * 1024;
+
+/**
+ * Arma el documento repartiendo el peso entre los adjuntos, y comprueba el
+ * resultado en vez de fiarse del cálculo.
+ */
+async function armarSinPasarse<T extends Adjunto>(
+  leidos: AdjuntoLeido<T>[],
+  pesoFijo: number,
+  armar: (preparados: AdjuntoPreparado<T>[]) => Promise<Uint8Array>,
+): Promise<Uint8Array> {
+  let presupuesto = PESO_MAXIMO_PDF - PESO_BASE - pesoFijo;
+
+  for (let intento = 1; ; intento++) {
+    const pdf = await armar(await prepararAdjuntos(leidos, presupuesto));
+    if (pdf.length <= PESO_QUE_NO_SE_ENTREGA || intento === 3) return pdf;
+    presupuesto = Math.floor(presupuesto * 0.7);
+  }
+}
+
+/** Hoja nueva con el encabezado y el título de la sección que continúa. */
+function abrirContinuacion(
+  doc: PDFDocument,
+  fuentes: Fuentes,
+  contexto: Contexto,
+  paginasPropias: PDFPage[],
+  titulo: string,
+): { pagina: PDFPage; y: number } {
+  const pagina = doc.addPage(A4);
+  paginasPropias.push(pagina);
+  const y = dibujarEncabezado(pagina, fuentes, contexto);
+  return {
+    pagina,
+    y: dibujarTituloSeccion(pagina, fuentes.normal, MARGEN, y, `${titulo} (continuación)`),
+  };
 }
 
 /**
  * Página con una imagen a página completa (una foto adjunta o la firma),
  * con su encabezado de marca y el espacio del pie respetado.
  */
-async function agregarPaginaImagen(
+function agregarPaginaImagen(
   doc: PDFDocument,
   fuentes: Fuentes,
-  contexto: { logo: PDFImage | null; tipoDocumento: string; empresa: string },
+  contexto: Contexto,
   paginasPropias: PDFPage[],
-  bytes: ArrayBuffer,
-  mimeType: string,
+  imagen: PDFImage,
   titulo: string,
   subtitulo?: string,
-): Promise<void> {
-  const { bytes: datos, esJpg } = await comoImagenEmbebible(bytes, mimeType);
-  const imagen = esJpg ? await doc.embedJpg(datos) : await doc.embedPng(datos);
-
+): void {
   const page = doc.addPage(A4);
   paginasPropias.push(page);
   const [anchoPagina] = A4;
 
-  const yTrasEncabezado = dibujarEncabezado(page, fuentes, {
-    logo: contexto.logo,
-    tipoDocumento: contexto.tipoDocumento,
-    empresa: contexto.empresa,
-  });
+  const yTrasEncabezado = dibujarEncabezado(page, fuentes, contexto);
 
   let y = dibujarTituloSeccion(page, fuentes.normal, MARGEN, yTrasEncabezado, titulo);
 
@@ -139,10 +170,7 @@ async function agregarPaginaImagen(
   });
 }
 
-async function fusionarPdf(
-  doc: PDFDocument,
-  bytes: ArrayBuffer,
-): Promise<boolean> {
+async function fusionarPdf(doc: PDFDocument, bytes: Uint8Array): Promise<boolean> {
   try {
     const origen = await PDFDocument.load(bytes, { ignoreEncryption: true });
     const paginas = await doc.copyPages(origen, origen.getPageIndices());
@@ -153,69 +181,47 @@ async function fusionarPdf(
   }
 }
 
-/** Agrega la foto o el PDF de un ítem (viático o adjunto); si no se puede, lo deja listado. */
+/** Agrega la foto o el PDF de un ítem (viático o adjunto); si no entra, lo deja listado. */
 async function agregarArchivo(
   doc: PDFDocument,
   fuentes: Fuentes,
-  contexto: { logo: PDFImage | null; tipoDocumento: string; empresa: string },
+  contexto: Contexto,
   paginasPropias: PDFPage[],
-  item: Adjunto,
+  preparado: AdjuntoPreparado<Adjunto>,
   titulo: string,
   subtitulo: string | undefined,
   sinFusionar: string[],
 ): Promise<void> {
-  const datos = await leerArchivo(item.blobUrl);
-  if (!datos) {
-    sinFusionar.push(item.fileName);
-    return;
-  }
-
-  if (item.mimeType === "application/pdf") {
-    const ok = await fusionarPdf(doc, datos);
-    if (!ok) sinFusionar.push(item.fileName);
-    return;
-  }
-
-  if (item.mimeType.startsWith("image/")) {
+  if (preparado.clase === "foto") {
     try {
-      await agregarPaginaImagen(
-        doc,
-        fuentes,
-        contexto,
-        paginasPropias,
-        datos,
-        item.mimeType,
-        titulo,
-        subtitulo,
-      );
+      const imagen = await doc.embedJpg(preparado.jpeg);
+      agregarPaginaImagen(doc, fuentes, contexto, paginasPropias, imagen, titulo, subtitulo);
     } catch {
-      sinFusionar.push(item.fileName);
+      sinFusionar.push(preparado.item.fileName);
     }
     return;
   }
 
-  sinFusionar.push(item.fileName);
+  if (preparado.clase === "pdf" && (await fusionarPdf(doc, preparado.bytes))) return;
+
+  sinFusionar.push(preparado.item.fileName);
 }
 
 /** Página final con lo que no se pudo incluir. Solo se agrega si hace falta. */
 function agregarPaginaFaltantes(
   doc: PDFDocument,
   fuentes: Fuentes,
-  contexto: { logo: PDFImage | null; tipoDocumento: string; empresa: string },
+  contexto: Contexto,
   paginasPropias: PDFPage[],
   sinFusionar: string[],
 ): void {
   if (sinFusionar.length === 0) return;
 
-  const page = doc.addPage(A4);
+  let page = doc.addPage(A4);
   paginasPropias.push(page);
   const [ancho] = A4;
 
-  const yTrasEncabezado = dibujarEncabezado(page, fuentes, {
-    logo: contexto.logo,
-    tipoDocumento: contexto.tipoDocumento,
-    empresa: contexto.empresa,
-  });
+  const yTrasEncabezado = dibujarEncabezado(page, fuentes, contexto);
 
   let y = dibujarTituloSeccion(
     page,
@@ -227,7 +233,7 @@ function agregarPaginaFaltantes(
 
   dibujarTexto(
     page,
-    "Formato no compatible para fusionar (Word, Excel u otro) o no se pudo leer. Descárguelos por separado desde el reporte.",
+    "No entraron en este documento: por su formato (Word, Excel u otro), porque no se pudieron leer o porque no cabían. Descárguelos por separado desde el reporte.",
     {
       x: MARGEN,
       y,
@@ -241,7 +247,15 @@ function agregarPaginaFaltantes(
   y -= 34;
 
   for (const nombre of sinFusionar) {
-    if (y < PISO_TEXTO) break;
+    if (y < PISO_TEXTO) {
+      ({ pagina: page, y } = abrirContinuacion(
+        doc,
+        fuentes,
+        contexto,
+        paginasPropias,
+        "Archivos no incluidos",
+      ));
+    }
     dibujarTexto(page, `• ${nombre}`, {
       x: MARGEN,
       y,
@@ -258,13 +272,30 @@ export async function generarReportePdf(
   reporte: ReporteCompleto,
   adjuntos: Adjunto[],
 ): Promise<Uint8Array> {
+  // Los archivos se leen una sola vez, aunque el documento haya que armarlo
+  // más de una para que quepa.
+  const [leidos, datosFirma] = await Promise.all([
+    leerAdjuntos(adjuntos),
+    reporte.signatureUrl ? leerArchivo(reporte.signatureUrl) : null,
+  ]);
+
+  return armarSinPasarse(leidos, datosFirma?.byteLength ?? 0, (preparados) =>
+    armarReporte(reporte, preparados, datosFirma),
+  );
+}
+
+async function armarReporte(
+  reporte: ReporteCompleto,
+  adjuntos: AdjuntoPreparado<Adjunto>[],
+  datosFirma: ArrayBuffer | null,
+): Promise<Uint8Array> {
   const doc = await PDFDocument.create();
   const fuentes: Fuentes = {
     normal: await doc.embedFont(StandardFonts.Helvetica),
     bold: await doc.embedFont(StandardFonts.HelveticaBold),
   };
   const logo = await embeberLogo(doc);
-  const contexto = {
+  const contexto: Contexto = {
     logo,
     tipoDocumento: "Reporte de servicio",
     empresa: reporte.companyName,
@@ -276,9 +307,7 @@ export async function generarReportePdf(
   paginasPropias.push(portada);
   const [ancho] = A4;
 
-  let y = dibujarEncabezado(portada, fuentes, {
-    ...contexto,
-  });
+  let y = dibujarEncabezado(portada, fuentes, contexto);
 
   // El nombre del proyecto se parte aquí, y no con `maxWidth`, para saber
   // cuántos renglones ocupó: la ficha empieza debajo del último. Bajando
@@ -399,16 +428,13 @@ export async function generarReportePdf(
     if (y < PISO_TEXTO) {
       // Un renglón en blanco no abre hoja: quedaría una continuación vacía.
       if (!linea) continue;
-      pagina = doc.addPage(A4);
-      paginasPropias.push(pagina);
-      y = dibujarEncabezado(pagina, fuentes, contexto);
-      y = dibujarTituloSeccion(
-        pagina,
-        fuentes.normal,
-        MARGEN,
-        y,
-        "Detalles del trabajo (continuación)",
-      );
+      ({ pagina, y } = abrirContinuacion(
+        doc,
+        fuentes,
+        contexto,
+        paginasPropias,
+        "Detalles del trabajo",
+      ));
     }
     dibujarTexto(pagina, linea, {
       x: MARGEN,
@@ -422,29 +448,28 @@ export async function generarReportePdf(
 
   // --- Firma ---
   const sinFusionar: string[] = [];
-  if (reporte.signatureUrl) {
-    const datosFirma = await leerArchivo(reporte.signatureUrl);
-    if (datosFirma) {
-      const firmaSubtitulo = [
-        reporte.signatureName ? `Firmado por ${reporte.signatureName}` : null,
-        reporte.signedAt ? formatInstante(reporte.signedAt) : null,
-      ]
-        .filter(Boolean)
-        .join(" · ");
-      try {
-        await agregarPaginaImagen(
-          doc,
-          fuentes,
-          contexto,
-          paginasPropias,
-          datosFirma,
-          "image/png",
-          "Firma de conformidad",
-          firmaSubtitulo || undefined,
-        );
-      } catch {
-        sinFusionar.push("firma");
-      }
+  if (datosFirma) {
+    const firmaSubtitulo = [
+      reporte.signatureName ? `Firmado por ${reporte.signatureName}` : null,
+      reporte.signedAt ? formatInstante(reporte.signedAt) : null,
+    ]
+      .filter(Boolean)
+      .join(" · ");
+    try {
+      // La firma la dibuja la propia aplicación y siempre es un PNG pequeño:
+      // entra tal cual, sin pasar por la reducción de las fotos.
+      const imagen = await doc.embedPng(datosFirma);
+      agregarPaginaImagen(
+        doc,
+        fuentes,
+        contexto,
+        paginasPropias,
+        imagen,
+        "Firma de conformidad",
+        firmaSubtitulo || undefined,
+      );
+    } catch {
+      sinFusionar.push("firma");
     }
   }
 
@@ -457,7 +482,7 @@ export async function generarReportePdf(
       paginasPropias,
       a,
       `Adjunto ${i + 1} de ${adjuntos.length}`,
-      a.fileName,
+      a.item.fileName,
       sinFusionar,
     );
   }
@@ -489,13 +514,22 @@ export async function generarReporteViaticoPdf(
   reporte: ReporteCompleto,
   gastos: GastoViatico[],
 ): Promise<Uint8Array> {
+  const leidos = await leerAdjuntos(gastos);
+
+  return armarSinPasarse(leidos, 0, (preparados) => armarViatico(reporte, preparados));
+}
+
+async function armarViatico(
+  reporte: ReporteCompleto,
+  gastos: AdjuntoPreparado<GastoViatico>[],
+): Promise<Uint8Array> {
   const doc = await PDFDocument.create();
   const fuentes: Fuentes = {
     normal: await doc.embedFont(StandardFonts.Helvetica),
     bold: await doc.embedFont(StandardFonts.HelveticaBold),
   };
   const logo = await embeberLogo(doc);
-  const contexto = {
+  const contexto: Contexto = {
     logo,
     tipoDocumento: "Reporte de viáticos",
     empresa: reporte.companyName,
@@ -506,9 +540,7 @@ export async function generarReporteViaticoPdf(
   paginasPropias.push(portada);
   const [ancho] = A4;
 
-  let y = dibujarEncabezado(portada, fuentes, {
-    ...contexto,
-  });
+  let y = dibujarEncabezado(portada, fuentes, contexto);
 
   dibujarTexto(portada, "Reporte de viáticos", {
     x: MARGEN,
@@ -530,7 +562,7 @@ export async function generarReporteViaticoPdf(
   );
   y -= 34;
 
-  const total = gastos.reduce((suma, g) => suma + (g.amount ?? 0), 0);
+  const total = gastos.reduce((suma, g) => suma + (g.item.amount ?? 0), 0);
   const anchoColumna = (ancho - MARGEN * 2 - 24) / 2;
   const columna1 = MARGEN;
   const columna2 = MARGEN + anchoColumna + 24;
@@ -576,15 +608,22 @@ export async function generarReporteViaticoPdf(
   );
 
   y = Math.min(y, y2) - 6;
-  y = dibujarTituloSeccion(portada, fuentes.normal, MARGEN, y, `Gastos (${gastos.length})`);
+  const tituloGastos = `Gastos (${gastos.length})`;
+  y = dibujarTituloSeccion(portada, fuentes.normal, MARGEN, y, tituloGastos);
 
-  for (const g of gastos) {
-    if (y < PISO_TEXTO) break;
+  // Igual que el detalle de un servicio: la lista sigue en otra hoja en vez de
+  // cortarse. El total de arriba suma todos los gastos; una lista recortada
+  // mostraría menos de los que suma.
+  let pagina = portada;
+  for (const { item: g } of gastos) {
+    if (y < PISO_TEXTO) {
+      ({ pagina, y } = abrirContinuacion(doc, fuentes, contexto, paginasPropias, tituloGastos));
+    }
     const monto =
       g.amount !== null ? formatearMonto(g.amount, reporte.currency) : "Sin monto";
     const fecha = g.fechaGasto ? formatFechaLarga(g.fechaGasto) : null;
 
-    dibujarTexto(portada, g.concepto ?? "Sin concepto", {
+    dibujarTexto(pagina, g.concepto ?? "Sin concepto", {
       x: MARGEN,
       y,
       size: 10.5,
@@ -594,7 +633,7 @@ export async function generarReporteViaticoPdf(
     });
 
     const anchoMonto = anchoDeTexto(fuentes.bold, monto, 10.5);
-    dibujarTexto(portada, monto, {
+    dibujarTexto(pagina, monto, {
       x: ancho - MARGEN - anchoMonto,
       y,
       size: 10.5,
@@ -603,7 +642,7 @@ export async function generarReporteViaticoPdf(
     });
 
     if (fecha) {
-      dibujarTexto(portada, fecha, {
+      dibujarTexto(pagina, fecha, {
         x: MARGEN,
         y: y - 12,
         size: 8.5,
@@ -613,7 +652,7 @@ export async function generarReporteViaticoPdf(
     }
 
     y -= fecha ? 26 : 18;
-    portada.drawLine({
+    pagina.drawLine({
       start: { x: MARGEN, y: y + 8 },
       end: { x: ancho - MARGEN, y: y + 8 },
       thickness: 0.5,
@@ -630,7 +669,7 @@ export async function generarReporteViaticoPdf(
       paginasPropias,
       g,
       `Gasto ${i + 1} de ${gastos.length}`,
-      g.concepto ?? undefined,
+      g.item.concepto ?? undefined,
       sinFusionar,
     );
   }
