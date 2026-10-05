@@ -253,6 +253,7 @@
     "motivoLabel": "Motivo",
     "resumenServicioAviso": "Este relatório de serviço foi redigido por outro técnico. Você só vê este resumo para se situar; para ver a sua própria despesa, entre na aba Despesas.",
     "eventoCorreoEnviado": "E-mail enviado para {correo}",
+    "eventoCorreoEnviadoConCopia": "E-mail enviado para {correo}, com cópia para {copia}",
     "eventoCorreoFallido": "O e-mail para {correo} não saiu",
     "eventoCorreoCorregido": "E-mail de quem assina corrigido: de {de} para {a}",
     "detalleTecnico": "Detalhe técnico: {detalle}"

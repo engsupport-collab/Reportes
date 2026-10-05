@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { verificarEnlacePublico } from "@/lib/enlace-firma";
 import { nombreDelPdf } from "@/lib/archivos";
 import { generarReportePdf, generarReporteViaticoPdf } from "@/lib/pdf";
+import { idiomaDeEmpresa } from "@/lib/pdf-idioma";
 import { listarAdjuntosParaPdf } from "@/lib/queries/attachments";
 import { obtenerReporte } from "@/lib/queries/reports";
 import { listarViaticosParaPdf } from "@/lib/queries/viaticos";
@@ -42,7 +43,10 @@ export async function GET(
           return generarReportePdf(reporte, adjuntos);
         })();
 
-  const nombreArchivo = nombreDelPdf(reporte.projectName);
+  const nombreArchivo = nombreDelPdf(
+    reporte.projectName,
+    idiomaDeEmpresa(reporte.companyId),
+  );
 
   return new NextResponse(Buffer.from(pdf), {
     headers: {

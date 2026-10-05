@@ -74,42 +74,30 @@ type Trazo = { texto: string; x: number; y: number; tamano: number };
  * que permite comprobar que dos textos no quedaron uno encima del otro.
  */
 async function trazosDelPdf(bytes: Uint8Array): Promise<Trazo[][]> {
-  const doc = await PDFDocument.load(bytes);
-  const comoAscii = new TextDecoder("latin1");
   const comoWinAnsi = new TextDecoder("windows-1252");
 
-  return doc.getPages().map((page) => {
-    const contenido = page.node.Contents();
-    const flujos =
-      contenido instanceof PDFArray
-        ? contenido.asArray().map((ref) => doc.context.lookup(ref))
-        : [contenido];
+  return (await operadoresDelPdf(bytes)).map((operadores) => {
     const trazos: Trazo[] = [];
 
-    for (const flujo of flujos) {
-      if (!(flujo instanceof PDFRawStream)) continue;
-      const operadores = comoAscii.decode(decodePDFRawStream(flujo).decode());
+    // Cada `drawText` es un bloque BT…ET: fuente y tamaño (Tf), interlineado
+    // (TL), posición (Tm) y un Tj por renglón, separados por T*.
+    for (const [, bloque] of operadores.matchAll(/\bBT\b([\s\S]*?)\bET\b/g)) {
+      const tamano = Number(/([\d.]+)\s+Tf/.exec(bloque!)?.[1]);
+      const interlineado = Number(/([\d.]+)\s+TL/.exec(bloque!)?.[1] ?? 0);
+      const posicion = /(-?[\d.]+)\s+(-?[\d.]+)\s+Tm/.exec(bloque!);
+      const x = Number(posicion?.[1]);
+      let y = Number(posicion?.[2]);
 
-      // Cada `drawText` es un bloque BT…ET: fuente y tamaño (Tf), interlineado
-      // (TL), posición (Tm) y un Tj por renglón, separados por T*.
-      for (const [, bloque] of operadores.matchAll(/\bBT\b([\s\S]*?)\bET\b/g)) {
-        const tamano = Number(/([\d.]+)\s+Tf/.exec(bloque!)?.[1]);
-        const interlineado = Number(/([\d.]+)\s+TL/.exec(bloque!)?.[1] ?? 0);
-        const posicion = /(-?[\d.]+)\s+(-?[\d.]+)\s+Tm/.exec(bloque!);
-        const x = Number(posicion?.[1]);
-        let y = Number(posicion?.[2]);
-
-        for (const [, hex, salto] of bloque!.matchAll(/<([0-9A-Fa-f]*)>\s*Tj|(T\*)/g)) {
-          if (salto) {
-            y -= interlineado;
-          } else {
-            trazos.push({
-              texto: comoWinAnsi.decode(Buffer.from(hex!, "hex")),
-              x,
-              y,
-              tamano,
-            });
-          }
+      for (const [, hex, salto] of bloque!.matchAll(/<([0-9A-Fa-f]*)>\s*Tj|(T\*)/g)) {
+        if (salto) {
+          y -= interlineado;
+        } else {
+          trazos.push({
+            texto: comoWinAnsi.decode(Buffer.from(hex!, "hex")),
+            x,
+            y,
+            tamano,
+          });
         }
       }
     }
@@ -117,6 +105,52 @@ async function trazosDelPdf(bytes: Uint8Array): Promise<Trazo[][]> {
     return trazos;
   });
 }
+
+/** Los operadores de dibujo de cada página, ya descomprimidos. */
+async function operadoresDelPdf(bytes: Uint8Array): Promise<string[]> {
+  const doc = await PDFDocument.load(bytes);
+  const comoAscii = new TextDecoder("latin1");
+
+  return doc.getPages().map((page) => {
+    const contenido = page.node.Contents();
+    const flujos =
+      contenido instanceof PDFArray
+        ? contenido.asArray().map((ref) => doc.context.lookup(ref))
+        : [contenido];
+
+    return flujos
+      .flatMap((flujo) =>
+        flujo instanceof PDFRawStream ? [comoAscii.decode(decodePDFRawStream(flujo).decode())] : [],
+      )
+      .join("\n");
+  });
+}
+
+/** Una imagen dibujada en una página: dónde quedó y de qué tamaño, en puntos. */
+type Dibujo = { x: number; y: number; ancho: number; alto: number };
+
+/**
+ * Cada imagen se dibuja con cuatro transformaciones seguidas —mover, girar,
+ * escalar, inclinar— y después su nombre: de la primera sale dónde quedó y de
+ * la tercera, su tamaño.
+ */
+const IMAGEN_DIBUJADA =
+  /1 0 0 1 (-?[\d.]+) (-?[\d.]+) cm\s+\S+ \S+ \S+ \S+ 0 0 cm\s+(-?[\d.]+) 0 0 (-?[\d.]+) 0 0 cm\s+\S+ \S+ \S+ \S+ 0 0 cm\s+\/\S+ Do/g;
+
+/** Las imágenes de cada página (logo, fotos y firma), con su posición y tamaño. */
+async function imagenesDelPdf(bytes: Uint8Array): Promise<Dibujo[][]> {
+  return (await operadoresDelPdf(bytes)).map((operadores) =>
+    [...operadores.matchAll(IMAGEN_DIBUJADA)].map(([, x, y, ancho, alto]) => ({
+      x: Number(x),
+      y: Number(y),
+      ancho: Number(ancho),
+      alto: Number(alto),
+    })),
+  );
+}
+
+/** El logo va en la franja de arriba; todo lo demás es contenido. */
+const esLogo = (dibujo: Dibujo) => dibujo.y > 750;
 
 /** El pie lleva la hora de generación: se deja fuera al comparar dos documentos. */
 const PISO_DEL_CONTENIDO = 60;
@@ -572,6 +606,551 @@ async function comprobarFotos() {
   }
 }
 
+// --- Firmas e idioma --------------------------------------------------------
+
+const FIRMANTE = "Carlos Gómez Restrepo";
+const FIRMADO_EL = new Date("2026-10-04T17:36:00Z");
+let refFirma = "";
+
+/**
+ * La firma como la guarda la aplicación: todo el recuadro donde se firmó
+ * (1020 x 528 en un iPhone), transparente, con el trazo en una parte. El trazo
+ * de prueba es un bloque de 600 x 150: cuatro veces más ancho que alto.
+ */
+async function prepararFirma(): Promise<void> {
+  const firma = await sharp({
+    create: { width: 1020, height: 528, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } },
+  })
+    .composite([
+      {
+        input: {
+          create: { width: 600, height: 150, channels: 4, background: { r: 17, g: 24, b: 39, alpha: 1 } },
+        },
+        left: 200,
+        top: 180,
+      },
+    ])
+    .png()
+    .toBuffer();
+  refFirma = await guardarDePrueba("firma.png", firma);
+}
+
+/** El reporte de prueba, ya firmado por el cliente. */
+function firmado(cambios: Partial<ReporteCompleto> = {}): ReporteCompleto {
+  return reporte({
+    signatureUrl: refFirma,
+    signatureName: FIRMANTE,
+    signatureEmail: "cliente@ejemplo.com",
+    signedAt: FIRMADO_EL,
+    ...cambios,
+  });
+}
+
+/** Columna derecha de la hoja: ahí va la firma del cliente. */
+const X_COLUMNA_2 = 48 + (595 - 48 * 2 - 24) / 2 + 24;
+const ANCHO_COLUMNA = (595 - 48 * 2 - 24) / 2;
+
+/**
+ * Lo que pidió el cliente el 2026-10-05: dos firmas —la suya, firmada, y la de
+ * quien reporta, que es su nombre—, en un bloque pequeño y al final. Hasta
+ * entonces la firma ocupaba una hoja entera entre el detalle y las fotos.
+ */
+async function comprobarFirmas() {
+  const { generarReportePdf } = await import("../src/lib/pdf");
+  const { textoDibujable } = await import("../src/lib/pdf-texto");
+  const { formatInstante } = await import("../src/lib/fechas");
+  const normal = await (await PDFDocument.create()).embedFont(StandardFonts.Helvetica);
+  const negrita = await (await PDFDocument.create()).embedFont(StandardFonts.HelveticaBold);
+
+  const FECHA_FIRMA = textoDibujable(`Firmado el ${formatInstante(FIRMADO_EL)}`, normal);
+  const DEL_BLOQUE = ["FIRMAS", "QUIEN REPORTA", "FIRMA DEL CLIENTE", FIRMANTE, FECHA_FIRMA];
+  const paginasCon = (paginas: Trazo[][], texto: string) =>
+    paginas.flatMap((pagina, i) => (pagina.some((t) => t.texto === texto) ? [i] : []));
+  const alturaDe = (pagina: Trazo[], texto: string) =>
+    pagina.find((t) => t.texto === texto)?.y ?? Number.NaN;
+  /** Lo que el bloque dibuja en una página, sin el pie. */
+  const bloqueEn = (pagina: Trazo[]) => {
+    const desde = pagina.findIndex((t) => t.texto === "FIRMAS");
+    return desde === -1 ? [] : pagina.slice(desde).filter(sobreElPie);
+  };
+
+  console.log("\nDos firmas, pequeñas y al final\n");
+
+  const soloFirma = await generarBytes("un reporte firmado, sin adjuntos", () =>
+    generarReportePdf(firmado(), []),
+  );
+  if (soloFirma) {
+    const paginas = await trazosDelPdf(soloFirma);
+    const imagenes = await imagenesDelPdf(soloFirma);
+    const portada = paginas[0]!;
+    const textos = portada.map((t) => t.texto);
+    const firma = imagenes[0]!.filter((d) => !esLogo(d));
+    const ultimoDelDetalle = portada.findLast((t) => t.tamano === 10.5 && t.texto.length > 20);
+
+    comprobar(
+      "es una sola hoja: la firma ya no gasta una propia",
+      paginas.length === 1,
+      `${paginas.length}`,
+    );
+    comprobar(
+      "el bloque trae las dos firmas: quien reporta y el cliente",
+      DEL_BLOQUE.every((texto) => textos.includes(texto)),
+      DEL_BLOQUE.filter((texto) => !textos.includes(texto)).join(" | "),
+    );
+    comprobar(
+      "quien reporta firma con su nombre: aparece en la ficha y otra vez sobre su raya",
+      portada.filter((t) => t.texto === BASE.authorName).length === 2 &&
+        portada.some((t) => t.texto === BASE.authorName && t.tamano === 11),
+    );
+    comprobar(
+      "va debajo del detalle, no encima",
+      Boolean(ultimoDelDetalle) && alturaDe(portada, "FIRMAS") < ultimoDelDetalle!.y - 20,
+      `detalle en ${ultimoDelDetalle?.y}, firmas en ${alturaDe(portada, "FIRMAS")}`,
+    );
+    comprobar(
+      "nada del bloque invade el pie de página",
+      portada.slice(textos.indexOf("FIRMAS")).every((t) => t.y >= PISO_DEL_CONTENIDO || t.y < 40),
+    );
+    comprobar("la firma del cliente está dibujada, y solo una vez", firma.length === 1);
+    if (firma.length === 1) {
+      const [f] = firma as [Dibujo];
+      const raya = alturaDe(portada, "FIRMA DEL CLIENTE") + 12;
+      comprobar(
+        "es pequeña: cabe en su columna y no pasa de 46 puntos de alto",
+        f.alto <= 46.01 && f.ancho <= ANCHO_COLUMNA + 0.01,
+        `${f.ancho.toFixed(0)} x ${f.alto.toFixed(0)} pt`,
+      );
+      comprobar(
+        "está en la columna del cliente, apoyada sobre su raya",
+        Math.abs(f.x - X_COLUMNA_2) < 0.01 && f.y > raya && f.y < raya + 10,
+        `x ${f.x}, y ${f.y}, raya en ${raya}`,
+      );
+      comprobar(
+        "va recortada a su trazo: tiene la forma del trazo, no la del recuadro donde se firmó",
+        Math.abs(f.ancho / f.alto - 600 / 150) < 0.05,
+        `${(f.ancho / f.alto).toFixed(2)} de ancho por cada 1 de alto (el recuadro es ${(1020 / 528).toFixed(2)})`,
+      );
+    }
+  }
+
+  const sinFirmar = await generar("el mismo reporte, sin firmar todavía", () =>
+    generarReportePdf(reporte({ status: "en_proceso" }), []),
+  );
+  if (sinFirmar && soloFirma) {
+    const textos = sinFirmar[0]!.map((t) => t.texto);
+    const delFirmado = (await trazosDelPdf(soloFirma))[0]!.map((t) => t.texto);
+    comprobar(
+      "el lugar de la firma del cliente está, y dice que falta",
+      textos.includes("FIRMA DEL CLIENTE") && textos.includes("Pendiente de firma"),
+    );
+    comprobar(
+      "no dice que alguien firmó",
+      !textos.some((t) => t.startsWith("Firmado el")) && !textos.includes(FIRMANTE),
+    );
+    comprobar(
+      "contraste: el firmado no dice que falta",
+      !delFirmado.includes("Pendiente de firma"),
+    );
+  }
+
+  console.log("\nCon fotos, las firmas van debajo de la última\n");
+
+  const dePie = await texturaDeFoto(1200, 1600).jpeg({ quality: 82 }).toBuffer();
+  const refDePie = await guardarDePrueba("de-pie.jpg", dePie);
+  const fotos = (cuantas: number) =>
+    Array.from({ length: cuantas }, (_, i) => ({
+      id: `s${i}`,
+      blobUrl: refDePie,
+      fileName: `IMG_${String(i + 1).padStart(4, "0")}.jpg`,
+      mimeType: "image/jpeg",
+    }));
+
+  const conFotos = await generarBytes("un reporte firmado con 3 fotos", () =>
+    generarReportePdf(firmado(), fotos(3)),
+  );
+  if (conFotos) {
+    const paginas = await trazosDelPdf(conFotos);
+    const imagenes = await imagenesDelPdf(conFotos);
+    const ultima = paginas.at(-1)!;
+    const contenido = imagenes.map((pagina) => pagina.filter((d) => !esLogo(d)));
+    const fotoAnterior = contenido[2]?.[0];
+    const [fotoFinal, firma] = [...(contenido.at(-1) ?? [])].sort((a, b) => b.alto - a.alto);
+
+    comprobar(
+      "son 4 hojas, la portada y una por foto: ninguna es solo para la firma",
+      paginas.length === 4,
+      `${paginas.length}`,
+    );
+    comprobar(
+      "las firmas están una sola vez, en la última hoja, con la última foto",
+      iguales(paginasCon(paginas, "FIRMAS").map(String), ["3"]) &&
+        ultima.some((t) => t.texto === "ADJUNTO 3 DE 3"),
+      `en la(s) hoja(s) ${paginasCon(paginas, "FIRMAS").map((i) => i + 1).join(", ")}`,
+    );
+    comprobar(
+      "contraste: entre el detalle y las fotos ya no hay nada de la firma",
+      !paginas.slice(0, -1).flat().some((t) => DEL_BLOQUE.includes(t.texto)),
+    );
+    comprobar(
+      "el bloque está completo y por encima del pie",
+      DEL_BLOQUE.every((texto) => bloqueEn(ultima).some((t) => t.texto === texto)) &&
+        bloqueEn(ultima).every((t) => t.y >= PISO_DEL_CONTENIDO),
+    );
+    comprobar(
+      "en esa hoja hay dos imágenes: la foto y la firma",
+      Boolean(fotoFinal && firma) && contenido.at(-1)!.length === 2,
+      `${contenido.at(-1)!.length}`,
+    );
+    if (fotoFinal && firma && fotoAnterior) {
+      comprobar(
+        "la foto termina antes de donde empiezan las firmas: no se montan",
+        fotoFinal.y > alturaDe(ultima, "FIRMAS") + 8,
+        `la foto baja hasta ${fotoFinal.y.toFixed(0)}, las firmas empiezan en ${alturaDe(ultima, "FIRMAS").toFixed(0)}`,
+      );
+      comprobar(
+        "la última foto cede sitio, pero se sigue viendo bien",
+        fotoFinal.alto < fotoAnterior.alto && fotoFinal.alto > 450,
+        `${fotoFinal.alto.toFixed(0)} pt de alto; las demás, ${fotoAnterior.alto.toFixed(0)}`,
+      );
+      comprobar(
+        "la firma es pequeña al lado de la foto",
+        firma.alto <= 46.01 && firma.alto < fotoFinal.alto / 5,
+      );
+    }
+    comprobar(
+      "las otras fotos siguen a hoja completa",
+      contenido.slice(1, -1).every((pagina) => pagina.length === 1 && pagina[0]!.alto > 600),
+    );
+  }
+
+  console.log("\nCuando lo último no es una foto\n");
+
+  const hojaSuelta = await PDFDocument.create();
+  hojaSuelta.addPage([400, 300]);
+  hojaSuelta.addPage([400, 300]);
+  const refPlano = await guardarDePrueba("plano-final.pdf", await hojaSuelta.save());
+  const refWord = await guardarDePrueba(
+    "acta.docx",
+    Buffer.concat([Buffer.from([0x50, 0x4b, 0x03, 0x04]), Buffer.alloc(3000, 1)]),
+  );
+  const plano = { id: "p1", blobUrl: refPlano, fileName: "plano.pdf", mimeType: "application/pdf" };
+  const word = {
+    id: "w1",
+    blobUrl: refWord,
+    fileName: "acta.docx",
+    mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  };
+
+  const conPdfAlFinal = await generar("una foto y después un PDF de 2 hojas", () =>
+    generarReportePdf(firmado(), [...fotos(1), plano]),
+  );
+  if (conPdfAlFinal) {
+    const ultima = conPdfAlFinal.at(-1)!;
+    comprobar(
+      "las firmas cierran el documento en una hoja propia: portada, foto, 2 del PDF y esa",
+      conPdfAlFinal.length === 5 && iguales(paginasCon(conPdfAlFinal, "FIRMAS").map(String), ["4"]),
+      `${conPdfAlFinal.length} hojas`,
+    );
+    comprobar(
+      "esa hoja lleva el encabezado y el bloque completo",
+      ultima.some((t) => t.texto === "REPORTE DE SERVICIO") &&
+        DEL_BLOQUE.every((texto) => ultima.some((t) => t.texto === texto)),
+    );
+    comprobar(
+      "sobre las hojas del PDF adjunto no se escribió nada",
+      conPdfAlFinal[2]!.length === 0 && conPdfAlFinal[3]!.length === 0,
+    );
+  }
+
+  const conWordAlFinal = await generar("una foto y después un Word", () =>
+    generarReportePdf(firmado(), [...fotos(1), word]),
+  );
+  if (conWordAlFinal) {
+    const ultima = conWordAlFinal.at(-1)!;
+    comprobar(
+      "las firmas van en la hoja que lista lo no incluido, debajo de la lista",
+      conWordAlFinal.length === 3 &&
+        ultima.some((t) => t.texto === "ARCHIVOS NO INCLUIDOS") &&
+        alturaDe(ultima, "FIRMAS") < alturaDe(ultima, "• acta.docx") - 20,
+      `${conWordAlFinal.length} hojas`,
+    );
+  }
+
+  console.log("\nCuando el detalle llena la hoja\n");
+
+  // De 18 a 34 renglones: con pocos las firmas caben debajo, después ya no
+  // caben y pasan a otra hoja, y al final el propio detalle sigue en otra.
+  const colocaciones = new Set<string>();
+  let malColocadas = 0;
+  let primerFallo = "";
+  for (let renglones = 18; renglones <= 34; renglones++) {
+    const detalle = Array.from({ length: renglones }, (_, i) => `Punto ${i + 1} revisado.`);
+    const paginas = await trazosDelPdf(
+      await generarReportePdf(
+        firmado({ projectName: "Mantenimiento de tablero", details: detalle.join("\r\n") }),
+        [],
+      ),
+    );
+    const ultima = paginas.at(-1)!;
+    const bloque = bloqueEn(ultima);
+    const puntos = ultima.filter((t) => t.texto.startsWith("Punto "));
+    const bien =
+      iguales(paginasCon(paginas, "FIRMAS").map(String), [String(paginas.length - 1)]) &&
+      DEL_BLOQUE.every((texto) => bloque.some((t) => t.texto === texto)) &&
+      bloque.every((t) => t.y >= PISO_DEL_CONTENIDO) &&
+      puntos.every((t) => t.y > alturaDe(ultima, "FIRMAS") + 20) &&
+      paginas.flat().filter((t) => t.texto.startsWith("Punto ")).length === renglones;
+    if (!bien) {
+      malColocadas++;
+      primerFallo ||= `con ${renglones} renglones`;
+    }
+    colocaciones.add(`${paginas.length} hoja(s), ${puntos.length > 0 ? "con" : "sin"} detalle en la última`);
+  }
+  comprobar(
+    "con cualquier largo de detalle, el bloque queda entero, una vez, al final y sobre el pie",
+    malColocadas === 0,
+    primerFallo,
+  );
+  comprobar(
+    "contraste: la prueba pasó por los tres casos — caben debajo, hoja propia, y detrás del detalle que continúa",
+    colocaciones.size === 3,
+    [...colocaciones].join(" | "),
+  );
+
+  console.log("\nNombres largos\n");
+
+  const NOMBRE_LARGO = "María Fernanda de los Ángeles Rodríguez Santamaría y Fernández de Córdoba";
+  const conNombres = await generar("quien reporta y quien firma con nombres que no caben en un renglón", () =>
+    generarReportePdf(firmado({ authorName: NOMBRE_LARGO, signatureName: NOMBRE_LARGO }), fotos(1)),
+  );
+  if (conNombres) {
+    const ultima = conNombres.at(-1)!;
+    const bloque = bloqueEn(ultima);
+    const raya = alturaDe(ultima, "QUIEN REPORTA") + 12;
+    const deQuienReporta = bloque.filter((t) => t.tamano === 11);
+    const deQuienFirma = bloque.filter((t) => t.tamano === 10 && t.x > 300);
+    comprobar(
+      "los dos nombres están completos, partidos en renglones",
+      deQuienReporta.length > 1 &&
+        deQuienReporta.map((t) => t.texto).join(" ") === NOMBRE_LARGO &&
+        deQuienFirma.map((t) => t.texto).join(" ") === NOMBRE_LARGO,
+      `${deQuienReporta.length} y ${deQuienFirma.length} renglones`,
+    );
+    comprobar(
+      "ningún renglón se sale de su columna",
+      [...deQuienReporta, ...deQuienFirma].every(
+        (t) => negrita.widthOfTextAtSize(t.texto, t.tamano) <= ANCHO_COLUMNA,
+      ),
+    );
+    comprobar(
+      "el de quien reporta crece hacia arriba: ninguno de sus renglones pisa la raya",
+      deQuienReporta.every((t) => t.y > raya),
+    );
+    comprobar(
+      "la fecha queda debajo del último renglón de quien firma, y sobre el pie",
+      alturaDe(ultima, FECHA_FIRMA) < Math.min(...deQuienFirma.map((t) => t.y)) &&
+        bloque.every((t) => t.y >= PISO_DEL_CONTENIDO),
+    );
+  }
+}
+
+/**
+ * El idioma del documento lo pone la empresa: LLC en inglés, SAS en español.
+ * El cliente generó un reporte de la LLC y los títulos le salieron en español.
+ */
+async function comprobarIdioma() {
+  const { generarReportePdf, generarReporteViaticoPdf } = await import("../src/lib/pdf");
+  const { nombreDelPdf } = await import("../src/lib/archivos");
+
+  console.log("\nLos reportes de la LLC salen en inglés\n");
+
+  const foto = await texturaDeFoto(1600, 1200).jpeg({ quality: 82 }).toBuffer();
+  const refFoto = await guardarDePrueba("idioma.jpg", foto);
+  const adjuntos = [
+    { id: "i1", blobUrl: refFoto, fileName: "IMG_0001.jpg", mimeType: "image/jpeg" },
+    { id: "i2", blobUrl: refFoto, fileName: "IMG_0002.jpg", mimeType: "image/jpeg" },
+    {
+      id: "i3",
+      blobUrl: "local:prueba-pdf-no-existe-5.docx",
+      fileName: "acta.docx",
+      mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    },
+  ];
+  // El mismo reporte para las dos empresas: lo único que cambia es de cuál es.
+  const comun: Partial<ReporteCompleto> = {
+    projectName: "HMI Intarema PGI",
+    details: "Line 2 HMI screens updated and tested with the operator.",
+    serviceType: "electrico",
+    etiquetas: ["preventivo", "urgencia"],
+  };
+  const deLaSas = await generar("el reporte, de la SAS", () =>
+    generarReportePdf(firmado({ ...comun, companyId: "saas", companyName: "SAS" }), adjuntos),
+  );
+  const deLaLlc = await generar("el mismo reporte, de la LLC", () =>
+    generarReportePdf(
+      firmado({ ...comun, companyId: "corp", companyName: "LLC", currency: "USD" }),
+      adjuntos,
+    ),
+  );
+
+  if (deLaSas && deLaLlc) {
+    const enIngles = deLaLlc.flat().map((t) => t.texto);
+    const enEspanol = deLaSas.flat().map((t) => t.texto);
+
+    const ESPERADO = [
+      "SERVICE REPORT",
+      "COMPLETED",
+      "CLIENT",
+      "QUOTE",
+      "PURCHASE ORDER",
+      "Not assigned",
+      "WORK DATE",
+      "October 4, 2026",
+      "SERVICE TYPE",
+      "Electrical",
+      "TAGS",
+      "Preventive maintenance, Urgent",
+      "CREATED BY",
+      "CREATED ON",
+      "WORK DETAILS",
+      "ATTACHMENT 1 OF 3",
+      "ATTACHMENT 2 OF 3",
+      "FILES NOT INCLUDED",
+      "SIGNATURES",
+      "REPORTED BY",
+      "CLIENT SIGNATURE",
+      // Con un espacio corriente: el formato de hora en inglés trae uno fino
+      // de no separación, que la fuente no tiene.
+      "Signed on 10/04/2026, 12:36 PM",
+      `Page 1 of ${deLaLlc.length}`,
+    ];
+    comprobar(
+      "títulos, rótulos, fechas, estado, clasificación y pie están en inglés",
+      ESPERADO.every((texto) => enIngles.includes(texto)),
+      ESPERADO.filter((texto) => !enIngles.includes(texto)).join(" | "),
+    );
+    comprobar(
+      "el aviso del pie y la nota de lo no incluido también",
+      enIngles.some((t) => t.startsWith("Document generated electronically on ")) &&
+        enIngles.some((t) => t.startsWith("Not included in this document")),
+    );
+
+    // Lo que los dos documentos tienen en común solo puede ser lo que alguien
+    // escribió —el proyecto, los nombres, el detalle— o la marca. Cualquier
+    // otro texto repetido es un rótulo que se quedó sin traducir.
+    const DATOS = new Set([
+      "HMI Intarema PGI",
+      BASE.clientName,
+      BASE.quoteNumber!,
+      BASE.authorName,
+      comun.details!,
+      FIRMANTE,
+      "IMG_0001.jpg",
+      "IMG_0002.jpg",
+      "• acta.docx",
+      "Eng-Support Corp.",
+      "Automation, Control & Digitalization I4.0",
+      "  ·  Automation, Control & Digitalization I4.0",
+    ]);
+    const repetidos = [...new Set(enIngles.filter((t) => enEspanol.includes(t)))];
+    const sinTraducir = repetidos.filter((t) => !DATOS.has(t));
+    comprobar(
+      "no quedó ningún texto fijo en español: lo único igual en los dos es lo escrito a mano y la marca",
+      sinTraducir.length === 0,
+      sinTraducir.join(" | "),
+    );
+    comprobar(
+      "contraste: la comparación sí encuentra lo escrito a mano en los dos",
+      [...DATOS].every((t) => repetidos.includes(t)),
+      [...DATOS].filter((t) => !repetidos.includes(t)).join(" | "),
+    );
+    comprobar(
+      "contraste: el de la SAS sigue en español",
+      ["REPORTE DE SERVICIO", "FIRMAS", "FIRMA DEL CLIENTE", "4 de octubre de 2026", "Eléctrico"].every(
+        (texto) => enEspanol.includes(texto),
+      ) && !enEspanol.includes("SERVICE REPORT"),
+    );
+    comprobar(
+      "los dos tienen las mismas hojas: solo cambió el idioma",
+      deLaSas.length === deLaLlc.length,
+      `${deLaSas.length} y ${deLaLlc.length}`,
+    );
+  }
+
+  const deOtra = await generar("un reporte de una empresa que no es la LLC", () =>
+    generarReportePdf(reporte({ companyId: "otra", companyName: "Otra" }), []),
+  );
+  if (deOtra) {
+    comprobar(
+      "solo la LLC va en inglés: cualquier otra, en español",
+      deOtra[0]!.some((t) => t.texto === "REPORTE DE SERVICIO"),
+    );
+  }
+
+  const viaticos = await generar("un reporte de viáticos de la LLC", () =>
+    generarReporteViaticoPdf(
+      reporte({ type: "viaticos", companyId: "corp", companyName: "LLC", currency: "USD" }),
+      [
+        {
+          id: "g1",
+          blobUrl: refFoto,
+          fileName: "receipt.jpg",
+          mimeType: "image/jpeg",
+          concepto: "Team lunch",
+          fechaGasto: new Date("2026-10-04T12:00:00Z"),
+          amount: 45000,
+        },
+        {
+          id: "g2",
+          blobUrl: refFoto,
+          fileName: "taxi.jpg",
+          mimeType: "image/jpeg",
+          concepto: null,
+          fechaGasto: null,
+          amount: null,
+        },
+      ],
+    ),
+  );
+  if (viaticos) {
+    const textos = viaticos.flat().map((t) => t.texto);
+    const ESPERADO = [
+      "TRAVEL EXPENSE REPORT",
+      "Travel expense report",
+      "FOR PROJECT",
+      "TOTAL",
+      "$45,000",
+      "EXPENSES (2)",
+      "October 4, 2026",
+      "No description",
+      "No amount",
+      "EXPENSE 1 OF 2",
+      "EXPENSE 2 OF 2",
+    ];
+    comprobar(
+      "también en inglés, con los montos en dólares",
+      ESPERADO.every((texto) => textos.includes(texto)),
+      ESPERADO.filter((texto) => !textos.includes(texto)).join(" | "),
+    );
+    comprobar(
+      "contraste: nada de lo fijo quedó en español",
+      !textos.some((t) => /VIÁTICOS|GASTO|JUSTIFICA|Sin concepto|Sin monto|Página|CREADO/i.test(t)),
+    );
+    comprobar(
+      "los viáticos no llevan firmas: son un documento interno",
+      !textos.includes("SIGNATURES"),
+    );
+  }
+
+  comprobar(
+    "el archivo se llama en el idioma del documento",
+    nombreDelPdf("HMI Intarema PGI", "en") === "report-hmi-intarema-pgi.pdf" &&
+      nombreDelPdf("HMI Intarema PGI", "es") === "reporte-hmi-intarema-pgi.pdf" &&
+      nombreDelPdf(c(0x1f44d), "en") === "report-service.pdf",
+    nombreDelPdf("HMI Intarema PGI", "en"),
+  );
+}
+
 // --- El reporte de prueba ---------------------------------------------------
 //
 // Mismo perfil que el que falló, sin copiar un dato del cliente: un nombre de
@@ -665,7 +1244,10 @@ async function main() {
     const inicio = textos.indexOf(esperado[0]!);
     const dibujado = portada.slice(inicio, inicio + esperado.length);
 
-    comprobar("tiene una sola página (no lleva firma ni adjuntos)", delFormulario.length === 1);
+    comprobar(
+      "tiene una sola página: sin adjuntos, las firmas caben debajo del detalle",
+      delFormulario.length === 1,
+    );
     comprobar(
       "el detalle está dibujado renglón por renglón, en orden",
       inicio >= 0 && iguales(dibujado.map((t) => t.texto), esperado),
@@ -944,6 +1526,8 @@ async function main() {
       "cada página de continuación lleva el encabezado y dice que es continuación",
       largo
         .slice(1)
+        // Solo las que continúan el detalle: la última puede ser la de firmas.
+        .filter((pagina) => pagina.some(esPunto))
         .every(
           (pagina) =>
             pagina.some((t) => t.texto === "REPORTE DE SERVICIO") &&
@@ -1061,6 +1645,9 @@ async function main() {
 
   try {
     await comprobarFotos();
+    await prepararFirma();
+    await comprobarFirmas();
+    await comprobarIdioma();
   } finally {
     await borrarArchivosDePrueba();
   }

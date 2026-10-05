@@ -10,8 +10,9 @@
  *
  * Lo que comprueba es lo que no se ve hasta que falla en producción: que el
  * mensaje va por el punto de subida de Gmail y sin doble codificación (un PDF
- * de varios megas no cabe por el otro), que el adjunto llega idéntico, y que
- * cuando Google contesta mal queda dicho por qué.
+ * de varios megas no cabe por el otro), que el adjunto llega idéntico, que la
+ * copia a administración va donde debe y a la vista, que el texto sale en el
+ * idioma del reporte, y que cuando Google contesta mal queda dicho por qué.
  */
 import { generateKeyPairSync, randomBytes } from "node:crypto";
 
@@ -28,6 +29,8 @@ process.env.GMAIL_SERVICE_ACCOUNT_JSON = JSON.stringify({
 });
 process.env.GMAIL_IMPERSONATE_EMAIL = "buzon@ejemplo.com";
 process.env.GMAIL_SENDER_EMAIL = "remitente@ejemplo.com";
+// Como en producción: sin definir, que es cuando la copia sale por defecto.
+delete process.env.GMAIL_CC_EMAIL;
 
 let fallos = 0;
 
@@ -80,12 +83,15 @@ function leerMensaje(mensaje: string) {
 }
 
 async function main() {
-  const { correoConfigurado, enviarCorreoConAdjunto } = await import("../src/lib/gmail");
+  const { copiaPara, correoConfigurado, enviarCorreoConAdjunto, resolverCopia } = await import(
+    "../src/lib/gmail"
+  );
 
   // Como el PDF de un reporte con varias fotos: 3 MB que no se comprimen.
   const pdf = new Uint8Array(randomBytes(3 * 1024 * 1024));
   const datos = {
     para: "cliente@ejemplo.com",
+    copia: "administracion@ejemplo.com",
     asunto: "Reporte firmado — Instalación eléctrica Ñandú",
     cuerpo: "Hola José,\n\nAdjunto encontrarás el reporte.\n\nGracias,",
     pdf,
@@ -131,6 +137,11 @@ async function main() {
       cabeceras.get("From") === '"Eng Supports" <remitente@ejemplo.com>' &&
         cabeceras.get("To") === "cliente@ejemplo.com",
     );
+    comprobar(
+      "la copia va a la vista (Cc), a quien se le indicó, y no hay copia oculta",
+      cabeceras.get("Cc") === "administracion@ejemplo.com" && !cabeceras.has("Bcc"),
+      cabeceras.get("Cc") ?? "sin Cc",
+    );
     const asunto = /^=\?UTF-8\?B\?(.+)\?=$/.exec(cabeceras.get("Subject") ?? "")?.[1] ?? "";
     comprobar(
       "el asunto llega con sus tildes y su eñe",
@@ -157,6 +168,84 @@ async function main() {
       );
     }
   }
+
+  console.log("\nLa copia a administración\n");
+
+  peticiones.length = 0;
+  await enviarCorreoConAdjunto({ ...datos, copia: null });
+  const sinCopia = peticiones[1] ? leerMensaje(peticiones[1].cuerpo).cabeceras : new Map();
+  comprobar(
+    "contraste: un correo al que no se le indica copia sale sin Cc",
+    sinCopia.get("To") === "cliente@ejemplo.com" && !sinCopia.has("Cc"),
+  );
+
+  const remitente = "soporte@empresa.com.co";
+  comprobar(
+    "sin nada configurado, la copia va al buzón de administración del dominio que envía",
+    resolverCopia({ configurada: undefined, remitente, destinatario: "cliente@otra.com" }) ===
+      "administracion@empresa.com.co",
+    resolverCopia({ configurada: undefined, remitente, destinatario: "cliente@otra.com" }) ?? "sin copia",
+  );
+  comprobar(
+    "con otra dirección configurada, va a esa",
+    resolverCopia({
+      configurada: "contabilidad@empresa.com.co",
+      remitente,
+      destinatario: "cliente@otra.com",
+    }) === "contabilidad@empresa.com.co",
+  );
+  comprobar(
+    "configurada vacía, no se copia a nadie (así va en desarrollo)",
+    resolverCopia({ configurada: "", remitente, destinatario: "cliente@otra.com" }) === null,
+  );
+  comprobar(
+    "si quien firma es el propio buzón de administración, no se le manda dos veces",
+    resolverCopia({
+      configurada: undefined,
+      remitente,
+      destinatario: " Administracion@Empresa.com.co ",
+    }) === null,
+  );
+  comprobar(
+    "con la configuración de esta prueba, la copia sale del dominio del remitente",
+    copiaPara("cliente@otra.com") === "administracion@ejemplo.com",
+    copiaPara("cliente@otra.com") ?? "sin copia",
+  );
+
+  console.log("\nEl correo va en el idioma del reporte\n");
+
+  const { textosDeEmpresa } = await import("../src/lib/pdf-idioma");
+  const ENLACE = "https://ejemplo.com/api/reportes/publico/abc";
+  const enIngles = textosDeEmpresa("corp");
+  const enEspanol = textosDeEmpresa("saas");
+  const cuerpoIngles = enIngles.correoCuerpo("John Smith", "HMI Intarema", ENLACE, "Eng Supports");
+  const cuerpoEspanol = enEspanol.correoCuerpo("José Pérez", "HMI Intarema", ENLACE, "Eng Supports");
+  comprobar(
+    "el de un reporte de la LLC, en inglés: asunto, saludo, texto y despedida",
+    enIngles.correoAsunto("HMI Intarema") === "Signed report — HMI Intarema" &&
+      cuerpoIngles.startsWith("Hello John Smith,\n") &&
+      cuerpoIngles.includes('Attached is the signed report for the project "HMI Intarema".') &&
+      cuerpoIngles.includes(`You can also view it online: ${ENLACE}`) &&
+      cuerpoIngles.endsWith("Thank you,\nEng Supports"),
+    cuerpoIngles.split("\n")[0],
+  );
+  comprobar(
+    "contraste: en el de inglés no quedó nada del texto en español",
+    !/Hola|Adjunto|También|Gracias|Reporte firmado/.test(
+      cuerpoIngles + enIngles.correoAsunto("HMI Intarema"),
+    ),
+  );
+  comprobar(
+    "el de la SAS sigue como estaba",
+    enEspanol.correoAsunto("HMI Intarema") === "Reporte firmado — HMI Intarema" &&
+      cuerpoEspanol ===
+        `Hola José Pérez,\n\nAdjunto encontrarás el reporte firmado del proyecto "HMI Intarema".\n\nTambién puedes consultarlo en línea: ${ENLACE}\n\nGracias,\nEng Supports`,
+  );
+  comprobar(
+    "sin enlace, el texto no deja la frase a medias",
+    !enIngles.correoCuerpo("John", "X", null, "Eng Supports").includes("online") &&
+      !enEspanol.correoCuerpo("José", "X", null, "Eng Supports").includes("en línea"),
+  );
 
   console.log("\nCuando no sale, queda dicho por qué\n");
 

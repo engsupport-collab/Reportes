@@ -131,9 +131,52 @@ function asuntoCodificado(asunto: string): string {
   return `=?UTF-8?B?${Buffer.from(asunto, "utf8").toString("base64")}?=`;
 }
 
+/** El buzón de la empresa que recibe copia de todo lo que sale. */
+const BUZON_DE_COPIA = "administracion";
+
+/**
+ * A quién se copia un correo, o null si a nadie.
+ *
+ * Sin nada configurado, al buzón de administración del mismo dominio desde el
+ * que se envía. La dirección no está escrita aquí a propósito: el repositorio
+ * es público, y una dirección escrita en él acaba en listas de correo basura.
+ * `configurada` (la variable `GMAIL_CC_EMAIL`) la sustituye por otra o, vacía,
+ * apaga la copia.
+ *
+ * Si la copia es la misma dirección a la que ya va el correo, no se repite.
+ */
+export function resolverCopia(opciones: {
+  configurada: string | undefined;
+  remitente: string | undefined;
+  destinatario: string;
+}): string | null {
+  const dominio = opciones.remitente?.split("@")[1];
+  const copia = opciones.configurada ?? (dominio ? `${BUZON_DE_COPIA}@${dominio}` : "");
+
+  if (!copia) return null;
+  if (copia.toLowerCase() === opciones.destinatario.trim().toLowerCase()) return null;
+  return copia;
+}
+
+/**
+ * La copia que lleva un correo dirigido a `destinatario`.
+ *
+ * La pidió el cliente para todo reporte que sale: si el correo de quien firma
+ * quedó mal escrito, administración lo tiene igual y puede reenviarlo, y con
+ * eso ya puede facturar. Va a la vista (`Cc`), no oculta.
+ */
+export function copiaPara(destinatario: string): string | null {
+  return resolverCopia({
+    configurada: env.GMAIL_CC_EMAIL,
+    remitente: env.GMAIL_SENDER_EMAIL,
+    destinatario,
+  });
+}
+
 function construirMensaje(opciones: {
   de: string;
   para: string;
+  copia: string | null;
   asunto: string;
   cuerpo: string;
   pdf: Uint8Array;
@@ -144,6 +187,7 @@ function construirMensaje(opciones: {
   return [
     `From: ${opciones.de}`,
     `To: ${opciones.para}`,
+    ...(opciones.copia ? [`Cc: ${opciones.copia}`] : []),
     `Subject: ${asuntoCodificado(opciones.asunto)}`,
     "MIME-Version: 1.0",
     `Content-Type: multipart/mixed; boundary="${limite}"`,
@@ -181,6 +225,8 @@ export function correoConfigurado(): boolean {
  */
 export async function enviarCorreoConAdjunto(opciones: {
   para: string;
+  /** A quién se copia, a la vista de quien recibe. */
+  copia?: string | null;
   asunto: string;
   cuerpo: string;
   pdf: Uint8Array;
@@ -193,6 +239,7 @@ export async function enviarCorreoConAdjunto(opciones: {
     const mensaje = construirMensaje({
       de: `"${opciones.nombreRemitente}" <${env.GMAIL_SENDER_EMAIL}>`,
       para: opciones.para,
+      copia: opciones.copia ?? null,
       asunto: opciones.asunto,
       cuerpo: opciones.cuerpo,
       pdf: opciones.pdf,

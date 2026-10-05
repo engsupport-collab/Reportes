@@ -253,6 +253,7 @@
     "motivoLabel": "Reason",
     "resumenServicioAviso": "This service report was written by another technician. You only see this summary to get your bearings; to see your own expense, go to the Expenses tab.",
     "eventoCorreoEnviado": "Email sent to {correo}",
+    "eventoCorreoEnviadoConCopia": "Email sent to {correo}, with a copy to {copia}",
     "eventoCorreoFallido": "The email to {correo} did not go out",
     "eventoCorreoCorregido": "Signer email corrected: from {de} to {a}",
     "detalleTecnico": "Technical detail: {detalle}"

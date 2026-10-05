@@ -103,6 +103,23 @@ export async function leerAdjuntos<T extends Adjunto>(
   });
 }
 
+/**
+ * La firma del cliente, recortada a su trazo.
+ *
+ * Se guarda con todo el recuadro donde se firmó, que es casi todo
+ * transparente. En el bloque de firmas, que es pequeño, ese vacío se comería
+ * el sitio y la firma quedaría diminuta: recortada, lo que ocupa el espacio es
+ * el trazo. Si no se puede recortar va como está — que la firma salga algo más
+ * pequeña es mejor que quedarse sin documento.
+ */
+export async function recortarFirma(datos: ArrayBuffer): Promise<Uint8Array> {
+  try {
+    return await sharp(datos).trim().png().toBuffer();
+  } catch {
+    return new Uint8Array(datos);
+  }
+}
+
 /** JPEG derecho, sin transparencia y con el lado mayor acotado. */
 async function comoJpeg(datos: Uint8Array, nivel: Nivel): Promise<Uint8Array> {
   return sharp(datos, { failOn: "error" })

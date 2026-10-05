@@ -14,7 +14,10 @@ function titulo(evento: EventoEstadoReporte, t: T): string {
     case "reabierto":
       return t("eventoReabierto");
     case "correo_enviado":
-      return t("eventoCorreoEnviado", { correo: datos.para ?? "" });
+      // Los envíos anteriores a la copia a administración no la traen.
+      return datos.copia
+        ? t("eventoCorreoEnviadoConCopia", { correo: datos.para ?? "", copia: datos.copia })
+        : t("eventoCorreoEnviado", { correo: datos.para ?? "" });
     case "correo_fallido":
       return t("eventoCorreoFallido", { correo: datos.para ?? "" });
     case "correo_corregido":

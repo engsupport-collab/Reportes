@@ -5,6 +5,7 @@ import path from "node:path";
 
 import { type PDFDocument, type PDFFont, type PDFImage, type PDFPage, rgb } from "pdf-lib";
 
+import type { TextosPdf } from "@/lib/pdf-idioma";
 import { anchoDeTexto, dibujarTexto } from "@/lib/pdf-texto";
 
 /**
@@ -254,7 +255,8 @@ export function dibujarInsignia(
  *
  * Dos líneas: la identidad de la empresa (con el eslogan del propio logo, no
  * inventado) junto a la numeración, y debajo un aviso de confidencialidad
- * genérico. Ni el teléfono ni el sitio web de la empresa están aquí porque no
+ * genérico. La numeración y el aviso van en el idioma del documento; el
+ * nombre y el eslogan son los de la marca y no se traducen. Ni el teléfono ni el sitio web de la empresa están aquí porque no
  * son datos que este generador tenga — un dato de contacto equivocado en un
  * documento que ve el cliente es peor que no ponerlo.
  *
@@ -268,11 +270,12 @@ export function dibujarPies(
   doc: PDFDocument,
   fuentes: { normal: PDFFont; bold: PDFFont },
   paginasPropias: PDFPage[],
+  textos: Pick<TextosPdf, "pagina" | "aviso">,
   fechaGeneracion: string,
 ): void {
   const paginas = doc.getPages();
   const total = paginas.length;
-  const aviso = `Documento generado electrónicamente el ${fechaGeneracion} — confidencial, uso exclusivo del destinatario.`;
+  const aviso = textos.aviso(fechaGeneracion);
 
   for (const page of paginasPropias) {
     const indice = paginas.indexOf(page);
@@ -303,7 +306,7 @@ export function dibujarPies(
       color: COLOR_MUTED,
     });
 
-    const numero = `Página ${indice + 1} de ${total}`;
+    const numero = textos.pagina(indice + 1, total);
     const anchoNumero = anchoDeTexto(fuentes.normal, numero, 8);
     dibujarTexto(page, numero, {
       x: width - MARGEN - anchoNumero,

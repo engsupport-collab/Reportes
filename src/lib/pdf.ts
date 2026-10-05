@@ -8,7 +8,7 @@ import {
   StandardFonts,
 } from "pdf-lib";
 
-import { tipoServicioLabel, ordenarEtiquetas } from "@/lib/etiquetas";
+import { esTipoServicioValido, ordenarEtiquetas } from "@/lib/etiquetas";
 import { formatFechaLarga, formatInstante } from "@/lib/fechas";
 import { formatearMonto } from "@/lib/moneda";
 import {
@@ -18,7 +18,9 @@ import {
   PESO_MAXIMO_PDF,
   leerAdjuntos,
   prepararAdjuntos,
+  recortarFirma,
 } from "@/lib/pdf-adjuntos";
+import { type TextosPdf, textosDeEmpresa } from "@/lib/pdf-idioma";
 import {
   A4,
   COLOR_LINEA,
@@ -37,8 +39,9 @@ import { leerArchivo } from "@/lib/storage";
 import type { ReporteCompleto } from "@/lib/queries/reports";
 
 /**
- * PDF del reporte: info + firma + viáticos + adjuntos, todo en un solo
- * documento para que quede como constancia completa del trabajo.
+ * PDF del reporte: la ficha, el detalle, los adjuntos y, cerrando, las firmas
+ * — todo en un solo documento para que quede como constancia completa del
+ * trabajo.
  *
  * Fotos y PDFs se fusionan de verdad (páginas nuevas o copiadas). Word/Excel
  * no se pueden fusionar sin convertirlos primero — eso exigiría una
@@ -49,7 +52,8 @@ import type { ReporteCompleto } from "@/lib/queries/reports";
  *
  * Cómo entra cada archivo —enderezado, reducido y sin pasarse del peso que el
  * documento puede tener— lo decide `pdf-adjuntos.ts`. La parte visual (logo,
- * colores, encabezado, pie) vive en `pdf-marca.ts`.
+ * colores, encabezado, pie) vive en `pdf-marca.ts`, y en qué idioma sale cada
+ * texto fijo, en `pdf-idioma.ts`: lo decide la empresa del reporte.
  *
  * Ningún texto se dibuja ni se mide llamando a la librería directamente: pasa
  * por `pdf-texto.ts`, que lo deja en lo que la fuente sabe dibujar. Un solo
@@ -58,13 +62,33 @@ import type { ReporteCompleto } from "@/lib/queries/reports";
 
 type Fuentes = { normal: PDFFont; bold: PDFFont };
 
-type Contexto = { logo: PDFImage | null; tipoDocumento: string; empresa: string };
+type Contexto = {
+  logo: PDFImage | null;
+  tipoDocumento: string;
+  empresa: string;
+  /** Los textos fijos, en el idioma de este documento. */
+  textos: TextosPdf;
+};
+
+/**
+ * Hasta dónde llegó lo dibujado en una hoja propia: de `y` hacia abajo está
+ * libre. Sirve para seguir escribiendo en ella en vez de abrir otra.
+ */
+type Cursor = { pagina: PDFPage; y: number };
 
 /** Por debajo de esta altura empieza el pie de página: ahí no se escribe. */
 const PISO_TEXTO = 60;
+/** Hasta dónde puede bajar una foto en su hoja. */
+const PISO_IMAGEN = 56;
 
 const TAMANO_TITULO = 19;
 const INTERLINEADO_TITULO = 24;
+
+/** La ficha y las firmas van en dos columnas iguales. */
+const SEPARACION_COLUMNAS = 24;
+const ANCHO_COLUMNA = (A4[0] - MARGEN * 2 - SEPARACION_COLUMNAS) / 2;
+const COLUMNA_1 = MARGEN;
+const COLUMNA_2 = MARGEN + ANCHO_COLUMNA + SEPARACION_COLUMNAS;
 
 /**
  * Lo que pesa el documento antes de sumarle ningún archivo: el logo, las
@@ -105,19 +129,28 @@ function abrirContinuacion(
   contexto: Contexto,
   paginasPropias: PDFPage[],
   titulo: string,
-): { pagina: PDFPage; y: number } {
+): Cursor {
   const pagina = doc.addPage(A4);
   paginasPropias.push(pagina);
   const y = dibujarEncabezado(pagina, fuentes, contexto);
   return {
     pagina,
-    y: dibujarTituloSeccion(pagina, fuentes.normal, MARGEN, y, `${titulo} (continuación)`),
+    y: dibujarTituloSeccion(
+      pagina,
+      fuentes.normal,
+      MARGEN,
+      y,
+      contexto.textos.continuacion(titulo),
+    ),
   };
 }
 
 /**
- * Página con una imagen a página completa (una foto adjunta o la firma),
- * con su encabezado de marca y el espacio del pie respetado.
+ * Página con una foto adjunta a página completa, con su encabezado de marca y
+ * el espacio del pie respetado.
+ *
+ * `reserva` deja libre esa altura debajo de la foto, para lo que venga después
+ * en la misma hoja. Devuelve desde dónde está libre.
  */
 function agregarPaginaImagen(
   doc: PDFDocument,
@@ -126,8 +159,9 @@ function agregarPaginaImagen(
   paginasPropias: PDFPage[],
   imagen: PDFImage,
   titulo: string,
-  subtitulo?: string,
-): void {
+  subtitulo: string | undefined,
+  reserva: number,
+): Cursor {
   const page = doc.addPage(A4);
   paginasPropias.push(page);
   const [anchoPagina] = A4;
@@ -148,9 +182,10 @@ function agregarPaginaImagen(
     y -= 12;
   }
 
-  // Entre el título y el pie: ese es todo el espacio que puede ocupar la foto.
+  // Entre el título y el pie —o lo reservado—: ese es todo el espacio que
+  // puede ocupar la foto.
   const techo = y + 6;
-  const piso = 56;
+  const piso = PISO_IMAGEN + reserva;
   const anchoDisponible = anchoPagina - MARGEN * 2;
   const altoDisponible = techo - piso;
 
@@ -168,6 +203,8 @@ function agregarPaginaImagen(
     width: w,
     height: h,
   });
+
+  return { pagina: page, y: piso };
 }
 
 async function fusionarPdf(doc: PDFDocument, bytes: Uint8Array): Promise<boolean> {
@@ -181,7 +218,11 @@ async function fusionarPdf(doc: PDFDocument, bytes: Uint8Array): Promise<boolean
   }
 }
 
-/** Agrega la foto o el PDF de un ítem (viático o adjunto); si no entra, lo deja listado. */
+/**
+ * Agrega la foto o el PDF de un ítem (viático o adjunto); si no entra, lo deja
+ * listado. Devuelve dónde quedó libre la hoja de la foto, o null si no abrió
+ * una hoja propia (un PDF fusionado trae las suyas, y ahí no se escribe).
+ */
 async function agregarArchivo(
   doc: PDFDocument,
   fuentes: Fuentes,
@@ -191,32 +232,47 @@ async function agregarArchivo(
   titulo: string,
   subtitulo: string | undefined,
   sinFusionar: string[],
-): Promise<void> {
+  reserva = 0,
+): Promise<Cursor | null> {
   if (preparado.clase === "foto") {
     try {
       const imagen = await doc.embedJpg(preparado.jpeg);
-      agregarPaginaImagen(doc, fuentes, contexto, paginasPropias, imagen, titulo, subtitulo);
+      return agregarPaginaImagen(
+        doc,
+        fuentes,
+        contexto,
+        paginasPropias,
+        imagen,
+        titulo,
+        subtitulo,
+        reserva,
+      );
     } catch {
       sinFusionar.push(preparado.item.fileName);
+      return null;
     }
-    return;
   }
 
-  if (preparado.clase === "pdf" && (await fusionarPdf(doc, preparado.bytes))) return;
+  if (preparado.clase === "pdf" && (await fusionarPdf(doc, preparado.bytes))) return null;
 
   sinFusionar.push(preparado.item.fileName);
+  return null;
 }
 
-/** Página final con lo que no se pudo incluir. Solo se agrega si hace falta. */
+/**
+ * Página con lo que no se pudo incluir. Solo se agrega si hace falta; devuelve
+ * dónde terminó la lista, o null si no hubo nada que listar.
+ */
 function agregarPaginaFaltantes(
   doc: PDFDocument,
   fuentes: Fuentes,
   contexto: Contexto,
   paginasPropias: PDFPage[],
   sinFusionar: string[],
-): void {
-  if (sinFusionar.length === 0) return;
+): Cursor | null {
+  if (sinFusionar.length === 0) return null;
 
+  const { textos } = contexto;
   let page = doc.addPage(A4);
   paginasPropias.push(page);
   const [ancho] = A4;
@@ -228,22 +284,18 @@ function agregarPaginaFaltantes(
     fuentes.normal,
     MARGEN,
     yTrasEncabezado,
-    "Archivos no incluidos",
+    textos.noIncluidos,
   );
 
-  dibujarTexto(
-    page,
-    "No entraron en este documento: por su formato (Word, Excel u otro), porque no se pudieron leer o porque no cabían. Descárguelos por separado desde el reporte.",
-    {
-      x: MARGEN,
-      y,
-      size: 9.5,
-      font: fuentes.normal,
-      color: COLOR_MUTED,
-      maxWidth: ancho - MARGEN * 2,
-      lineHeight: 13,
-    },
-  );
+  dibujarTexto(page, textos.noIncluidosNota, {
+    x: MARGEN,
+    y,
+    size: 9.5,
+    font: fuentes.normal,
+    color: COLOR_MUTED,
+    maxWidth: ancho - MARGEN * 2,
+    lineHeight: 13,
+  });
   y -= 34;
 
   for (const nombre of sinFusionar) {
@@ -253,7 +305,7 @@ function agregarPaginaFaltantes(
         fuentes,
         contexto,
         paginasPropias,
-        "Archivos no incluidos",
+        textos.noIncluidos,
       ));
     }
     dibujarTexto(page, `• ${nombre}`, {
@@ -266,6 +318,186 @@ function agregarPaginaFaltantes(
     });
     y -= 16;
   }
+
+  return { pagina: page, y };
+}
+
+// --- Firmas -------------------------------------------------------------------
+//
+// El reporte cierra con dos firmas, una al lado de la otra: la de quien lo
+// hizo —su nombre basta— y la del cliente, que es la que firma de verdad.
+//
+// Van al final del documento y ocupan lo justo: debajo de lo último que se
+// dibujó si caben, y en hoja propia solo cuando no (lo último es un PDF
+// adjunto, o la hoja ya está llena). Antes la firma del cliente llenaba una
+// hoja entera, y entre el detalle y las fotos.
+
+type Firmas = {
+  reporta: string;
+  /** Null mientras el cliente no haya firmado. */
+  cliente: { nombre: string; fecha: string | null; imagen: PDFImage | null } | null;
+};
+
+type MedidaFirmas = {
+  lineasReporta: string[];
+  lineasCliente: string[];
+  /** Alto del espacio sobre la raya, donde va la firma. */
+  zona: number;
+  /** Todo lo que el bloque ocupa, contando lo que lo separa de lo anterior. */
+  alto: number;
+};
+
+/** Aire entre lo último dibujado y el título del bloque. */
+const SEPARACION_FIRMAS = 24;
+/** Del título a donde empieza el espacio para firmar. */
+const BAJO_EL_TITULO = 18;
+/**
+ * Lo más grande que se dibuja la firma del cliente. El ancho también se
+ * acota: una firma escrita con el teclado es muy alargada y, sin tope,
+ * llenaría la columna entera y quedaría desproporcionada junto al resto.
+ */
+const ALTO_FIRMA = 46;
+const ANCHO_FIRMA = 170;
+const TAMANO_QUIEN_REPORTA = 11;
+const INTERLINEADO_QUIEN_REPORTA = 13;
+const TAMANO_FIRMANTE = 10;
+const INTERLINEADO_FIRMANTE = 12;
+/** De la raya al rótulo, y del rótulo al nombre de quien firmó. */
+const RAYA_A_ROTULO = 12;
+const ROTULO_A_NOMBRE = 14;
+const NOMBRE_A_FECHA = 11;
+
+/**
+ * Cuánto ocupa el bloque de firmas. Se mide antes de dibujarlo porque de eso
+ * depende dónde va: hay que saberlo para dejarle sitio debajo de la última
+ * foto.
+ */
+function medirFirmas(fuentes: Fuentes, firmas: Firmas): MedidaFirmas {
+  const lineasReporta = envolverTexto(
+    firmas.reporta,
+    fuentes.bold,
+    TAMANO_QUIEN_REPORTA,
+    ANCHO_COLUMNA,
+  );
+  const lineasCliente = firmas.cliente
+    ? envolverTexto(firmas.cliente.nombre, fuentes.bold, TAMANO_FIRMANTE, ANCHO_COLUMNA)
+    : [];
+
+  const zona = Math.max(ALTO_FIRMA, lineasReporta.length * INTERLINEADO_QUIEN_REPORTA);
+  const bajoLaRaya = firmas.cliente
+    ? RAYA_A_ROTULO +
+      ROTULO_A_NOMBRE +
+      (lineasCliente.length - 1) * INTERLINEADO_FIRMANTE +
+      (firmas.cliente.fecha ? NOMBRE_A_FECHA : 0)
+    : RAYA_A_ROTULO;
+
+  return {
+    lineasReporta,
+    lineasCliente,
+    zona,
+    alto: SEPARACION_FIRMAS + BAJO_EL_TITULO + zona + bajoLaRaya,
+  };
+}
+
+function agregarFirmas(
+  doc: PDFDocument,
+  fuentes: Fuentes,
+  contexto: Contexto,
+  paginasPropias: PDFPage[],
+  cursor: Cursor | null,
+  firmas: Firmas,
+  medida: MedidaFirmas,
+): void {
+  const { textos } = contexto;
+
+  let pagina: PDFPage;
+  let yTitulo: number;
+  if (cursor && cursor.y - medida.alto >= PISO_TEXTO) {
+    pagina = cursor.pagina;
+    yTitulo = cursor.y - SEPARACION_FIRMAS;
+  } else {
+    pagina = doc.addPage(A4);
+    paginasPropias.push(pagina);
+    yTitulo = dibujarEncabezado(pagina, fuentes, contexto);
+  }
+
+  dibujarTituloSeccion(pagina, fuentes.normal, MARGEN, yTitulo, textos.firmas);
+  const yRaya = yTitulo - BAJO_EL_TITULO - medida.zona;
+
+  for (const [x, rotulo] of [
+    [COLUMNA_1, textos.quienReporta],
+    [COLUMNA_2, textos.firmaCliente],
+  ] as const) {
+    pagina.drawLine({
+      start: { x, y: yRaya },
+      end: { x: x + ANCHO_COLUMNA, y: yRaya },
+      thickness: 0.75,
+      color: COLOR_MUTED,
+    });
+    dibujarTexto(pagina, rotulo.toUpperCase(), {
+      x,
+      y: yRaya - RAYA_A_ROTULO,
+      size: 7.5,
+      font: fuentes.normal,
+      color: COLOR_MUTED,
+    });
+  }
+
+  // Quien reporta firma con su nombre: va sobre la raya, donde iría el trazo.
+  // Si no cabe en un renglón, crece hacia arriba para no pisarla.
+  for (const [i, linea] of medida.lineasReporta.entries()) {
+    const renglonesDebajo = medida.lineasReporta.length - 1 - i;
+    dibujarTexto(pagina, linea, {
+      x: COLUMNA_1,
+      y: yRaya + 7 + renglonesDebajo * INTERLINEADO_QUIEN_REPORTA,
+      size: TAMANO_QUIEN_REPORTA,
+      font: fuentes.bold,
+      color: COLOR_TEXTO,
+    });
+  }
+
+  if (!firmas.cliente) {
+    dibujarTexto(pagina, textos.pendienteDeFirma, {
+      x: COLUMNA_2,
+      y: yRaya + 7,
+      size: 9,
+      font: fuentes.normal,
+      color: COLOR_MUTED,
+    });
+    return;
+  }
+
+  const { imagen, fecha } = firmas.cliente;
+  if (imagen) {
+    const escala = Math.min(ANCHO_FIRMA / imagen.width, ALTO_FIRMA / imagen.height);
+    pagina.drawImage(imagen, {
+      x: COLUMNA_2,
+      y: yRaya + 4,
+      width: imagen.width * escala,
+      height: imagen.height * escala,
+    });
+  }
+
+  let y = yRaya - RAYA_A_ROTULO - ROTULO_A_NOMBRE;
+  for (const linea of medida.lineasCliente) {
+    dibujarTexto(pagina, linea, {
+      x: COLUMNA_2,
+      y,
+      size: TAMANO_FIRMANTE,
+      font: fuentes.bold,
+      color: COLOR_TEXTO,
+    });
+    y -= INTERLINEADO_FIRMANTE;
+  }
+  if (fecha) {
+    dibujarTexto(pagina, textos.firmadoEl(fecha), {
+      x: COLUMNA_2,
+      y: y + INTERLINEADO_FIRMANTE - NOMBRE_A_FECHA,
+      size: 8,
+      font: fuentes.normal,
+      color: COLOR_MUTED,
+    });
+  }
 }
 
 export async function generarReportePdf(
@@ -274,10 +506,11 @@ export async function generarReportePdf(
 ): Promise<Uint8Array> {
   // Los archivos se leen una sola vez, aunque el documento haya que armarlo
   // más de una para que quepa.
-  const [leidos, datosFirma] = await Promise.all([
+  const [leidos, firmaGuardada] = await Promise.all([
     leerAdjuntos(adjuntos),
     reporte.signatureUrl ? leerArchivo(reporte.signatureUrl) : null,
   ]);
+  const datosFirma = firmaGuardada ? await recortarFirma(firmaGuardada) : null;
 
   return armarSinPasarse(leidos, datosFirma?.byteLength ?? 0, (preparados) =>
     armarReporte(reporte, preparados, datosFirma),
@@ -287,7 +520,7 @@ export async function generarReportePdf(
 async function armarReporte(
   reporte: ReporteCompleto,
   adjuntos: AdjuntoPreparado<Adjunto>[],
-  datosFirma: ArrayBuffer | null,
+  datosFirma: Uint8Array | null,
 ): Promise<Uint8Array> {
   const doc = await PDFDocument.create();
   const fuentes: Fuentes = {
@@ -295,10 +528,12 @@ async function armarReporte(
     bold: await doc.embedFont(StandardFonts.HelveticaBold),
   };
   const logo = await embeberLogo(doc);
+  const textos = textosDeEmpresa(reporte.companyId);
   const contexto: Contexto = {
     logo,
-    tipoDocumento: "Reporte de servicio",
+    tipoDocumento: textos.reporteServicio,
     empresa: reporte.companyName,
+    textos,
   };
   const paginasPropias: PDFPage[] = [];
 
@@ -335,92 +570,99 @@ async function armarReporte(
     fuentes.bold,
     ancho - MARGEN - (terminado ? 78 : 84),
     y + 3,
-    terminado ? "Terminado" : "En proceso",
+    terminado ? textos.terminado : textos.enProceso,
     terminado,
   );
   y -= 34 + (lineasTitulo.length - 1) * INTERLINEADO_TITULO;
 
-  const anchoColumna = (ancho - MARGEN * 2 - 24) / 2;
-  const columna1 = MARGEN;
-  const columna2 = MARGEN + anchoColumna + 24;
   const inicioFilas = y;
 
-  y = dibujarCampo(portada, fuentes, columna1, y, anchoColumna, "Cliente", reporte.clientName);
   y = dibujarCampo(
     portada,
     fuentes,
-    columna1,
+    COLUMNA_1,
     y,
-    anchoColumna,
-    "Cotización",
-    reporte.quoteNumber ?? "Sin asignar",
+    ANCHO_COLUMNA,
+    textos.cliente,
+    reporte.clientName,
   );
   y = dibujarCampo(
     portada,
     fuentes,
-    columna1,
+    COLUMNA_1,
     y,
-    anchoColumna,
-    "Orden de compra",
-    reporte.purchaseOrderNo ?? "Sin asignar",
+    ANCHO_COLUMNA,
+    textos.cotizacion,
+    reporte.quoteNumber ?? textos.sinAsignar,
   );
   y = dibujarCampo(
     portada,
     fuentes,
-    columna1,
+    COLUMNA_1,
     y,
-    anchoColumna,
-    "Fecha del trabajo",
-    formatFechaLarga(reporte.workDate),
+    ANCHO_COLUMNA,
+    textos.ordenCompra,
+    reporte.purchaseOrderNo ?? textos.sinAsignar,
+  );
+  y = dibujarCampo(
+    portada,
+    fuentes,
+    COLUMNA_1,
+    y,
+    ANCHO_COLUMNA,
+    textos.fechaTrabajo,
+    formatFechaLarga(reporte.workDate, textos.locale),
   );
 
   let y2 = inicioFilas;
   const etiquetas = ordenarEtiquetas(reporte.etiquetas)
-    .map((e) => e.label)
+    .map((e) => textos.clasificacion[e.id])
     .join(", ");
   y2 = dibujarCampo(
     portada,
     fuentes,
-    columna2,
+    COLUMNA_2,
     y2,
-    anchoColumna,
-    "Tipo de servicio",
-    tipoServicioLabel(reporte.serviceType) ?? "Sin definir",
+    ANCHO_COLUMNA,
+    textos.tipoServicio,
+    reporte.serviceType && esTipoServicioValido(reporte.serviceType)
+      ? textos.clasificacion[reporte.serviceType]
+      : textos.sinDefinir,
   );
   y2 = dibujarCampo(
     portada,
     fuentes,
-    columna2,
+    COLUMNA_2,
     y2,
-    anchoColumna,
-    "Etiquetas",
-    etiquetas || "Ninguna",
+    ANCHO_COLUMNA,
+    textos.etiquetas,
+    etiquetas || textos.ninguna,
   );
   y2 = dibujarCampo(
     portada,
     fuentes,
-    columna2,
+    COLUMNA_2,
     y2,
-    anchoColumna,
-    "Creado por",
+    ANCHO_COLUMNA,
+    textos.creadoPor,
     reporte.authorName,
   );
   y2 = dibujarCampo(
     portada,
     fuentes,
-    columna2,
+    COLUMNA_2,
     y2,
-    anchoColumna,
-    "Creado el",
-    formatInstante(reporte.createdAt),
+    ANCHO_COLUMNA,
+    textos.creadoEl,
+    formatInstante(reporte.createdAt, textos.locale),
   );
 
   y = Math.min(y, y2) - 6;
-  y = dibujarTituloSeccion(portada, fuentes.normal, MARGEN, y, "Detalles del trabajo");
+  y = dibujarTituloSeccion(portada, fuentes.normal, MARGEN, y, textos.detalles);
 
   const lineasDetalle = reporte.details
     ? envolverTexto(reporte.details, fuentes.normal, 10.5, ancho - MARGEN * 2)
-    : ["Sin detalles."];
+    : [textos.sinDetalles];
   // Lo que no cabe en la hoja sigue en la siguiente. Cortarlo ahí dejaba al
   // cliente con un reporte incompleto sin que nadie se enterara.
   let pagina = portada;
@@ -433,7 +675,7 @@ async function armarReporte(
         fuentes,
         contexto,
         paginasPropias,
-        "Detalles del trabajo",
+        textos.detalles,
       ));
     }
     dibujarTexto(pagina, linea, {
@@ -446,50 +688,75 @@ async function armarReporte(
     y -= 15;
   }
 
-  // --- Firma ---
+  // --- Firmas: se preparan aquí y se dibujan al final ---
   const sinFusionar: string[] = [];
+  let imagenFirma: PDFImage | null = null;
   if (datosFirma) {
-    const firmaSubtitulo = [
-      reporte.signatureName ? `Firmado por ${reporte.signatureName}` : null,
-      reporte.signedAt ? formatInstante(reporte.signedAt) : null,
-    ]
-      .filter(Boolean)
-      .join(" · ");
     try {
       // La firma la dibuja la propia aplicación y siempre es un PNG pequeño:
       // entra tal cual, sin pasar por la reducción de las fotos.
-      const imagen = await doc.embedPng(datosFirma);
-      agregarPaginaImagen(
-        doc,
-        fuentes,
-        contexto,
-        paginasPropias,
-        imagen,
-        "Firma de conformidad",
-        firmaSubtitulo || undefined,
-      );
+      imagenFirma = await doc.embedPng(datosFirma);
     } catch {
-      sinFusionar.push("firma");
+      sinFusionar.push(textos.firmaCliente);
     }
   }
+  const firmas: Firmas = {
+    reporta: reporte.authorName,
+    cliente: datosFirma
+      ? {
+          nombre: reporte.signatureName ?? reporte.clientName,
+          fecha: reporte.signedAt ? formatInstante(reporte.signedAt, textos.locale) : null,
+          imagen: imagenFirma,
+        }
+      : null,
+  };
+  const medida = medirFirmas(fuentes, firmas);
 
   // --- Adjuntos ---
+  // De aquí en adelante `libre` es la última hoja propia en la que se dibujó:
+  // el detalle, y después cada foto.
+  let libre: Cursor = { pagina, y };
   for (const [i, a] of adjuntos.entries()) {
-    await agregarArchivo(
+    // A la última foto se le pide dejar sitio debajo para las firmas, que así
+    // no gastan una hoja. Si ya hay algo sin incluir no hace falta: detrás
+    // viene la hoja que lo lista, y las firmas van en esa.
+    const cierraElDocumento = i === adjuntos.length - 1 && sinFusionar.length === 0;
+    const hoja = await agregarArchivo(
       doc,
       fuentes,
       contexto,
       paginasPropias,
       a,
-      `Adjunto ${i + 1} de ${adjuntos.length}`,
+      textos.adjunto(i + 1, adjuntos.length),
       a.item.fileName,
       sinFusionar,
+      cierraElDocumento ? medida.alto + PISO_TEXTO - PISO_IMAGEN : 0,
     );
+    libre = hoja ?? libre;
   }
 
-  agregarPaginaFaltantes(doc, fuentes, contexto, paginasPropias, sinFusionar);
+  libre = agregarPaginaFaltantes(doc, fuentes, contexto, paginasPropias, sinFusionar) ?? libre;
 
-  dibujarPies(doc, fuentes, paginasPropias, formatInstante(new Date()));
+  // Solo se sigue en esa hoja si es la última del documento: detrás de ella
+  // puede haber quedado un PDF adjunto, y las firmas cierran el reporte.
+  const esLaUltima = doc.getPages().at(-1) === libre.pagina;
+  agregarFirmas(
+    doc,
+    fuentes,
+    contexto,
+    paginasPropias,
+    esLaUltima ? libre : null,
+    firmas,
+    medida,
+  );
+
+  dibujarPies(
+    doc,
+    fuentes,
+    paginasPropias,
+    textos,
+    formatInstante(new Date(), textos.locale),
+  );
 
   return doc.save();
 }
@@ -503,12 +770,13 @@ type GastoViatico = Adjunto & {
 /**
  * PDF de un reporte de viáticos: la ficha con el total y a qué proyecto
  * pertenece, seguida de cada gasto con su foto de respaldo fusionada — igual
- * que el PDF de un reporte de servicio, pero sin firma, adjuntos genéricos, ni
+ * que el PDF de un reporte de servicio, pero sin firmas, adjuntos genéricos, ni
  * los campos que no le aplican (orden de compra, tipo de servicio, etiquetas).
  *
  * Este PDF es exclusivamente interno: nunca se envía al cliente, ni por
  * correo ni por el enlace público de firma — solo el de servicio se comparte
- * fuera del sistema.
+ * fuera del sistema. El idioma sigue la misma regla que el de servicio, para
+ * que todos los documentos de una empresa salgan en el suyo.
  */
 export async function generarReporteViaticoPdf(
   reporte: ReporteCompleto,
@@ -529,10 +797,12 @@ async function armarViatico(
     bold: await doc.embedFont(StandardFonts.HelveticaBold),
   };
   const logo = await embeberLogo(doc);
+  const textos = textosDeEmpresa(reporte.companyId);
   const contexto: Contexto = {
     logo,
-    tipoDocumento: "Reporte de viáticos",
+    tipoDocumento: textos.reporteViaticos,
     empresa: reporte.companyName,
+    textos,
   };
   const paginasPropias: PDFPage[] = [];
 
@@ -542,7 +812,7 @@ async function armarViatico(
 
   let y = dibujarEncabezado(portada, fuentes, contexto);
 
-  dibujarTexto(portada, "Reporte de viáticos", {
+  dibujarTexto(portada, textos.reporteViaticos, {
     x: MARGEN,
     y,
     size: TAMANO_TITULO,
@@ -557,33 +827,30 @@ async function armarViatico(
     fuentes.bold,
     ancho - MARGEN - (terminado ? 78 : 84),
     y + 3,
-    terminado ? "Terminado" : "En proceso",
+    terminado ? textos.terminado : textos.enProceso,
     terminado,
   );
   y -= 34;
 
   const total = gastos.reduce((suma, g) => suma + (g.item.amount ?? 0), 0);
-  const anchoColumna = (ancho - MARGEN * 2 - 24) / 2;
-  const columna1 = MARGEN;
-  const columna2 = MARGEN + anchoColumna + 24;
   const inicioFilas = y;
 
   y = dibujarCampo(
     portada,
     fuentes,
-    columna1,
+    COLUMNA_1,
     y,
-    anchoColumna,
-    "Justifica a",
+    ANCHO_COLUMNA,
+    textos.justificaA,
     reporte.projectName,
   );
   y = dibujarCampo(
     portada,
     fuentes,
-    columna1,
+    COLUMNA_1,
     y,
-    anchoColumna,
-    "Creado por",
+    ANCHO_COLUMNA,
+    textos.creadoPor,
     reporte.authorName,
   );
 
@@ -591,24 +858,24 @@ async function armarViatico(
   y2 = dibujarCampo(
     portada,
     fuentes,
-    columna2,
+    COLUMNA_2,
     y2,
-    anchoColumna,
-    "Total",
+    ANCHO_COLUMNA,
+    textos.total,
     formatearMonto(total, reporte.currency),
   );
   y2 = dibujarCampo(
     portada,
     fuentes,
-    columna2,
+    COLUMNA_2,
     y2,
-    anchoColumna,
-    "Creado el",
-    formatInstante(reporte.createdAt),
+    ANCHO_COLUMNA,
+    textos.creadoEl,
+    formatInstante(reporte.createdAt, textos.locale),
   );
 
   y = Math.min(y, y2) - 6;
-  const tituloGastos = `Gastos (${gastos.length})`;
+  const tituloGastos = textos.gastos(gastos.length);
   y = dibujarTituloSeccion(portada, fuentes.normal, MARGEN, y, tituloGastos);
 
   // Igual que el detalle de un servicio: la lista sigue en otra hoja en vez de
@@ -620,10 +887,10 @@ async function armarViatico(
       ({ pagina, y } = abrirContinuacion(doc, fuentes, contexto, paginasPropias, tituloGastos));
     }
     const monto =
-      g.amount !== null ? formatearMonto(g.amount, reporte.currency) : "Sin monto";
-    const fecha = g.fechaGasto ? formatFechaLarga(g.fechaGasto) : null;
+      g.amount !== null ? formatearMonto(g.amount, reporte.currency) : textos.sinMonto;
+    const fecha = g.fechaGasto ? formatFechaLarga(g.fechaGasto, textos.locale) : null;
 
-    dibujarTexto(pagina, g.concepto ?? "Sin concepto", {
+    dibujarTexto(pagina, g.concepto ?? textos.sinConcepto, {
       x: MARGEN,
       y,
       size: 10.5,
@@ -668,7 +935,7 @@ async function armarViatico(
       contexto,
       paginasPropias,
       g,
-      `Gasto ${i + 1} de ${gastos.length}`,
+      textos.gasto(i + 1, gastos.length),
       g.item.concepto ?? undefined,
       sinFusionar,
     );
@@ -676,7 +943,13 @@ async function armarViatico(
 
   agregarPaginaFaltantes(doc, fuentes, contexto, paginasPropias, sinFusionar);
 
-  dibujarPies(doc, fuentes, paginasPropias, formatInstante(new Date()));
+  dibujarPies(
+    doc,
+    fuentes,
+    paginasPropias,
+    textos,
+    formatInstante(new Date(), textos.locale),
+  );
 
   return doc.save();
 }

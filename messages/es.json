@@ -253,6 +253,7 @@
     "motivoLabel": "Motivo",
     "resumenServicioAviso": "Este reporte de servicio lo redactó otro técnico. Solo ves este resumen para ubicarte; para ver tu propio gasto, entra a la pestaña Viáticos.",
     "eventoCorreoEnviado": "Correo enviado a {correo}",
+    "eventoCorreoEnviadoConCopia": "Correo enviado a {correo}, con copia a {copia}",
     "eventoCorreoFallido": "El correo a {correo} no salió",
     "eventoCorreoCorregido": "Correo de quien firma corregido: de {de} a {a}",
     "detalleTecnico": "Detalle técnico: {detalle}"

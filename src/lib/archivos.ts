@@ -113,8 +113,11 @@ export function sanearNombre(nombre: string): string {
  * un adjunto de correo, y ninguno de los dos admite cualquier carácter. La
  * tilde se le quita a la letra en vez de cambiar la letra entera por un guion
  * ("técnico" queda "tecnico", no "t-cnico").
+ *
+ * La palabra con la que empieza va en el idioma del documento: es lo primero
+ * que el cliente ve del adjunto, antes de abrirlo.
  */
-export function nombreDelPdf(proyecto: string): string {
+export function nombreDelPdf(proyecto: string, idioma: "es" | "en" = "es"): string {
   const base = proyecto
     .normalize("NFD")
     .replace(/\p{Diacritic}/gu, "")
@@ -123,7 +126,9 @@ export function nombreDelPdf(proyecto: string): string {
     .slice(0, 80)
     .replace(/^-+|-+$/g, "");
 
-  return `reporte-${base || "servicio"}.pdf`;
+  return idioma === "en"
+    ? `report-${base || "service"}.pdf`
+    : `reporte-${base || "servicio"}.pdf`;
 }
 
 export type ResultadoValidacion = { ok: true } | { ok: false; error: string };

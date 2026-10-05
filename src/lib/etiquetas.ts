@@ -80,10 +80,6 @@ export function esTipoServicioValido(id: string): id is TipoServicio {
   return (TIPOS_SERVICIO_IDS as readonly string[]).includes(id);
 }
 
-export function tipoServicioLabel(id: string | null): string | null {
-  return TIPOS_SERVICIO.find((t) => t.id === id)?.label ?? null;
-}
-
 /** Etiquetas de un reporte, ordenadas como el catálogo y sin valores extraños. */
 export function ordenarEtiquetas(ids: string[]): OpcionEtiqueta[] {
   const set = new Set(ids);

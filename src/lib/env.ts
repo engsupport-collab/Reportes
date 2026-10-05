@@ -91,6 +91,14 @@ const envSchema = z.object({
     .string()
     .email("GMAIL_SENDER_EMAIL debe ser un correo válido")
     .optional(),
+  // A quién se copia cada reporte que sale. No hace falta definirla: sin ella
+  // la copia va al buzón de administración del dominio del remitente (ver
+  // `copiaPara` en `src/lib/gmail.ts`). Sirve para cambiar esa dirección o,
+  // dejándola vacía, para no copiar a nadie — así debe estar en desarrollo,
+  // donde una prueba no tiene por qué llegarle a la empresa.
+  GMAIL_CC_EMAIL: z
+    .union([z.literal(""), z.string().email("GMAIL_CC_EMAIL debe ser un correo válido")])
+    .optional(),
 })
   /**
    * Un modo de conexión u otro, pero completo.
