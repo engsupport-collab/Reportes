@@ -16,6 +16,7 @@ import {
 } from "@/actions/reports";
 import {
   borrarFirmaAction,
+  cambiarIdiomaReporteAction,
   corregirCorreoFirmaAction,
   firmarReporteAction,
 } from "@/actions/signature";
@@ -750,12 +751,14 @@ export default async function DetalleReportePage({ params, searchParams }: Param
                   reporte.signedAt ? formatInstante(reporte.signedAt) : null
                 }
                 correo={reporte.signatureEmail}
+                idioma={reporte.idioma}
                 ultimoEnvio={ultimoEnvio}
                 nombrePorDefecto={reporte.clientName}
                 onFirmar={firmarReporteAction.bind(null, reporte.id)}
                 onBorrar={borrarFirmaAction.bind(null, reporte.id)}
                 onCorregirCorreo={corregirCorreoFirmaAction.bind(null, reporte.id)}
                 onReenviar={reenviarCorreoAction.bind(null, reporte.id)}
+                onCambiarIdioma={cambiarIdiomaReporteAction.bind(null, reporte.id)}
                 soloLectura={bloqueado}
               />
             </div>

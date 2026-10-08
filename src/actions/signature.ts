@@ -13,6 +13,7 @@ import {
   requireAccesoReportes,
 } from "@/lib/auth-guard";
 import { registrarEvento } from "@/lib/eventos-reporte";
+import { esIdiomaDeDocumento, idiomaPropioDeReporte } from "@/lib/idioma-documento";
 import { obtenerReporte } from "@/lib/queries/reports";
 import { borrarArchivo, guardarArchivo } from "@/lib/storage";
 import { correoClienteSchema, firmaSchema } from "@/lib/validation";
@@ -89,12 +90,20 @@ export async function firmarReporteAction(
   // firmar reemplaza, no acumula archivos huérfanos en el almacenamiento.
   const anterior = reporte.signatureUrl;
 
+  // Junto al correo se elige en qué idioma sale el reporte. Si el formulario
+  // no lo trae —una pantalla abierta desde antes de que existiera— se deja
+  // como estaba.
+  const idiomaElegido = formData.get("documentLanguage");
+
   await db
     .update(reports)
     .set({
       signatureUrl: url,
       signatureName: parsed.data.signatureName,
       signatureEmail: parsed.data.signatureEmail,
+      ...(esIdiomaDeDocumento(idiomaElegido)
+        ? { documentLanguage: idiomaPropioDeReporte(idiomaElegido, reporte.idiomaDelCliente) }
+        : {}),
       signedAt: new Date(),
       updatedAt: new Date(),
       updatedBy: user.id,
@@ -168,6 +177,53 @@ export async function corregirCorreoFirmaAction(
   revalidatePath(`/reportes/${reportId}`);
 
   return { ok: t("correoCorregido") };
+}
+
+export type IdiomaReporteState = { error?: string; ok?: string };
+
+/**
+ * Cambia en qué idioma sale un reporte ya firmado: su PDF y su correo.
+ *
+ * Igual que el correo de quien firma, se permite también con el reporte
+ * terminado: no es parte de lo que el cliente firmó, es cómo se le entrega, y
+ * es justo terminado cuando se descubre que le llegó en el idioma que no era.
+ * Se cambia aquí y se vuelve a enviar. Cada cambio queda en el historial.
+ */
+export async function cambiarIdiomaReporteAction(
+  reportId: string,
+  idioma: string,
+): Promise<IdiomaReporteState> {
+  const user = await requireAccesoReportes();
+  const [reporte, t] = await Promise.all([
+    obtenerReporte(reportId),
+    getTranslations("validacion"),
+  ]);
+
+  if (!reporte || reporte.type !== "servicio" || !puedeAccederAReporte(user, reporte)) {
+    return { error: t("reporteNoExiste") };
+  }
+  if (!esIdiomaDeDocumento(idioma)) {
+    return { error: t("revisaLosDatos") };
+  }
+  if (idioma === reporte.idioma) return { ok: t("idiomaActualizado") };
+
+  // Solo el idioma. `updatedAt` y `updatedBy` no se tocan, por lo mismo que al
+  // corregir el correo: su rastro es el evento.
+  await db
+    .update(reports)
+    .set({ documentLanguage: idiomaPropioDeReporte(idioma, reporte.idiomaDelCliente) })
+    .where(eq(reports.id, reportId));
+
+  await registrarEvento({
+    reportId,
+    tipo: "idioma_cambiado",
+    userId: user.id,
+    metadata: { de: reporte.idioma, a: idioma },
+  });
+
+  revalidatePath(`/reportes/${reportId}`);
+
+  return { ok: t("idiomaActualizado") };
 }
 
 export async function borrarFirmaAction(reportId: string) {

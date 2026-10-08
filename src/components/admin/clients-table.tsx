@@ -9,6 +9,7 @@ import {
   eliminarClienteAction,
   type ClienteState,
 } from "@/actions/clients";
+import { SelectorIdiomaDocumento } from "@/components/selector-idioma-documento";
 import type { ClienteConEmpresa } from "@/lib/queries/clients";
 
 function BotonEliminar({ cliente }: { cliente: ClienteConEmpresa }) {
@@ -102,6 +103,14 @@ function EditarCliente({
         disabled={pendiente}
         className="min-w-0 flex-1 rounded-lg border border-border bg-surface px-3 py-1.5 text-sm text-text focus:border-brand focus:outline-none"
       />
+      <div className="w-full">
+        <SelectorIdiomaDocumento
+          titulo={t("idiomaReportes")}
+          ayuda={t("idiomaReportesAyuda")}
+          porDefecto={cliente.documentLanguage}
+          disabled={pendiente}
+        />
+      </div>
       <button
         type="submit"
         disabled={pendiente}
@@ -151,6 +160,8 @@ export function ClientsTable({ clientes }: { clientes: ClienteConEmpresa[] }) {
               <p className="text-sm font-semibold text-text">{c.name}</p>
               <p className="text-xs text-muted">
                 {c.companyName}
+                {" · "}
+                {t(c.documentLanguage === "en" ? "reportesEnIngles" : "reportesEnEspanol")}
                 {!c.isActive ? ` · ${t("desactivado")}` : ""}
               </p>
             </div>

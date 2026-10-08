@@ -6,6 +6,8 @@ import { useTranslations } from "next-intl";
 
 import { crearClienteAction, type ClienteState } from "@/actions/clients";
 import { Modal } from "@/components/modal";
+import { SelectorIdiomaDocumento } from "@/components/selector-idioma-documento";
+import { idiomaDeEmpresa } from "@/lib/idioma-documento";
 
 function BotonCrear() {
   const { pending } = useFormStatus();
@@ -74,6 +76,15 @@ export function CrearClienteModal({
             placeholder={t("placeholderNombre")}
           />
         </div>
+
+        {/* La empresa viene de la cotización y puede cambiar con el modal
+            cerrado: con ella cambia el idioma que se propone. */}
+        <SelectorIdiomaDocumento
+          key={companyId}
+          titulo={t("idiomaReportes")}
+          ayuda={t("idiomaReportesAyuda")}
+          porDefecto={idiomaDeEmpresa(companyId)}
+        />
 
         {state.error ? (
           <p role="alert" className="text-sm text-danger">

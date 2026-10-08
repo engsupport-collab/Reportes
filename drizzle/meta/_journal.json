@@ -15,6 +15,20 @@
       "when": 1788800000000,
       "tag": "0001_empresas_base",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1791473142514,
+      "tag": "0002_idioma_del_cliente",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1791474160779,
+      "tag": "0003_idioma_del_reporte",
+      "breakpoints": true
     }
   ]
 }

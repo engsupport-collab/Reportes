@@ -4,7 +4,13 @@ import { useActionState, useState, useTransition } from "react";
 import { useTranslations } from "next-intl";
 
 import type { ReenviarState } from "@/actions/reports";
-import type { CorreoFirmaState, FirmaState } from "@/actions/signature";
+import type {
+  CorreoFirmaState,
+  FirmaState,
+  IdiomaReporteState,
+} from "@/actions/signature";
+import { SelectorIdiomaDocumento } from "@/components/selector-idioma-documento";
+import type { IdiomaDocumento } from "@/lib/idioma-documento";
 import { SignaturePad } from "./signature-pad";
 
 function BotonBorrarFirma({ onBorrar }: { onBorrar: () => void | Promise<void> }) {
@@ -32,6 +38,65 @@ function BotonBorrarFirma({ onBorrar }: { onBorrar: () => void | Promise<void> }
 export type UltimoEnvio = { salio: boolean; correo: string; fecha: string };
 
 /**
+ * En qué idioma sale el reporte, ya firmado: se cambia con un toque y queda
+ * guardado, sin botón aparte.
+ *
+ * Está junto al correo porque las dos cosas son lo mismo: cómo se le entrega
+ * el reporte al cliente. Y como el correo, se puede cambiar con el reporte
+ * terminado — después se pulsa "Reenviar" y le llega en el idioma nuevo.
+ */
+function IdiomaDelEnvio({
+  idioma,
+  onCambiar,
+}: {
+  idioma: IdiomaDocumento;
+  onCambiar: (idioma: IdiomaDocumento) => Promise<IdiomaReporteState>;
+}) {
+  const t = useTranslations("firma");
+  const [guardando, startTransition] = useTransition();
+  const [resultado, setResultado] = useState<IdiomaReporteState>({});
+  // Lo recién tocado se muestra marcado desde el toque, sin esperar a que la
+  // página vuelva del servidor. Si no se pudo guardar, vuelve a verse el que
+  // sigue valiendo.
+  const [elegido, setElegido] = useState<IdiomaDocumento | null>(null);
+
+  function cambiar(nuevo: IdiomaDocumento) {
+    setElegido(nuevo);
+    startTransition(async () => {
+      let r: IdiomaReporteState;
+      try {
+        r = await onCambiar(nuevo);
+      } catch {
+        // Una petición que no llega no devuelve un error: lanza.
+        r = { error: t("sinConexion") };
+      }
+      setResultado(r);
+      if (r.error) setElegido(null);
+    });
+  }
+
+  return (
+    <div className="space-y-2 border-t border-border pt-3">
+      <SelectorIdiomaDocumento
+        titulo={t("enviarEn")}
+        ayuda={t("enviarEnAyuda")}
+        valor={elegido ?? idioma}
+        onCambiar={cambiar}
+        disabled={guardando}
+      />
+      {resultado.error ? (
+        <p role="alert" className="text-sm text-danger">
+          {resultado.error}
+        </p>
+      ) : null}
+      {resultado.ok && !guardando ? (
+        <p className="text-sm text-success">{resultado.ok}</p>
+      ) : null}
+    </div>
+  );
+}
+
+/**
  * El correo al que se manda el reporte: verlo, corregirlo y, una vez
  * terminado, volver a mandarlo.
  *
@@ -41,14 +106,18 @@ export type UltimoEnvio = { salio: boolean; correo: string; fecha: string };
  */
 function CorreoDelFirmante({
   correo,
+  idioma,
   terminado,
   ultimoEnvio,
   onCorregir,
+  onCambiarIdioma,
   onReenviar,
 }: {
   correo: string | null;
+  idioma: IdiomaDocumento;
   terminado: boolean;
   ultimoEnvio: UltimoEnvio | null;
+  onCambiarIdioma: (idioma: IdiomaDocumento) => Promise<IdiomaReporteState>;
   onCorregir: (estado: CorreoFirmaState, formData: FormData) => Promise<CorreoFirmaState>;
   onReenviar: () => Promise<ReenviarState>;
 }) {
@@ -143,6 +212,8 @@ function CorreoDelFirmante({
         <p className="text-sm text-success">{correccion.ok}</p>
       ) : null}
 
+      <IdiomaDelEnvio idioma={idioma} onCambiar={onCambiarIdioma} />
+
       {/* Mientras el reporte está abierto no se manda nada: para eso está el
           botón de terminar. Terminado, aquí se ve si salió y se puede repetir. */}
       {terminado ? (
@@ -192,11 +263,13 @@ export function SignatureBlock({
   firmanteNombre,
   firmadoEl,
   correo,
+  idioma,
   ultimoEnvio,
   nombrePorDefecto,
   onFirmar,
   onBorrar,
   onCorregirCorreo,
+  onCambiarIdioma,
   onReenviar,
   soloLectura = false,
 }: {
@@ -205,6 +278,11 @@ export function SignatureBlock({
   firmadoEl: string | null;
   /** A dónde se manda el reporte. Se escribe al firmar y se puede corregir después. */
   correo: string | null;
+  /**
+   * En qué idioma salen el PDF y el correo. Viene el del cliente; se elige
+   * junto al correo, al firmar, y se puede cambiar después.
+   */
+  idioma: IdiomaDocumento;
   ultimoEnvio: UltimoEnvio | null;
   nombrePorDefecto: string;
   onFirmar: (estado: FirmaState, formData: FormData) => Promise<FirmaState>;
@@ -213,6 +291,7 @@ export function SignatureBlock({
     estado: CorreoFirmaState,
     formData: FormData,
   ) => Promise<CorreoFirmaState>;
+  onCambiarIdioma: (idioma: IdiomaDocumento) => Promise<IdiomaReporteState>;
   onReenviar: () => Promise<ReenviarState>;
   /**
    * El reporte está terminado: se ve la firma, pero ni se reemplaza ni se
@@ -221,8 +300,9 @@ export function SignatureBlock({
    * debería poder existir (`finalizarReporteAction` la exige), pero esta
    * pantalla no depende de esa garantía para quedarse de solo lectura.
    *
-   * El correo es la excepción: se puede corregir también terminado, porque es
-   * justo entonces cuando se descubre que no llegó.
+   * El correo y el idioma son la excepción: se pueden cambiar también
+   * terminado, porque es justo entonces cuando se descubre que no llegó, o
+   * que llegó en el idioma que no era.
    */
   soloLectura?: boolean;
 }) {
@@ -249,9 +329,11 @@ export function SignatureBlock({
 
         <CorreoDelFirmante
           correo={correo}
+          idioma={idioma}
           terminado={soloLectura}
           ultimoEnvio={ultimoEnvio}
           onCorregir={onCorregirCorreo}
+          onCambiarIdioma={onCambiarIdioma}
           onReenviar={onReenviar}
         />
       </div>
@@ -263,6 +345,6 @@ export function SignatureBlock({
   }
 
   return (
-    <SignaturePad action={onFirmar} nombrePorDefecto={nombrePorDefecto} />
+    <SignaturePad action={onFirmar} nombrePorDefecto={nombrePorDefecto} idioma={idioma} />
   );
 }

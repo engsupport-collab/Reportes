@@ -179,7 +179,11 @@
     "eliminar": "Excluir",
     "confirmEliminar": "Excluir definitivamente {nombre}? Esta ação não pode ser desfeita.",
     "clienteActivoNoSeElimina": "Este cliente está ativo. Desative-o primeiro.",
-    "clienteConHistorialNoSeElimina": "Este cliente tem cotações associadas e não pode ser excluído. Deixe-o desativado — os documentos que o usam continuarão mostrando-o normalmente."
+    "clienteConHistorialNoSeElimina": "Este cliente tem cotações associadas e não pode ser excluído. Deixe-o desativado — os documentos que o usam continuarão mostrando-o normalmente.",
+    "idiomaReportes": "Idioma dos relatórios",
+    "idiomaReportesAyuda": "Neste idioma este cliente recebe o PDF do relatório e o e-mail.",
+    "reportesEnEspanol": "Relatórios em espanhol",
+    "reportesEnIngles": "Relatórios em inglês"
   },
   "reportForm": {
     "guardando": "Salvando…",
@@ -256,7 +260,9 @@
     "eventoCorreoEnviadoConCopia": "E-mail enviado para {correo}, com cópia para {copia}",
     "eventoCorreoFallido": "O e-mail para {correo} não saiu",
     "eventoCorreoCorregido": "E-mail de quem assina corrigido: de {de} para {a}",
-    "detalleTecnico": "Detalhe técnico: {detalle}"
+    "detalleTecnico": "Detalhe técnico: {detalle}",
+    "eventoIdiomaCambiado": "Idioma do relatório alterado: de {de} para {a}",
+    "eventoIdiomaDelEnvio": "Idioma: {idioma}"
   },
   "filtros": {
     "tipoServicio": "Tipo de serviço",
@@ -359,7 +365,9 @@
     "reenviando": "Enviando…",
     "enviadoA": "Enviado para {correo} em {fecha}",
     "noSalioA": "O último envio para {correo} não saiu ({fecha}). Confira o e-mail e envie de novo.",
-    "sinConexion": "Não foi possível concluir: a conexão caiu. Tente de novo."
+    "sinConexion": "Não foi possível concluir: a conexão caiu. Tente de novo.",
+    "enviarEn": "Enviar o relatório em",
+    "enviarEnAyuda": "O PDF e o e-mail saem neste idioma."
   },
   "reportActions": {
     "confirmTerminado": "Este relatório não tem nenhum anexo.\n\nVocê pode marcá-lo como concluído mesmo assim, mas ele ficará sinalizado como incompleto —para você e para o administrador— até que envie o documento.\n\nMarcar como concluído?",
@@ -464,7 +472,8 @@
     "correoReenviado": "Relatório enviado para {correo}.",
     "correoNoSalio": "O e-mail não saiu. Confira se o endereço está correto e tente de novo em instantes.",
     "correoCorregido": "E-mail atualizado.",
-    "correoSinCambios": "O e-mail já era esse."
+    "correoSinCambios": "O e-mail já era esse.",
+    "idiomaActualizado": "Idioma atualizado."
   },
   "estadosCotizacion": {
     "elaborar": "A elaborar",
@@ -560,7 +569,8 @@
     "paginacionAriaLabel": "Paginação",
     "anterior": "Anterior",
     "siguiente": "Próxima",
-    "pagina": "Página {actual} de {total}"
+    "pagina": "Página {actual} de {total}",
+    "cotizacion": "Cotação"
   },
   "notFound": {
     "titulo": "Esta página não existe",

@@ -28,7 +28,8 @@ export type ReportStatus = (typeof REPORT_STATUSES)[number];
  *
  * Los tres de correo existen porque el envío al cliente no dejaba rastro: si
  * el correo no salía, no había forma de saber después si se intentó, a qué
- * dirección ni por qué falló.
+ * dirección ni por qué falló. El del idioma, porque cambiarlo con el reporte
+ * ya firmado cambia lo que recibe el cliente sin tocar nada de lo que firmó.
  */
 export const REPORT_EVENT_TYPES = [
   "finalizado",
@@ -36,6 +37,7 @@ export const REPORT_EVENT_TYPES = [
   "correo_enviado",
   "correo_fallido",
   "correo_corregido",
+  "idioma_cambiado",
 ] as const;
 export type ReportEventType = (typeof REPORT_EVENT_TYPES)[number];
 

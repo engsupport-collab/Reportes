@@ -5,13 +5,16 @@ import { and, desc, eq, ilike, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   attachments,
+  clients,
   companies,
+  quotes,
   reportEvents,
   reportTags,
   reports,
   users,
 } from "@/db/schema";
 import type { TipoServicio } from "@/lib/etiquetas";
+import { idiomaDeCliente, idiomaDeReporte } from "@/lib/idioma-documento";
 import { leerMetadata } from "@/lib/eventos-reporte";
 import type { ReportEventType, ReportStatus } from "@/lib/roles";
 
@@ -116,6 +119,8 @@ export type ReporteEnLista = {
   companyId: string;
   companyName: string;
   projectName: string;
+  /** Null en los reportes anteriores a las cotizaciones. */
+  quoteNumber: string | null;
   purchaseOrderNo: string | null;
   clientName: string;
   workDate: Date;
@@ -243,6 +248,7 @@ export async function listarReportes(filtros: FiltrosReportes): Promise<{
         companyId: reports.companyId,
         companyName: companies.name,
         projectName: reports.projectName,
+        quoteNumber: reports.quoteNumber,
         purchaseOrderNo: reports.purchaseOrderNo,
         clientName: reports.clientName,
         workDate: reports.workDate,
@@ -277,6 +283,7 @@ export async function listarReportes(filtros: FiltrosReportes): Promise<{
       companyId: r.companyId,
       companyName: r.companyName,
       projectName: r.projectName,
+      quoteNumber: r.quoteNumber,
       purchaseOrderNo: r.purchaseOrderNo,
       clientName: r.clientName,
       workDate: r.workDate,
@@ -415,26 +422,36 @@ export async function obtenerReporte(id: string) {
       // aquí —porque el cliente firmó— no se vuelve a pedir.
       signatureEmail: reports.signatureEmail,
       signedAt: reports.signedAt,
+      documentLanguage: reports.documentLanguage,
       createdAt: reports.createdAt,
       updatedAt: reports.updatedAt,
       updatedBy: reports.updatedBy,
       attachmentCount: conteoAdjuntos,
       etiquetasCsv,
+      clienteIdioma: clients.documentLanguage,
     })
     .from(reports)
     .innerJoin(users, eq(users.id, reports.authorId))
     .innerJoin(companies, eq(companies.id, reports.companyId))
+    // Al cliente del catálogo se llega por la cotización. LEFT JOIN: un
+    // reporte anterior a las cotizaciones no tiene ninguna.
+    .leftJoin(quotes, eq(quotes.id, reports.quoteId))
+    .leftJoin(clients, eq(clients.id, quotes.clientId))
     .where(eq(reports.id, id))
     .limit(1);
 
   if (!fila) return null;
 
-  const { etiquetasCsv: csv, ...resto } = fila;
+  const { etiquetasCsv: csv, clienteIdioma, ...resto } = fila;
 
   return {
     ...resto,
     attachmentCount: Number(fila.attachmentCount),
     etiquetas: csvAEtiquetas(csv),
+    /** El idioma que le toca por su cliente, se haya elegido otro o no. */
+    idiomaDelCliente: idiomaDeCliente(clienteIdioma, fila.companyId),
+    /** En qué idioma salen su PDF y su correo (ver `idioma-documento.ts`). */
+    idioma: idiomaDeReporte(fila, clienteIdioma),
   };
 }
 

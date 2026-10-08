@@ -1,9 +1,16 @@
 import type { getTranslations } from "next-intl/server";
 
 import { formatInstante } from "@/lib/fechas";
+import { esIdiomaDeDocumento } from "@/lib/idioma-documento";
+import { NOMBRES_IDIOMA } from "@/lib/idiomas";
 import type { EventoEstadoReporte } from "@/lib/queries/reports";
 
 type T = Awaited<ReturnType<typeof getTranslations<"reportDetail">>>;
+
+/** Un idioma de documento con su nombre; cualquier otra cosa, tal como venga. */
+function nombreDeIdioma(codigo: string | undefined): string {
+  return esIdiomaDeDocumento(codigo) ? NOMBRES_IDIOMA[codigo] : (codigo ?? "");
+}
 
 /** Qué pasó, en una frase. Los datos del evento salen de su `metadata`. */
 function titulo(evento: EventoEstadoReporte, t: T): string {
@@ -22,6 +29,11 @@ function titulo(evento: EventoEstadoReporte, t: T): string {
       return t("eventoCorreoFallido", { correo: datos.para ?? "" });
     case "correo_corregido":
       return t("eventoCorreoCorregido", { de: datos.de ?? "", a: datos.a ?? "" });
+    case "idioma_cambiado":
+      return t("eventoIdiomaCambiado", {
+        de: nombreDeIdioma(datos.de),
+        a: nombreDeIdioma(datos.a),
+      });
   }
 }
 
@@ -73,6 +85,13 @@ export function HistorialEstado({
             {e.motivo ? (
               <p className="mt-1 text-xs text-text">
                 {t("motivoLabel")}: {e.motivo}
+              </p>
+            ) : null}
+            {/* En qué idioma salió: es lo primero que se pregunta cuando el
+                cliente dice que le llegó en el que no era. */}
+            {e.tipo === "correo_enviado" && e.datos.idioma ? (
+              <p className="mt-1 text-xs text-muted">
+                {t("eventoIdiomaDelEnvio", { idioma: nombreDeIdioma(e.datos.idioma) })}
               </p>
             ) : null}
             {/* El porqué de un envío fallido, tal como lo dio el servidor: es

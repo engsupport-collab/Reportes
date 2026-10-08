@@ -179,7 +179,11 @@
     "eliminar": "Eliminar",
     "confirmEliminar": "¿Eliminar definitivamente a {nombre}? Esta acción no se puede deshacer.",
     "clienteActivoNoSeElimina": "Este cliente está activo. Desactívalo primero.",
-    "clienteConHistorialNoSeElimina": "Este cliente tiene cotizaciones asociadas y no se puede eliminar. Déjalo desactivado — los documentos que lo usan lo van a seguir mostrando igual."
+    "clienteConHistorialNoSeElimina": "Este cliente tiene cotizaciones asociadas y no se puede eliminar. Déjalo desactivado — los documentos que lo usan lo van a seguir mostrando igual.",
+    "idiomaReportes": "Idioma de los reportes",
+    "idiomaReportesAyuda": "En este idioma le llegan a este cliente el PDF del reporte y el correo.",
+    "reportesEnEspanol": "Reportes en español",
+    "reportesEnIngles": "Reportes en inglés"
   },
   "reportForm": {
     "guardando": "Guardando…",
@@ -256,7 +260,9 @@
     "eventoCorreoEnviadoConCopia": "Correo enviado a {correo}, con copia a {copia}",
     "eventoCorreoFallido": "El correo a {correo} no salió",
     "eventoCorreoCorregido": "Correo de quien firma corregido: de {de} a {a}",
-    "detalleTecnico": "Detalle técnico: {detalle}"
+    "detalleTecnico": "Detalle técnico: {detalle}",
+    "eventoIdiomaCambiado": "Idioma del reporte cambiado: de {de} a {a}",
+    "eventoIdiomaDelEnvio": "Idioma: {idioma}"
   },
   "filtros": {
     "tipoServicio": "Tipo de servicio",
@@ -359,7 +365,9 @@
     "reenviando": "Enviando…",
     "enviadoA": "Enviado a {correo} el {fecha}",
     "noSalioA": "El último envío a {correo} no salió ({fecha}). Revisa el correo y vuelve a enviarlo.",
-    "sinConexion": "No se pudo completar: se cortó la conexión. Vuelve a intentarlo."
+    "sinConexion": "No se pudo completar: se cortó la conexión. Vuelve a intentarlo.",
+    "enviarEn": "Enviar el reporte en",
+    "enviarEnAyuda": "El PDF y el correo salen en este idioma."
   },
   "reportActions": {
     "confirmTerminado": "Este reporte no tiene ningún archivo adjunto.\n\nPuedes marcarlo como terminado igual, pero va a quedar señalado como incompleto —para ti y para el administrador— hasta que subas el documento.\n\n¿Marcar como terminado?",
@@ -464,7 +472,8 @@
     "correoReenviado": "Reporte enviado a {correo}.",
     "correoNoSalio": "El correo no salió. Revisa que la dirección esté bien escrita y vuelve a intentarlo en un momento.",
     "correoCorregido": "Correo actualizado.",
-    "correoSinCambios": "El correo ya era ese."
+    "correoSinCambios": "El correo ya era ese.",
+    "idiomaActualizado": "Idioma actualizado."
   },
   "estadosCotizacion": {
     "elaborar": "Elaborar",
@@ -560,7 +569,8 @@
     "paginacionAriaLabel": "Paginación",
     "anterior": "Anterior",
     "siguiente": "Siguiente",
-    "pagina": "Página {actual} de {total}"
+    "pagina": "Página {actual} de {total}",
+    "cotizacion": "Cotización"
   },
   "notFound": {
     "titulo": "Esta página no existe",

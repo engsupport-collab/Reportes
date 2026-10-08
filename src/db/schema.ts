@@ -12,6 +12,7 @@ import {
 
 import { ESTADOS_COTIZACION } from "@/lib/cotizaciones";
 import { TIPOS_SERVICIO_IDS } from "@/lib/etiquetas";
+import { IDIOMAS_DOCUMENTO } from "@/lib/idioma-documento";
 import { IDIOMAS } from "@/lib/idiomas";
 import { MONEDAS } from "@/lib/moneda";
 import { REPORT_EVENT_TYPES, REPORT_STATUSES, USER_ROLES } from "@/lib/roles";
@@ -141,6 +142,18 @@ export const clients = pgTable(
       .references(() => companies.id, { onDelete: "restrict" }),
     name: text("name").notNull(),
     isActive: boolean("is_active").notNull().default(true),
+    /**
+     * En qué idioma recibe este cliente sus documentos: el PDF del reporte y
+     * el correo que lo lleva (ver `lib/idioma-documento.ts`).
+     *
+     * Va en el cliente y no en la empresa porque la empresa no lo dice: los
+     * clientes de Estados Unidos también se atienden desde la SAS.
+     *
+     * Admite null a propósito: es "nadie lo ha marcado", y entonces vale el
+     * idioma de su empresa. Así agregar la columna no tocó ningún dato de los
+     * clientes que ya existían, ni cambió en qué idioma salían sus reportes.
+     */
+    documentLanguage: text("document_language", { enum: IDIOMAS_DOCUMENTO }),
     createdBy: text("created_by")
       .notNull()
       .references(() => users.id, { onDelete: "restrict" }),
@@ -392,6 +405,14 @@ export const reports = pgTable(
     // reportes firmados antes.
     signatureEmail: text("signature_email"),
     signedAt: marcaDeTiempo("signed_at"),
+    /**
+     * Idioma elegido para este reporte en particular, al firmarlo o después:
+     * en cuál salen su PDF y su correo. Null —lo normal— es "el de su
+     * cliente" (ver `lib/idioma-documento.ts`). Solo se escribe cuando alguien
+     * elige uno distinto del que le tocaba, así que un reporte sigue a su
+     * cliente mientras nadie decida otra cosa para él.
+     */
+    documentLanguage: text("document_language", { enum: IDIOMAS_DOCUMENTO }),
 
     createdAt: marcaDeTiempo("created_at").notNull().defaultNow(),
     updatedAt: marcaDeTiempo("updated_at").notNull().defaultNow(),

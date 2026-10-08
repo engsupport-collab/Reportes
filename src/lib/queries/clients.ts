@@ -4,6 +4,7 @@ import { and, asc, eq } from "drizzle-orm";
 
 import { db } from "@/db";
 import { clients, companies } from "@/db/schema";
+import { type IdiomaDocumento, idiomaDeCliente } from "@/lib/idioma-documento";
 
 export type ClienteConEmpresa = {
   id: string;
@@ -11,6 +12,8 @@ export type ClienteConEmpresa = {
   companyName: string;
   name: string;
   isActive: boolean;
+  /** En qué idioma recibe sus documentos: el marcado o, si no, el de su empresa. */
+  documentLanguage: IdiomaDocumento;
   createdAt: Date;
 };
 
@@ -35,19 +38,25 @@ export async function listarClientes(
     opciones?.incluirInactivos ? undefined : eq(clients.isActive, true),
   ].filter((c) => c !== undefined);
 
-  return db
+  const filas = await db
     .select({
       id: clients.id,
       companyId: clients.companyId,
       companyName: companies.name,
       name: clients.name,
       isActive: clients.isActive,
+      documentLanguage: clients.documentLanguage,
       createdAt: clients.createdAt,
     })
     .from(clients)
     .innerJoin(companies, eq(companies.id, clients.companyId))
     .where(condiciones.length > 0 ? and(...condiciones) : undefined)
     .orderBy(asc(clients.name));
+
+  return filas.map((c) => ({
+    ...c,
+    documentLanguage: idiomaDeCliente(c.documentLanguage, c.companyId),
+  }));
 }
 
 /**

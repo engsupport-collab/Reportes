@@ -12,11 +12,15 @@ import type { ReportEventType } from "@/lib/roles";
 export type DatosDeEvento = {
   finalizado: undefined;
   reabierto: undefined;
-  /** `copia` es a quién más se le mandó, cuando el correo llevó copia. */
-  correo_enviado: { para: string; copia?: string };
+  /**
+   * `copia` es a quién más se le mandó, cuando el correo llevó copia;
+   * `idioma`, en cuál salió (los envíos anteriores al dato no lo traen).
+   */
+  correo_enviado: { para: string; copia?: string; idioma?: string };
   /** `causa` es un detalle técnico corto, para soporte: "gmail: HTTP 413". */
   correo_fallido: { para: string; causa: string };
   correo_corregido: { de: string; a: string };
+  idioma_cambiado: { de: string; a: string };
 };
 
 /**

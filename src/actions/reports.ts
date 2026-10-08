@@ -317,7 +317,11 @@ async function enviarYAnotar(
       reportId,
       tipo: "correo_enviado",
       userId,
-      metadata: { para: correo, ...(resultado.copia ? { copia: resultado.copia } : {}) },
+      metadata: {
+        para: correo,
+        ...(resultado.copia ? { copia: resultado.copia } : {}),
+        idioma: resultado.idioma,
+      },
     });
   } else {
     await registrarEvento({

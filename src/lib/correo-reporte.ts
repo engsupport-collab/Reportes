@@ -5,7 +5,8 @@ import { env } from "./env";
 import { firmarEnlacePublico } from "./enlace-firma";
 import { copiaPara, correoConfigurado, enviarCorreoConAdjunto } from "./gmail";
 import { generarReportePdf } from "./pdf";
-import { type IdiomaPdf, idiomaDeEmpresa, textosDeEmpresa, type TextosPdf } from "./pdf-idioma";
+import type { IdiomaDocumento } from "./idioma-documento";
+import { type TextosPdf, textosPdf } from "./pdf-idioma";
 import { listarAdjuntosParaPdf } from "./queries/attachments";
 import { obtenerReporte } from "./queries/reports";
 
@@ -24,8 +25,8 @@ import { obtenerReporte } from "./queries/reports";
  * si el adjunto se pierde por el camino o si el cliente prefiere abrirlo desde
  * el navegador.
  *
- * El correo va en el mismo idioma que el PDF que lleva —el de la empresa del
- * reporte—, y con copia a administración (ver `copiaPara`).
+ * El correo va en el mismo idioma que el PDF que lleva —el del cliente que lo
+ * recibe—, y con copia a administración (ver `copiaPara`).
  *
  * Devuelve si el envío salió y, si no, en qué paso se quedó: armar el PDF y
  * mandar el correo son dos cosas distintas que fallan por motivos distintos,
@@ -34,9 +35,9 @@ import { obtenerReporte } from "./queries/reports";
  */
 const NOMBRE_REMITENTE = "Eng Supports";
 
-/** Si salió, a quién se copió: también eso queda en el historial. */
+/** Si salió, a quién se copió y en qué idioma: también eso queda en el historial. */
 export type EnvioDeReporte =
-  | { ok: true; copia: string | null }
+  | { ok: true; copia: string | null; idioma: IdiomaDocumento }
   | { ok: false; causa: string };
 
 export async function enviarReporteAlCliente(datos: {
@@ -54,7 +55,7 @@ export async function enviarReporteAlCliente(datos: {
   }
 
   let pdf: Uint8Array;
-  let idioma: IdiomaPdf;
+  let idioma: IdiomaDocumento;
   let textos: TextosPdf;
   try {
     const reporte = await obtenerReporte(datos.reportId);
@@ -63,8 +64,8 @@ export async function enviarReporteAlCliente(datos: {
       return { ok: false, causa: "el reporte ya no existe" };
     }
 
-    idioma = idiomaDeEmpresa(reporte.companyId);
-    textos = textosDeEmpresa(reporte.companyId);
+    idioma = reporte.idioma;
+    textos = textosPdf(idioma);
 
     const adjuntos = await listarAdjuntosParaPdf(datos.reportId);
     pdf = await generarReportePdf(reporte, adjuntos);
@@ -100,7 +101,7 @@ export async function enviarReporteAlCliente(datos: {
       nombreRemitente: NOMBRE_REMITENTE,
     });
 
-    return resultado.ok ? { ok: true, copia } : resultado;
+    return resultado.ok ? { ok: true, copia, idioma } : resultado;
   } catch (error) {
     console.warn(
       "No se pudo enviar el reporte %s al cliente:",

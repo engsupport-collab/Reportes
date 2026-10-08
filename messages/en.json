@@ -179,7 +179,11 @@
     "eliminar": "Delete",
     "confirmEliminar": "Permanently delete {nombre}? This cannot be undone.",
     "clienteActivoNoSeElimina": "This client is active. Deactivate it first.",
-    "clienteConHistorialNoSeElimina": "This client has quotes associated with it and can't be deleted. Leave it deactivated — documents that use it will keep showing it the same way."
+    "clienteConHistorialNoSeElimina": "This client has quotes associated with it and can't be deleted. Leave it deactivated — documents that use it will keep showing it the same way.",
+    "idiomaReportes": "Report language",
+    "idiomaReportesAyuda": "This client receives the report PDF and the email in this language.",
+    "reportesEnEspanol": "Reports in Spanish",
+    "reportesEnIngles": "Reports in English"
   },
   "reportForm": {
     "guardando": "Saving…",
@@ -256,7 +260,9 @@
     "eventoCorreoEnviadoConCopia": "Email sent to {correo}, with a copy to {copia}",
     "eventoCorreoFallido": "The email to {correo} did not go out",
     "eventoCorreoCorregido": "Signer email corrected: from {de} to {a}",
-    "detalleTecnico": "Technical detail: {detalle}"
+    "detalleTecnico": "Technical detail: {detalle}",
+    "eventoIdiomaCambiado": "Report language changed: from {de} to {a}",
+    "eventoIdiomaDelEnvio": "Language: {idioma}"
   },
   "filtros": {
     "tipoServicio": "Service type",
@@ -359,7 +365,9 @@
     "reenviando": "Sending…",
     "enviadoA": "Sent to {correo} on {fecha}",
     "noSalioA": "The last send to {correo} did not go out ({fecha}). Check the address and send it again.",
-    "sinConexion": "Could not complete: the connection dropped. Try again."
+    "sinConexion": "Could not complete: the connection dropped. Try again.",
+    "enviarEn": "Send the report in",
+    "enviarEnAyuda": "The PDF and the email go out in this language."
   },
   "reportActions": {
     "confirmTerminado": "This report has no attachments.\n\nYou can still mark it as completed, but it will stay flagged as incomplete —for you and for the administrator— until you upload the document.\n\nMark as completed?",
@@ -464,7 +472,8 @@
     "correoReenviado": "Report sent to {correo}.",
     "correoNoSalio": "The email did not go out. Check that the address is spelled correctly and try again in a moment.",
     "correoCorregido": "Email updated.",
-    "correoSinCambios": "That was already the email."
+    "correoSinCambios": "That was already the email.",
+    "idiomaActualizado": "Language updated."
   },
   "estadosCotizacion": {
     "elaborar": "To draft",
@@ -560,7 +569,8 @@
     "paginacionAriaLabel": "Pagination",
     "anterior": "Previous",
     "siguiente": "Next",
-    "pagina": "Page {actual} of {total}"
+    "pagina": "Page {actual} of {total}",
+    "cotizacion": "Quote"
   },
   "notFound": {
     "titulo": "This page doesn't exist",

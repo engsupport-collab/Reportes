@@ -3,6 +3,7 @@ import { z } from "zod";
 import { ESTADOS_COTIZACION } from "./cotizaciones";
 import { TIPOS_SERVICIO_IDS, esEtiquetaValida } from "./etiquetas";
 import { parseFechaISO } from "./fechas";
+import { IDIOMAS_DOCUMENTO } from "./idioma-documento";
 import { PASSWORD_MIN_LENGTH } from "./password";
 import { REPORT_STATUSES, USER_ROLES } from "./roles";
 
@@ -321,6 +322,10 @@ export function clienteSchema(t: T) {
       .trim()
       .min(1, t("ingresaNombreCliente"))
       .max(200, t("clienteLargo")),
+    // Opcional: si el formulario no lo manda —una pantalla abierta desde antes
+    // de que existiera el dato—, quien llama decide qué hacer sin él, en vez
+    // de rechazar el nombre por algo que el usuario no llegó a ver.
+    documentLanguage: z.enum(IDIOMAS_DOCUMENTO).optional().catch(undefined),
   });
 }
 

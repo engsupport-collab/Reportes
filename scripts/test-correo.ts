@@ -214,14 +214,14 @@ async function main() {
 
   console.log("\nEl correo va en el idioma del reporte\n");
 
-  const { textosDeEmpresa } = await import("../src/lib/pdf-idioma");
+  const { textosPdf } = await import("../src/lib/pdf-idioma");
   const ENLACE = "https://ejemplo.com/api/reportes/publico/abc";
-  const enIngles = textosDeEmpresa("corp");
-  const enEspanol = textosDeEmpresa("saas");
+  const enIngles = textosPdf("en");
+  const enEspanol = textosPdf("es");
   const cuerpoIngles = enIngles.correoCuerpo("John Smith", "HMI Intarema", ENLACE, "Eng Supports");
   const cuerpoEspanol = enEspanol.correoCuerpo("José Pérez", "HMI Intarema", ENLACE, "Eng Supports");
   comprobar(
-    "el de un reporte de la LLC, en inglés: asunto, saludo, texto y despedida",
+    "para un cliente que recibe en inglés: asunto, saludo, texto y despedida",
     enIngles.correoAsunto("HMI Intarema") === "Signed report — HMI Intarema" &&
       cuerpoIngles.startsWith("Hello John Smith,\n") &&
       cuerpoIngles.includes('Attached is the signed report for the project "HMI Intarema".') &&
@@ -236,7 +236,7 @@ async function main() {
     ),
   );
   comprobar(
-    "el de la SAS sigue como estaba",
+    "para un cliente que recibe en español sigue como estaba",
     enEspanol.correoAsunto("HMI Intarema") === "Reporte firmado — HMI Intarema" &&
       cuerpoEspanol ===
         `Hola José Pérez,\n\nAdjunto encontrarás el reporte firmado del proyecto "HMI Intarema".\n\nTambién puedes consultarlo en línea: ${ENLACE}\n\nGracias,\nEng Supports`,

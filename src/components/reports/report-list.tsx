@@ -65,6 +65,14 @@ export async function ReportList({
           >
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
+                {/* Arriba y destacado: en la oficina un trabajo se busca por
+                    su número de cotización, no por el nombre del proyecto. */}
+                {r.quoteNumber ? (
+                  <p className="truncate text-sm font-semibold tracking-wide text-brand">
+                    <span className="sr-only">{t("cotizacion")} </span>
+                    {r.quoteNumber}
+                  </p>
+                ) : null}
                 <p className="truncate text-sm font-semibold text-text">
                   {r.projectName}
                 </p>

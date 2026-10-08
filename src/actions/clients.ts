@@ -7,6 +7,7 @@ import { revalidatePath } from "next/cache";
 import { db } from "@/db";
 import { clients, quotes } from "@/db/schema";
 import { requireAdmin } from "@/lib/auth-guard";
+import { idiomaDeEmpresa } from "@/lib/idioma-documento";
 import { listarEmpresas } from "@/lib/queries/companies";
 import { clienteSchema } from "@/lib/validation";
 
@@ -40,7 +41,10 @@ export async function crearClienteAction(
     return { error: t("eligeEmpresaReporte") };
   }
 
-  const parsed = clienteSchema(t).safeParse({ name: formData.get("name") });
+  const parsed = clienteSchema(t).safeParse({
+    name: formData.get("name"),
+    documentLanguage: formData.get("documentLanguage") ?? undefined,
+  });
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? t("revisaLosDatos") };
   }
@@ -50,6 +54,9 @@ export async function crearClienteAction(
     id,
     companyId: empresa.id,
     name: parsed.data.name,
+    // Un cliente nuevo queda siempre con su idioma escrito. Si el formulario
+    // no lo trajo, el de su empresa: es lo mismo que se le habría propuesto.
+    documentLanguage: parsed.data.documentLanguage ?? idiomaDeEmpresa(empresa.id),
     createdBy: user.id,
   });
 
@@ -62,10 +69,15 @@ export async function crearClienteAction(
 }
 
 /**
- * Edición del nombre de un cliente. La empresa no se toca, mismo criterio que
- * `actualizarCotizacionAction`: moverlo de una empresa a otra es una
- * operación distinta, con sus propias implicaciones sobre las cotizaciones
- * que ya lo referencian.
+ * Edición de un cliente: su nombre y el idioma en que recibe sus reportes. La
+ * empresa no se toca, mismo criterio que `actualizarCotizacionAction`: moverlo
+ * de una empresa a otra es una operación distinta, con sus propias
+ * implicaciones sobre las cotizaciones que ya lo referencian.
+ *
+ * Cambiar el idioma vale también para los reportes que el cliente ya tiene: el
+ * PDF se arma en el momento, así que el próximo que se descargue o se reenvíe
+ * sale en el idioma nuevo. Es lo que permite corregir uno que ya se mandó en
+ * el idioma equivocado.
  */
 export async function actualizarClienteAction(
   id: string,
@@ -75,14 +87,24 @@ export async function actualizarClienteAction(
   await requireAdmin();
   const t = await getTranslations("validacion");
 
-  const parsed = clienteSchema(t).safeParse({ name: formData.get("name") });
+  const parsed = clienteSchema(t).safeParse({
+    name: formData.get("name"),
+    documentLanguage: formData.get("documentLanguage") ?? undefined,
+  });
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? t("revisaLosDatos") };
   }
 
   await db
     .update(clients)
-    .set({ name: parsed.data.name, updatedAt: new Date() })
+    .set({
+      name: parsed.data.name,
+      // Sin idioma en el formulario no se toca el que tenga.
+      ...(parsed.data.documentLanguage
+        ? { documentLanguage: parsed.data.documentLanguage }
+        : {}),
+      updatedAt: new Date(),
+    })
     .where(eq(clients.id, id));
 
   revalidatePath("/admin/clientes");

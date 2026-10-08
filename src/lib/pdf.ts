@@ -20,7 +20,7 @@ import {
   prepararAdjuntos,
   recortarFirma,
 } from "@/lib/pdf-adjuntos";
-import { type TextosPdf, textosDeEmpresa } from "@/lib/pdf-idioma";
+import { type TextosPdf, textosPdf } from "@/lib/pdf-idioma";
 import {
   A4,
   COLOR_LINEA,
@@ -53,7 +53,7 @@ import type { ReporteCompleto } from "@/lib/queries/reports";
  * Cómo entra cada archivo —enderezado, reducido y sin pasarse del peso que el
  * documento puede tener— lo decide `pdf-adjuntos.ts`. La parte visual (logo,
  * colores, encabezado, pie) vive en `pdf-marca.ts`, y en qué idioma sale cada
- * texto fijo, en `pdf-idioma.ts`: lo decide la empresa del reporte.
+ * texto fijo, en `pdf-idioma.ts`: lo decide el cliente que lo recibe.
  *
  * Ningún texto se dibuja ni se mide llamando a la librería directamente: pasa
  * por `pdf-texto.ts`, que lo deja en lo que la fuente sabe dibujar. Un solo
@@ -528,7 +528,7 @@ async function armarReporte(
     bold: await doc.embedFont(StandardFonts.HelveticaBold),
   };
   const logo = await embeberLogo(doc);
-  const textos = textosDeEmpresa(reporte.companyId);
+  const textos = textosPdf(reporte.idioma);
   const contexto: Contexto = {
     logo,
     tipoDocumento: textos.reporteServicio,
@@ -775,8 +775,8 @@ type GastoViatico = Adjunto & {
  *
  * Este PDF es exclusivamente interno: nunca se envía al cliente, ni por
  * correo ni por el enlace público de firma — solo el de servicio se comparte
- * fuera del sistema. El idioma sigue la misma regla que el de servicio, para
- * que todos los documentos de una empresa salgan en el suyo.
+ * fuera del sistema. Por eso su idioma es el de la empresa y no el del cliente
+ * (lo resuelve `obtenerReporte`).
  */
 export async function generarReporteViaticoPdf(
   reporte: ReporteCompleto,
@@ -797,7 +797,7 @@ async function armarViatico(
     bold: await doc.embedFont(StandardFonts.HelveticaBold),
   };
   const logo = await embeberLogo(doc);
-  const textos = textosDeEmpresa(reporte.companyId);
+  const textos = textosPdf(reporte.idioma);
   const contexto: Contexto = {
     logo,
     tipoDocumento: textos.reporteViaticos,

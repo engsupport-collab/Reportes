@@ -955,14 +955,90 @@ async function comprobarFirmas() {
 }
 
 /**
- * El idioma del documento lo pone la empresa: LLC en inglés, SAS en español.
- * El cliente generó un reporte de la LLC y los títulos le salieron en español.
+ * El idioma del documento lo pone el cliente que lo recibe.
+ *
+ * Primero lo puso la empresa —LLC en inglés, SAS en español— y a un cliente de
+ * Estados Unidos, atendido desde la SAS, le llegó el reporte en español
+ * (2026-10-08): en uso real todas las cotizaciones estaban en la SAS. La regla
+ * por empresa quedó como valor de partida para quien no tiene idioma marcado.
  */
 async function comprobarIdioma() {
   const { generarReportePdf, generarReporteViaticoPdf } = await import("../src/lib/pdf");
   const { nombreDelPdf } = await import("../src/lib/archivos");
+  const { idiomaDeCliente, idiomaDeReporte, idiomaPropioDeReporte } = await import(
+    "../src/lib/idioma-documento"
+  );
 
-  console.log("\nLos reportes de la LLC salen en inglés\n");
+  console.log("\nA quién le toca cada idioma\n");
+
+  const servicio = (companyId: string) => ({ type: "servicio" as const, companyId });
+  comprobar(
+    "un cliente marcado en inglés recibe en inglés aunque se le atienda desde la SAS",
+    idiomaDeReporte(servicio("saas"), "en") === "en",
+  );
+  comprobar(
+    "contraste: ese mismo cliente, sin marcar, recibe en español",
+    idiomaDeReporte(servicio("saas"), null) === "es",
+  );
+  comprobar(
+    "sin marcar, vale la empresa: LLC en inglés, y cualquier otra en español",
+    idiomaDeReporte(servicio("corp"), null) === "en" &&
+      idiomaDeReporte(servicio("saas"), undefined) === "es" &&
+      idiomaDeReporte(servicio("otra"), null) === "es",
+  );
+  comprobar(
+    "lo marcado manda sobre la empresa también al revés: un cliente de la LLC en español",
+    idiomaDeReporte(servicio("corp"), "es") === "es",
+  );
+  comprobar(
+    "un valor que no es un idioma de documento no cuenta como marcado",
+    idiomaDeCliente("pt", "saas") === "es" && idiomaDeCliente("", "corp") === "en",
+  );
+  comprobar(
+    "los viáticos son internos: van en el idioma de la empresa, sea quien sea el cliente",
+    idiomaDeReporte({ type: "viaticos", companyId: "saas" }, "en") === "es" &&
+      idiomaDeReporte({ type: "viaticos", companyId: "corp" }, "es") === "en",
+  );
+
+  console.log("\nQuien envía tiene la última palabra\n");
+
+  const elegido = (companyId: string, documentLanguage: string | null) => ({
+    type: "servicio" as const,
+    companyId,
+    documentLanguage,
+  });
+  comprobar(
+    "lo elegido para un reporte manda sobre su cliente y su empresa, en los dos sentidos",
+    idiomaDeReporte(elegido("saas", "en"), null) === "en" &&
+      idiomaDeReporte(elegido("saas", "en"), "es") === "en" &&
+      idiomaDeReporte(elegido("corp", "es"), "en") === "es",
+  );
+  comprobar(
+    "contraste: sin nada elegido para el reporte, vale lo de su cliente",
+    idiomaDeReporte(elegido("saas", null), "en") === "en" &&
+      idiomaDeReporte(elegido("saas", null), null) === "es",
+  );
+  comprobar(
+    "en un reporte de viáticos no cuenta ni lo elegido",
+    idiomaDeReporte({ type: "viaticos", companyId: "saas", documentLanguage: "en" }, "en") === "es",
+  );
+  comprobar(
+    "elegir el mismo idioma que ya le tocaba no deja nada guardado: el reporte sigue a su cliente",
+    idiomaPropioDeReporte("es", "es") === null && idiomaPropioDeReporte("en", "en") === null,
+  );
+  comprobar(
+    "elegir otro sí queda guardado",
+    idiomaPropioDeReporte("en", "es") === "en" && idiomaPropioDeReporte("es", "en") === "es",
+  );
+  // Lo que eso permite: el día que al cliente se le marca inglés en el
+  // catálogo, sus reportes ya firmados salen en inglés sin tocar cada uno.
+  const firmadoEnEspanol = elegido("saas", idiomaPropioDeReporte("es", "es"));
+  comprobar(
+    "un reporte firmado con el idioma de su cliente cambia cuando cambia el del cliente",
+    idiomaDeReporte(firmadoEnEspanol, null) === "es" && idiomaDeReporte(firmadoEnEspanol, "en") === "en",
+  );
+
+  console.log("\nEl mismo reporte, en español y en inglés\n");
 
   const foto = await texturaDeFoto(1600, 1200).jpeg({ quality: 82 }).toBuffer();
   const refFoto = await guardarDePrueba("idioma.jpg", foto);
@@ -976,21 +1052,21 @@ async function comprobarIdioma() {
       mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     },
   ];
-  // El mismo reporte para las dos empresas: lo único que cambia es de cuál es.
+  // El mismo reporte, de la misma empresa (la SAS): lo único que cambia es en
+  // qué idioma lo recibe su cliente. Es el caso que falló.
   const comun: Partial<ReporteCompleto> = {
     projectName: "HMI Intarema PGI",
     details: "Line 2 HMI screens updated and tested with the operator.",
     serviceType: "electrico",
     etiquetas: ["preventivo", "urgencia"],
+    companyId: "saas",
+    companyName: "SAS",
   };
-  const deLaSas = await generar("el reporte, de la SAS", () =>
-    generarReportePdf(firmado({ ...comun, companyId: "saas", companyName: "SAS" }), adjuntos),
+  const deLaSas = await generar("el reporte, para un cliente que lo recibe en español", () =>
+    generarReportePdf(firmado({ ...comun, idioma: "es" }), adjuntos),
   );
-  const deLaLlc = await generar("el mismo reporte, de la LLC", () =>
-    generarReportePdf(
-      firmado({ ...comun, companyId: "corp", companyName: "LLC", currency: "USD" }),
-      adjuntos,
-    ),
+  const deLaLlc = await generar("el mismo reporte, para un cliente que lo recibe en inglés", () =>
+    generarReportePdf(firmado({ ...comun, idioma: "en" }), adjuntos),
   );
 
   if (deLaSas && deLaLlc) {
@@ -1051,6 +1127,8 @@ async function comprobarIdioma() {
       "Eng-Support Corp.",
       "Automation, Control & Digitalization I4.0",
       "  ·  Automation, Control & Digitalization I4.0",
+      // El nombre de la empresa: es la misma en los dos.
+      "SAS",
     ]);
     const repetidos = [...new Set(enIngles.filter((t) => enEspanol.includes(t)))];
     const sinTraducir = repetidos.filter((t) => !DATOS.has(t));
@@ -1065,7 +1143,7 @@ async function comprobarIdioma() {
       [...DATOS].filter((t) => !repetidos.includes(t)).join(" | "),
     );
     comprobar(
-      "contraste: el de la SAS sigue en español",
+      "contraste: el del cliente en español sigue en español",
       ["REPORTE DE SERVICIO", "FIRMAS", "FIRMA DEL CLIENTE", "4 de octubre de 2026", "Eléctrico"].every(
         (texto) => enEspanol.includes(texto),
       ) && !enEspanol.includes("SERVICE REPORT"),
@@ -1077,19 +1155,31 @@ async function comprobarIdioma() {
     );
   }
 
-  const deOtra = await generar("un reporte de una empresa que no es la LLC", () =>
-    generarReportePdf(reporte({ companyId: "otra", companyName: "Otra" }), []),
+  const deLaLlcSinIdioma = await generar(
+    "contraste: un reporte de la LLC al que se le pide español",
+    () =>
+      generarReportePdf(
+        reporte({ companyId: "corp", companyName: "LLC", currency: "USD", idioma: "es" }),
+        [],
+      ),
   );
-  if (deOtra) {
+  if (deLaLlcSinIdioma) {
     comprobar(
-      "solo la LLC va en inglés: cualquier otra, en español",
-      deOtra[0]!.some((t) => t.texto === "REPORTE DE SERVICIO"),
+      "el generador obedece al idioma del reporte, no vuelve a mirar la empresa",
+      deLaLlcSinIdioma[0]!.some((t) => t.texto === "REPORTE DE SERVICIO") &&
+        !deLaLlcSinIdioma[0]!.some((t) => t.texto === "SERVICE REPORT"),
     );
   }
 
-  const viaticos = await generar("un reporte de viáticos de la LLC", () =>
+  const viaticos = await generar("un reporte de viáticos en inglés (los de la LLC)", () =>
     generarReporteViaticoPdf(
-      reporte({ type: "viaticos", companyId: "corp", companyName: "LLC", currency: "USD" }),
+      reporte({
+        type: "viaticos",
+        companyId: "corp",
+        companyName: "LLC",
+        currency: "USD",
+        idioma: "en",
+      }),
       [
         {
           id: "g1",
@@ -1195,6 +1285,9 @@ const BASE: ReporteCompleto = {
   updatedBy: null,
   attachmentCount: 0,
   etiquetas: ["online"],
+  documentLanguage: null,
+  idiomaDelCliente: "es",
+  idioma: "es",
 };
 
 function reporte(cambios: Partial<ReporteCompleto> = {}): ReporteCompleto {

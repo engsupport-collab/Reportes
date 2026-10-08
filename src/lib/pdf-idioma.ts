@@ -1,31 +1,24 @@
 import type { EtiquetaTrabajo, TipoServicio } from "@/lib/etiquetas";
+import type { IdiomaDocumento } from "@/lib/idioma-documento";
 
 import mensajesEn from "../../messages/en.json";
 import mensajesEs from "../../messages/es.json";
 
 /**
- * En qué idioma sale el PDF de un reporte, y el correo que lo lleva.
+ * Los textos fijos del PDF de un reporte y del correo que lo lleva, en cada
+ * idioma en que pueden salir.
  *
- * Lo decide la empresa del reporte, no el idioma de la pantalla de quien lo
- * genera: los de la LLC (Estados Unidos) salen en inglés y los de la SAS
- * (Colombia) en español. El documento lo recibe el cliente final, y el mismo
- * reporte se arma en tres sitios —la descarga, el enlace público y el correo
- * al terminar—: si dependiera de la pantalla, un técnico con el teléfono en
- * español le mandaría en español a un cliente de Estados Unidos, y el enlace
- * público, que no tiene sesión, no sabría cuál usar.
+ * Cuál le toca a cada documento no se decide aquí sino en
+ * `idioma-documento.ts`: es el del cliente que lo recibe. Nunca el de la
+ * pantalla de quien lo genera — el mismo reporte se arma desde la descarga, el
+ * enlace público y el correo al terminar, y dos de los tres no tienen pantalla
+ * con idioma.
  *
  * Solo cambian los textos fijos y las fechas. Lo que escribió el técnico —el
  * detalle, los nombres— va tal como lo escribió.
  *
- * Solo de servidor: trae los diccionarios completos de dos idiomas. Desde un
- * componente de cliente se importa, como mucho, el tipo `IdiomaPdf`.
+ * Solo de servidor: trae los diccionarios completos de dos idiomas.
  */
-export type IdiomaPdf = "es" | "en";
-
-/** `corp` es la LLC. Cualquier otra empresa, hoy solo la SAS, va en español. */
-export function idiomaDeEmpresa(companyId: string): IdiomaPdf {
-  return companyId === "corp" ? "en" : "es";
-}
 
 /**
  * Tipo de servicio y etiquetas, con las mismas palabras que la pantalla en ese
@@ -34,7 +27,7 @@ export function idiomaDeEmpresa(companyId: string): IdiomaPdf {
  */
 type Clasificacion = Record<TipoServicio | EtiquetaTrabajo, string>;
 
-const CLASIFICACION: Record<IdiomaPdf, Clasificacion> = {
+const CLASIFICACION: Record<IdiomaDocumento, Clasificacion> = {
   es: mensajesEs.etiquetas,
   en: mensajesEn.etiquetas,
 };
@@ -151,9 +144,9 @@ const EN: TextosPdf = {
     ].join("\n"),
 };
 
-const TEXTOS: Record<IdiomaPdf, TextosPdf> = { es: ES, en: EN };
+const TEXTOS: Record<IdiomaDocumento, TextosPdf> = { es: ES, en: EN };
 
-/** Los textos fijos de un documento, en el idioma que le toca a su empresa. */
-export function textosDeEmpresa(companyId: string): TextosPdf {
-  return TEXTOS[idiomaDeEmpresa(companyId)];
+/** Los textos fijos de un documento, en el idioma en que sale. */
+export function textosPdf(idioma: IdiomaDocumento): TextosPdf {
+  return TEXTOS[idioma];
 }

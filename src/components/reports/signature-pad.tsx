@@ -4,6 +4,8 @@ import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { useTranslations } from "next-intl";
 
 import type { FirmaState } from "@/actions/signature";
+import { SelectorIdiomaDocumento } from "@/components/selector-idioma-documento";
+import type { IdiomaDocumento } from "@/lib/idioma-documento";
 import {
   ESTILOS_FIRMA,
   generarFirmaEscrita,
@@ -28,9 +30,12 @@ type Modo = "escribir" | "dibujar";
 export function SignaturePad({
   action,
   nombrePorDefecto,
+  idioma,
 }: {
   action: (estado: FirmaState, formData: FormData) => Promise<FirmaState>;
   nombrePorDefecto: string;
+  /** En qué idioma saldría hoy el reporte: el que viene marcado. */
+  idioma: IdiomaDocumento;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const hayTrazo = useRef(false);
@@ -347,6 +352,14 @@ export function SignaturePad({
         />
         <p className="text-xs text-muted">{t("ayudaCorreo")}</p>
       </div>
+
+      {/* Justo después del correo: es el momento en que se sabe a quién va.
+          Viene marcado el idioma del cliente, y se puede cambiar. */}
+      <SelectorIdiomaDocumento
+        titulo={t("enviarEn")}
+        ayuda={t("enviarEnAyuda")}
+        porDefecto={idioma}
+      />
 
       {/* Dos formas de firmar. Dibujar va primero y viene seleccionada: es la
           firma de puño y letra. Escribir es la salida cuando dibujar con el

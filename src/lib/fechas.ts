@@ -58,9 +58,9 @@ export function aValorInput(fecha: Date): string {
 
 /**
  * `locale` es opcional y por defecto "es-CO". Las pantallas lo pasan tomado
- * del idioma de la sesión. El PDF (`lib/pdf.ts`) pasa el de la empresa del
- * reporte, no el de quien lo descarga: es una constancia de trabajo para el
- * cliente, no parte de la interfaz (ver `lib/pdf-idioma.ts`).
+ * del idioma de la sesión. El PDF (`lib/pdf.ts`) pasa el del cliente que
+ * recibe el reporte, no el de quien lo descarga: es una constancia de trabajo
+ * para el cliente, no parte de la interfaz (ver `lib/idioma-documento.ts`).
  */
 
 /** Date -> "1 de agosto de 2026" / "August 1, 2026" / "1 de agosto de 2026". */
