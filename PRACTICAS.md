@@ -125,7 +125,10 @@ después. No hay un paso manual que sirva de freno.
    local. Los scripts van **fuera** del proyecto y se ejecutan con
    `npx -y -p playwright node <ruta>`.
 4. Commit, push a `main`.
-5. Migrar producción si cambió el esquema.
+5. Migrar producción si cambió el esquema. **Si la migración solo agrega
+   (una columna que admite null, una tabla nueva), va antes del push**: el
+   código viejo no la nota, y el nuevo, que sí la lee, nunca corre sin ella.
+   Al revés hay un par de minutos en que cada consulta a esa tabla falla.
 6. Comprobar que el despliegue terminó bien. Lo anota `vercel[bot]` en el
    propio commit: `gh api repos/engsupport-collab/Reportes/commits/<sha>/status`.
 7. Verificar en https://reportes.engsupports.com.co **sin crear cuentas ni
@@ -231,10 +234,20 @@ Al día siguiente el cliente generó un reporte de la LLC, para un proyecto de
 Estados Unidos, y los títulos le salieron en español.
 
 - **El idioma de lo que sale hacia afuera lo decide a quién va, no quién lo
-  genera.** El PDF y su correo van en el idioma de la empresa del reporte
-  (`pdf-idioma.ts`): LLC en inglés, SAS en español. El mismo reporte se arma
-  desde la descarga, el enlace público y el correo, y dos de los tres no
-  tienen una pantalla con idioma.
+  genera.** El mismo reporte se arma desde la descarga, el enlace público y el
+  correo, y dos de los tres no tienen una pantalla con idioma.
+- **Una regla se comprueba contra cómo se usa el sistema, no contra cómo se
+  pensó.** La primera fue "LLC en inglés, SAS en español", y tres días después
+  a un cliente de Estados Unidos le llegó el reporte en español: las 98
+  cotizaciones de producción estaban en la SAS y ninguna en la LLC. La regla
+  funcionaba; no se cumplía la suposición. Una consulta de solo lectura lo
+  habría dicho antes de escribirla.
+- **Lo que una regla decide sola, quien envía lo tiene que poder ver y
+  cambiar.** El idioma viene del cliente (`idioma-documento.ts`: lo marcado en
+  el catálogo y, si no, el de su empresa), pero se muestra y se elige junto al
+  correo de quien firma, y se puede cambiar con el reporte terminado para
+  reenviarlo. Así un reporte que quedó en la cotización equivocada se
+  corrige ahí mismo, sin rehacerlo.
 - **Para saber si quedó algo sin traducir, se compara, no se enumera.** El
   mismo reporte en los dos idiomas: lo único igual en ambos puede ser lo que
   alguien escribió a mano y la marca. Cualquier otro texto repetido es un
