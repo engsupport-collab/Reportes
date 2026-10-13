@@ -218,6 +218,11 @@ y ninguna se veía en un navegador de escritorio.
 - **Lo que sale hacia afuera deja rastro.** El correo al cliente no dejaba
   ninguno: no se podía saber si se intentó, a quién ni por qué falló. Cada
   intento es ahora un evento del reporte, con su causa.
+- **Un aviso no frena a quien trabaja.** El correo de "se creó una
+  cotización" sale con `after`, cuando la respuesta ya se envió: medido con
+  Google tardando 4 segundos, crear la cotización siguió tardando 1,3. Y como
+  entonces nadie está mirando, cómo terminó queda anotado en la propia
+  cotización, con un botón para repetirlo si no salió.
 - **Probar el correo sin mandarlo.** `npm run test:correo` reemplaza `fetch`.
   Para el recorrido en el navegador, un doble dentro del servidor local
   (`NODE_OPTIONS="--require doble.cjs" npm start`) que conteste por Google:
