@@ -277,6 +277,17 @@ export const quotes = pgTable(
      */
     revisada: boolean("revisada").notNull().default(true),
 
+    /**
+     * Cómo terminó el aviso por correo de que esta cotización se creó: a quién
+     * salió y cuándo, o por qué no salió. Un JSON corto (ver
+     * `lib/aviso-cotizacion.ts`); null en las anteriores al aviso.
+     *
+     * Existe porque lo que sale hacia afuera tiene que dejar rastro: sin esto,
+     * si el correo no sale nadie se entera, y la cotización falta en el plan
+     * de la semana sin que se sepa por qué.
+     */
+    creationNotice: text("creation_notice"),
+
     createdBy: text("created_by")
       .notNull()
       .references(() => users.id, { onDelete: "restrict" }),

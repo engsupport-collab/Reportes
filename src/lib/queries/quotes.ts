@@ -168,6 +168,8 @@ export async function listarCotizaciones(filtros: FiltrosCotizaciones): Promise<
 export type CotizacionCompleta = CotizacionEnLista & {
   description: string | null;
   amount: number | null;
+  /** Cómo terminó el aviso de creación, tal como se guardó (ver `leerAviso`). */
+  creationNotice: string | null;
   createdByName: string;
   createdAt: Date;
   updatedAt: Date;
@@ -199,6 +201,7 @@ export async function obtenerCotizacion(
       description: quotes.description,
       amount: quotes.amount,
       revisada: quotes.revisada,
+      creationNotice: quotes.creationNotice,
       createdByName: users.fullName,
       createdAt: quotes.createdAt,
       updatedAt: quotes.updatedAt,

@@ -12,11 +12,15 @@
  * mensaje va por el punto de subida de Gmail y sin doble codificación (un PDF
  * de varios megas no cabe por el otro), que el adjunto llega idéntico, que la
  * copia a administración va donde debe y a la vista, que el texto sale en el
- * idioma del reporte, y que cuando Google contesta mal queda dicho por qué.
+ * idioma del reporte, que el aviso de una cotización nueva dice lo que tiene
+ * que decir a quien se lo tiene que decir, y que cuando Google contesta mal
+ * queda dicho por qué.
  */
 import { generateKeyPairSync, randomBytes } from "node:crypto";
 
 import { config } from "dotenv";
+
+import type { CotizacionCompleta } from "../src/lib/queries/quotes";
 
 config({ path: ".env.local" });
 
@@ -31,6 +35,7 @@ process.env.GMAIL_IMPERSONATE_EMAIL = "buzon@ejemplo.com";
 process.env.GMAIL_SENDER_EMAIL = "remitente@ejemplo.com";
 // Como en producción: sin definir, que es cuando la copia sale por defecto.
 delete process.env.GMAIL_CC_EMAIL;
+delete process.env.GMAIL_NOTIFY_EMAILS;
 
 let fallos = 0;
 
@@ -83,9 +88,15 @@ function leerMensaje(mensaje: string) {
 }
 
 async function main() {
-  const { copiaPara, correoConfigurado, enviarCorreoConAdjunto, resolverCopia } = await import(
-    "../src/lib/gmail"
-  );
+  const {
+    copiaPara,
+    correoConfigurado,
+    destinatariosDeAvisos,
+    enviarCorreo,
+    enviarCorreoConAdjunto,
+    resolverAvisos,
+    resolverCopia,
+  } = await import("../src/lib/gmail");
 
   // Como el PDF de un reporte con varias fotos: 3 MB que no se comprimen.
   const pdf = new Uint8Array(randomBytes(3 * 1024 * 1024));
@@ -245,6 +256,198 @@ async function main() {
     "sin enlace, el texto no deja la frase a medias",
     !enIngles.correoCuerpo("John", "X", null, "Eng Supports").includes("online") &&
       !enEspanol.correoCuerpo("José", "X", null, "Eng Supports").includes("en línea"),
+  );
+
+  console.log("\nEl aviso de una cotización nueva: a quién\n");
+
+  const quienEnvia = { remitente: "soporte@empresa.com.co", buzon: "coordinador@empresa.com.co" };
+  const lista = (correos: string[]) => correos.join(" | ");
+  comprobar(
+    "sin nada configurado, va a administración y al buzón que envía",
+    lista(resolverAvisos({ configurados: undefined, ...quienEnvia })) ===
+      "administracion@empresa.com.co | coordinador@empresa.com.co",
+    lista(resolverAvisos({ configurados: undefined, ...quienEnvia })),
+  );
+  comprobar(
+    "con una lista configurada, va a esos y a nadie más",
+    lista(resolverAvisos({ configurados: "a@empresa.com.co, b@empresa.com.co;c@otra.com", ...quienEnvia })) ===
+      "a@empresa.com.co | b@empresa.com.co | c@otra.com",
+  );
+  comprobar(
+    "configurada vacía, no se avisa a nadie (así va en desarrollo)",
+    resolverAvisos({ configurados: "", ...quienEnvia }).length === 0,
+  );
+  comprobar(
+    "una misma dirección no recibe el aviso dos veces",
+    lista(
+      resolverAvisos({
+        configurados: undefined,
+        remitente: "soporte@empresa.com.co",
+        buzon: "Administracion@Empresa.com.co",
+      }),
+    ) === "administracion@empresa.com.co",
+  );
+  comprobar(
+    "con la configuración de esta prueba, salen del remitente y del buzón",
+    lista(destinatariosDeAvisos()) === "administracion@ejemplo.com | buzon@ejemplo.com",
+    lista(destinatariosDeAvisos()),
+  );
+
+  console.log("\nEl aviso de una cotización nueva: qué dice\n");
+
+  const { leerAviso, textoDelAviso } = await import("../src/lib/aviso-cotizacion");
+  const { formatFechaLarga, formatInstante } = await import("../src/lib/fechas");
+  const { formatearMonto } = await import("../src/lib/moneda");
+
+  const cotizacion: CotizacionCompleta = {
+    id: "00000000-0000-4000-8000-0000000000c1",
+    companyId: "saas",
+    companyName: "SAS",
+    currency: "COP",
+    quoteNumber: "Q2026_099",
+    projectName: "Instalación eléctrica Ñandú",
+    clientId: "00000000-0000-4000-8000-0000000000c2",
+    clientName: "Industrias del Valle S.A.",
+    status: "pendiente_autorizacion",
+    purchaseOrderNo: "4500123456",
+    dueDate: new Date("2026-10-20T12:00:00Z"),
+    revisada: true,
+    createdAt: new Date("2026-10-13T14:12:00Z"),
+    description: "Tablero nuevo para la línea 2.\nIncluye puesta en marcha.",
+    amount: 1200000,
+    creationNotice: null,
+    createdByName: "José Pérez",
+    updatedAt: new Date("2026-10-13T14:12:00Z"),
+  };
+  const ENLACE_COTIZACION = "https://ejemplo.com/admin/cotizaciones/abc";
+  const aviso = textoDelAviso(cotizacion, ENLACE_COTIZACION);
+  const renglones = aviso.cuerpo.split("\n");
+
+  comprobar(
+    "el asunto dice el número y el proyecto",
+    aviso.asunto === "Nueva cotización Q2026_099 — Instalación eléctrica Ñandú",
+    aviso.asunto,
+  );
+  const ESPERADOS = [
+    "Número: Q2026_099",
+    "Proyecto: Instalación eléctrica Ñandú",
+    "Cliente: Industrias del Valle S.A.",
+    "Empresa: SAS",
+    "Estado: Pendiente por autorización",
+    "Orden de compra: 4500123456",
+    `Fecha comprometida de entrega: ${formatFechaLarga(cotizacion.dueDate!)}`,
+    `Valor cotizado: ${formatearMonto(1200000, "COP")}`,
+    `Creada por: José Pérez, el ${formatInstante(cotizacion.createdAt)}`,
+    "Descripción:",
+    "Tablero nuevo para la línea 2.",
+    "Incluye puesta en marcha.",
+    `Abrirla en el sistema: ${ENLACE_COTIZACION}`,
+  ];
+  comprobar(
+    "el texto trae todos los datos de la cotización y el enlace para abrirla",
+    ESPERADOS.every((renglon) => renglones.includes(renglon)),
+    ESPERADOS.filter((renglon) => !renglones.includes(renglon)).join(" | "),
+  );
+
+  const aMedias = textoDelAviso(
+    { ...cotizacion, purchaseOrderNo: null, dueDate: null, amount: null, description: null },
+    null,
+  ).cuerpo;
+  comprobar(
+    "lo que no se llenó se dice, no se omite: en un plan de pendientes es un pendiente",
+    ["Orden de compra: Sin asignar", "Fecha comprometida de entrega: Sin definir", "Valor cotizado: Sin definir"].every(
+      (renglon) => aMedias.split("\n").includes(renglon),
+    ),
+  );
+  const delFormulario = textoDelAviso(
+    { ...cotizacion, description: "Tablero nuevo.\r\nIncluye puesta en marcha." },
+    null,
+  ).cuerpo;
+  comprobar(
+    "la descripción escrita en un formulario (saltos CR+LF) queda con los saltos del resto del texto",
+    !delFormulario.includes("\r") &&
+      delFormulario.includes("Descripción:\nTablero nuevo.\nIncluye puesta en marcha."),
+  );
+  comprobar(
+    "sin descripción ni enlace, el texto no deja rótulos sueltos",
+    !aMedias.includes("Descripción:") && !aMedias.includes("Abrirla en el sistema"),
+  );
+  const DE_CAMPO = "Se creó desde campo, con lo mínimo: falta revisarla y completar sus datos.";
+  comprobar(
+    "la que nace en campo lo dice",
+    textoDelAviso({ ...cotizacion, revisada: false }, null).cuerpo.split("\n").includes(DE_CAMPO),
+  );
+  comprobar("contraste: la que crea el administrador no lo dice", !aviso.cuerpo.includes(DE_CAMPO));
+
+  console.log("\nEl aviso de una cotización nueva: cómo viaja\n");
+
+  peticiones.length = 0;
+  const avisoEnviado = await enviarCorreo({
+    para: ["administracion@ejemplo.com", "buzon@ejemplo.com"],
+    ...aviso,
+    nombreRemitente: "Eng Supports",
+  });
+  const crudo = peticiones[1]?.cuerpo ?? "";
+  const corte = crudo.indexOf("\r\n\r\n");
+  const cabecerasAviso = new Map(
+    crudo
+      .slice(0, corte)
+      .split("\r\n")
+      .map((linea) => [linea.slice(0, linea.indexOf(": ")), linea.slice(linea.indexOf(": ") + 2)] as const),
+  );
+  const textoAviso = Buffer.from(crudo.slice(corte + 4).replace(/\s+/g, ""), "base64").toString("utf8");
+
+  comprobar(
+    "sale, por el mismo punto de subida que el reporte",
+    avisoEnviado.ok &&
+      peticiones[1]?.url ===
+        "https://gmail.googleapis.com/upload/gmail/v1/users/me/messages/send?uploadType=media",
+  );
+  comprobar(
+    "va a los dos destinatarios, a la vista, sin copias",
+    cabecerasAviso.get("To") === "administracion@ejemplo.com, buzon@ejemplo.com" &&
+      !cabecerasAviso.has("Cc") &&
+      !cabecerasAviso.has("Bcc"),
+    cabecerasAviso.get("To") ?? "sin To",
+  );
+  comprobar(
+    "es solo texto: ni adjunto ni partes",
+    (cabecerasAviso.get("Content-Type") ?? "").startsWith("text/plain") &&
+      !crudo.includes("multipart") &&
+      !crudo.includes("application/pdf"),
+    cabecerasAviso.get("Content-Type") ?? "sin Content-Type",
+  );
+  comprobar("el texto llega igual, con sus tildes y sus renglones", textoAviso === aviso.cuerpo);
+  const asuntoAviso = /^=\?UTF-8\?B\?(.+)\?=$/.exec(cabecerasAviso.get("Subject") ?? "")?.[1] ?? "";
+  comprobar(
+    "el asunto llega con su tilde y su eñe",
+    Buffer.from(asuntoAviso, "base64").toString("utf8") === aviso.asunto,
+  );
+  comprobar(
+    "contraste: el correo del reporte sigue llevando su adjunto",
+    (await enviarCorreoConAdjunto(datos)).ok && (peticiones.at(-1)?.cuerpo ?? "").includes("application/pdf"),
+  );
+
+  console.log("\nEl aviso de una cotización nueva: lo que queda anotado\n");
+
+  const anotado = leerAviso(
+    JSON.stringify({ ok: true, para: ["a@ejemplo.com", "b@ejemplo.com"], cuando: "2026-10-13T14:12:05.000Z" }),
+  );
+  comprobar(
+    "un aviso que salió se vuelve a leer con sus destinatarios y su hora",
+    anotado?.ok === true && anotado.para.length === 2 && anotado.cuando === "2026-10-13T14:12:05.000Z",
+  );
+  const fallido = leerAviso(JSON.stringify({ ok: false, causa: "Gmail: HTTP 400", cuando: "2026-10-13T14:12:05.000Z" }));
+  comprobar(
+    "uno que no salió, con su causa",
+    fallido?.ok === false && fallido.causa === "Gmail: HTTP 400",
+  );
+  comprobar(
+    "lo que no es un aviso se lee como \"sin aviso\": no tumba la pantalla de la cotización",
+    leerAviso(null) === null &&
+      leerAviso("{roto") === null &&
+      leerAviso('{"ok":true}') === null &&
+      leerAviso('"texto"') === null,
   );
 
   console.log("\nCuando no sale, queda dicho por qué\n");

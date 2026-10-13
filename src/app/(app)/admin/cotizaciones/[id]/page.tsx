@@ -5,14 +5,17 @@ import { getTranslations } from "next-intl/server";
 import {
   cambiarEstadoCotizacionAction,
   marcarCotizacionRevisadaAction,
+  reenviarAvisoCotizacionAction,
 } from "@/actions/quotes";
 import {
   CambiarEstadoCotizacion,
   MarcarRevisadaBoton,
+  ReenviarAvisoBoton,
 } from "@/components/admin/quote-actions";
 import { QuoteStatusBadge } from "@/components/admin/quote-status-badge";
 import { Saludo } from "@/components/saludo";
 import { requireAdmin } from "@/lib/auth-guard";
+import { leerAviso } from "@/lib/aviso-cotizacion";
 import { esEstadoActivo } from "@/lib/cotizaciones";
 import { formatFechaLarga, formatInstante } from "@/lib/fechas";
 import { formatearMonto } from "@/lib/moneda";
@@ -46,6 +49,7 @@ export default async function DetalleCotizacionPage({ params }: Params) {
   ]);
 
   const firmados = reportes.filter((r) => r.tieneFirma).length;
+  const aviso = leerAviso(cotizacion.creationNotice);
 
   return (
     <>
@@ -111,6 +115,28 @@ export default async function DetalleCotizacionPage({ params }: Params) {
             <p className="mt-4 text-xs text-muted">
               {t("avisoFirmados", { count: firmados })}
             </p>
+          ) : null}
+
+          {/* El aviso por correo de que se creó: a quién salió, o que no salió
+              y cómo repetirlo. Las anteriores al aviso no muestran nada. */}
+          {aviso?.ok ? (
+            <p className="mt-4 break-words text-xs text-muted">
+              {t("avisoEnviado", {
+                correos: aviso.para.join(", "),
+                fecha: formatInstante(new Date(aviso.cuando)),
+              })}
+            </p>
+          ) : null}
+          {aviso && !aviso.ok ? (
+            <div className="mt-4 space-y-2 rounded-xl border border-danger/30 bg-danger/10 px-4 py-3">
+              <p role="alert" className="text-sm text-danger">
+                {t("avisoNoSalio", { fecha: formatInstante(new Date(aviso.cuando)) })}
+              </p>
+              <p className="text-xs text-muted">
+                {t("detalleTecnico", { detalle: aviso.causa })}
+              </p>
+              <ReenviarAvisoBoton action={reenviarAvisoCotizacionAction.bind(null, id)} />
+            </div>
           ) : null}
 
           <div className="mt-6 flex flex-wrap items-center gap-3 border-t border-border pt-4">

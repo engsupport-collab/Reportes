@@ -536,7 +536,15 @@
     "firmado": "Assinado",
     "sinFirmar": "Sem assinatura",
     "crearReporte": "Criar relatório com esta cotação",
-    "noActivaAviso": "Esta cotação não está ativa: mude o status para pendente de autorização ou em andamento para poder criar relatórios a partir dela."
+    "noActivaAviso": "Esta cotação não está ativa: mude o status para pendente de autorização ou em andamento para poder criar relatórios a partir dela.",
+    "avisoEnviado": "Aviso de criação enviado para {correos} · {fecha}",
+    "avisoNoSalio": "O aviso de criação por e-mail não saiu · {fecha}",
+    "reenviarAviso": "Enviar o aviso",
+    "enviandoAviso": "Enviando…",
+    "avisoReenviado": "Aviso enviado.",
+    "avisoSigueSinSalir": "O aviso não saiu. Tente de novo em instantes.",
+    "detalleTecnico": "Detalhe técnico: {detalle}",
+    "sinConexion": "Sem conexão. Verifique o sinal e tente de novo."
   },
   "quoteSelector": {
     "label": "Cotação",

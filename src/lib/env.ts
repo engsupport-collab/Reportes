@@ -99,6 +99,21 @@ const envSchema = z.object({
   GMAIL_CC_EMAIL: z
     .union([z.literal(""), z.string().email("GMAIL_CC_EMAIL debe ser un correo válido")])
     .optional(),
+  // A quién se le avisa cuando se crea una cotización, separados por comas.
+  // Tampoco hace falta definirla: sin ella va a administración y al buzón que
+  // envía (ver `destinatariosDeAvisos` en `src/lib/gmail.ts`). Vacía, no se
+  // avisa a nadie — así debe estar en desarrollo.
+  GMAIL_NOTIFY_EMAILS: z
+    .string()
+    .refine(
+      (valor) =>
+        valor
+          .split(/[,;\s]+/)
+          .filter(Boolean)
+          .every((correo) => z.string().email().safeParse(correo).success),
+      "GMAIL_NOTIFY_EMAILS debe ser una lista de correos separados por comas",
+    )
+    .optional(),
 })
   /**
    * Un modo de conexión u otro, pero completo.

@@ -536,7 +536,15 @@
     "firmado": "Signed",
     "sinFirmar": "Unsigned",
     "crearReporte": "Create report with this quote",
-    "noActivaAviso": "This quote isn't active: set its status to pending authorization or in progress to create reports from it."
+    "noActivaAviso": "This quote isn't active: set its status to pending authorization or in progress to create reports from it.",
+    "avisoEnviado": "Creation notice sent to {correos} · {fecha}",
+    "avisoNoSalio": "The creation notice email did not go out · {fecha}",
+    "reenviarAviso": "Send the notice",
+    "enviandoAviso": "Sending…",
+    "avisoReenviado": "Notice sent.",
+    "avisoSigueSinSalir": "The notice did not go out. Try again in a moment.",
+    "detalleTecnico": "Technical detail: {detalle}",
+    "sinConexion": "No connection. Check your signal and try again."
   },
   "quoteSelector": {
     "label": "Quote",

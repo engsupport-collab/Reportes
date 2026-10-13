@@ -173,38 +173,89 @@ export function copiaPara(destinatario: string): string | null {
   });
 }
 
+/**
+ * A quién se le avisa de lo que pasa puertas adentro —hoy, que se creó una
+ * cotización—, o nadie si la lista queda vacía.
+ *
+ * Sin nada configurado: al buzón de administración del dominio desde el que se
+ * envía y al buzón que envía, que son los dos que pidió el cliente. Tampoco
+ * aquí están escritas las direcciones, por lo mismo que la de la copia.
+ * `configurados` (la variable `GMAIL_NOTIFY_EMAILS`, separados por comas) los
+ * sustituye por otros o, vacía, apaga los avisos — así va en desarrollo.
+ */
+export function resolverAvisos(opciones: {
+  configurados: string | undefined;
+  remitente: string | undefined;
+  buzon: string | undefined;
+}): string[] {
+  const dominio = opciones.remitente?.split("@")[1];
+  const candidatos =
+    opciones.configurados !== undefined
+      ? opciones.configurados.split(/[,;\s]+/)
+      : [dominio ? `${BUZON_DE_COPIA}@${dominio}` : "", opciones.buzon ?? ""];
+
+  const vistos = new Set<string>();
+  return candidatos
+    .map((correo) => correo.trim())
+    .filter((correo) => {
+      const clave = correo.toLowerCase();
+      if (!correo.includes("@") || vistos.has(clave)) return false;
+      vistos.add(clave);
+      return true;
+    });
+}
+
+/** Los destinatarios de los avisos internos, con la configuración de este entorno. */
+export function destinatariosDeAvisos(): string[] {
+  return resolverAvisos({
+    configurados: env.GMAIL_NOTIFY_EMAILS,
+    remitente: env.GMAIL_SENDER_EMAIL,
+    buzon: env.GMAIL_IMPERSONATE_EMAIL,
+  });
+}
+
 function construirMensaje(opciones: {
   de: string;
-  para: string;
+  para: string[];
   copia: string | null;
   asunto: string;
   cuerpo: string;
-  pdf: Uint8Array;
-  nombreArchivo: string;
+  /** Sin adjunto el mensaje es solo su texto, no un sobre con una sola parte. */
+  adjunto?: { pdf: Uint8Array; nombreArchivo: string };
 }): string {
-  const limite = `limite_${crypto.randomUUID()}`;
-
-  return [
+  const cabeceras = [
     `From: ${opciones.de}`,
-    `To: ${opciones.para}`,
+    `To: ${opciones.para.join(", ")}`,
     ...(opciones.copia ? [`Cc: ${opciones.copia}`] : []),
     `Subject: ${asuntoCodificado(opciones.asunto)}`,
     "MIME-Version: 1.0",
-    `Content-Type: multipart/mixed; boundary="${limite}"`,
-    "",
-    `--${limite}`,
+  ];
+  const texto = [
     'Content-Type: text/plain; charset="UTF-8"',
     // El cuerpo también va en base64: lleva tildes, y "7bit" solo admite ASCII.
     "Content-Transfer-Encoding: base64",
     "",
     base64Envuelto(opciones.cuerpo),
+  ];
+
+  if (!opciones.adjunto) return [...cabeceras, ...texto].join("\r\n");
+
+  const limite = `limite_${crypto.randomUUID()}`;
+  const { pdf, nombreArchivo } = opciones.adjunto;
+
+  return [
+    ...cabeceras,
+    `Content-Type: multipart/mixed; boundary="${limite}"`,
     "",
     `--${limite}`,
-    `Content-Type: application/pdf; name="${opciones.nombreArchivo}"`,
-    `Content-Disposition: attachment; filename="${opciones.nombreArchivo}"`,
+    ...texto,
+    "",
+    `--${limite}`,
+    `Content-Type: application/pdf; name="${nombreArchivo}"`,
+    `Content-Disposition: attachment; filename="${nombreArchivo}"`,
     "Content-Transfer-Encoding: base64",
     "",
-    base64Envuelto(opciones.pdf),
+    base64Envuelto(pdf),
     "",
     `--${limite}--`,
   ].join("\r\n");
@@ -216,6 +267,27 @@ export function correoConfigurado(): boolean {
     env.GMAIL_SERVICE_ACCOUNT_JSON &&
       env.GMAIL_IMPERSONATE_EMAIL &&
       env.GMAIL_SENDER_EMAIL,
+  );
+}
+
+/**
+ * Un correo de solo texto a uno o varios destinatarios: los avisos internos.
+ * Igual que el del reporte, devuelve si salió en vez de lanzar.
+ */
+export async function enviarCorreo(opciones: {
+  para: string[];
+  asunto: string;
+  cuerpo: string;
+  nombreRemitente: string;
+}): Promise<ResultadoEnvio> {
+  return despachar(() =>
+    construirMensaje({
+      de: `"${opciones.nombreRemitente}" <${env.GMAIL_SENDER_EMAIL}>`,
+      para: opciones.para,
+      copia: null,
+      asunto: opciones.asunto,
+      cuerpo: opciones.cuerpo,
+    }),
   );
 }
 
@@ -233,18 +305,24 @@ export async function enviarCorreoConAdjunto(opciones: {
   nombreArchivo: string;
   nombreRemitente: string;
 }): Promise<ResultadoEnvio> {
-  try {
-    const accessToken = await obtenerAccessToken();
-
-    const mensaje = construirMensaje({
+  return despachar(() =>
+    construirMensaje({
       de: `"${opciones.nombreRemitente}" <${env.GMAIL_SENDER_EMAIL}>`,
-      para: opciones.para,
+      para: [opciones.para],
       copia: opciones.copia ?? null,
       asunto: opciones.asunto,
       cuerpo: opciones.cuerpo,
-      pdf: opciones.pdf,
-      nombreArchivo: opciones.nombreArchivo,
-    });
+      adjunto: { pdf: opciones.pdf, nombreArchivo: opciones.nombreArchivo },
+    }),
+  );
+}
+
+/** Pide el permiso a Google y entrega el mensaje. Nunca lanza: dice por qué no salió. */
+async function despachar(armar: () => string): Promise<ResultadoEnvio> {
+  try {
+    const accessToken = await obtenerAccessToken();
+
+    const mensaje = armar();
 
     const respuesta = await fetch(URL_ENVIO, {
       method: "POST",

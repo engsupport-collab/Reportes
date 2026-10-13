@@ -536,7 +536,15 @@
     "firmado": "Firmado",
     "sinFirmar": "Sin firmar",
     "crearReporte": "Crear reporte con esta cotización",
-    "noActivaAviso": "Esta cotización no está activa: pon el estado en pendiente por autorización o en curso para poder crear reportes desde ella."
+    "noActivaAviso": "Esta cotización no está activa: pon el estado en pendiente por autorización o en curso para poder crear reportes desde ella.",
+    "avisoEnviado": "Aviso de creación enviado a {correos} · {fecha}",
+    "avisoNoSalio": "El aviso de creación por correo no salió · {fecha}",
+    "reenviarAviso": "Enviar el aviso",
+    "enviandoAviso": "Enviando…",
+    "avisoReenviado": "Aviso enviado.",
+    "avisoSigueSinSalir": "El aviso no salió. Vuelve a intentarlo en un momento.",
+    "detalleTecnico": "Detalle técnico: {detalle}",
+    "sinConexion": "No hay conexión. Revisa la señal y vuelve a intentarlo."
   },
   "quoteSelector": {
     "label": "Cotización",

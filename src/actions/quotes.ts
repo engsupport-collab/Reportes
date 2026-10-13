@@ -4,10 +4,12 @@ import { and, eq, isNull } from "drizzle-orm";
 import { getTranslations } from "next-intl/server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { after } from "next/server";
 
 import { db } from "@/db";
 import { quotes, reports } from "@/db/schema";
 import { requireAccesoReportes, requireAdmin } from "@/lib/auth-guard";
+import { avisarCotizacionCreada } from "@/lib/correo-cotizacion";
 import { esEstadoActivo } from "@/lib/cotizaciones";
 import { obtenerClienteActivoDeEmpresa } from "@/lib/queries/clients";
 import { listarEmpresas } from "@/lib/queries/companies";
@@ -32,6 +34,17 @@ export type CotizacionState = {
    */
   creada?: { id: string; projectName: string; clientName: string };
 };
+
+/**
+ * Deja programado el aviso por correo de una cotización recién creada.
+ *
+ * Sale con `after`, cuando la respuesta ya se envió: quien la creó no espera
+ * a Google, y si el correo falla la cotización ya está guardada igual. El
+ * resultado queda anotado en la propia cotización y se ve en su detalle.
+ */
+function avisarDespues(id: string) {
+  after(() => avisarCotizacionCreada(id));
+}
 
 /** Invalida la caché de las pantallas donde puede aparecer esta cotización. */
 function revalidarListas(id?: string) {
@@ -146,6 +159,8 @@ export async function crearCotizacionAction(
     }
     throw error;
   }
+
+  avisarDespues(id);
 
   revalidarListas();
   redirect(`/admin/cotizaciones/${id}`);
@@ -333,12 +348,36 @@ export async function crearCotizacionCampoAction(
     revisada: false,
   });
 
+  // También la que nace en campo: es la que más falta le hace al plan de la
+  // semana, porque todavía nadie de la oficina la ha visto.
+  avisarDespues(id);
+
   revalidatePath("/reportes/nuevo");
   revalidatePath("/admin/cotizaciones");
 
   return {
     creada: { id, projectName: parsed.data.projectName, clientName: cliente.name },
   };
+}
+
+export type AvisoState = { error?: string; ok?: string };
+
+/**
+ * Vuelve a mandar el aviso de creación de una cotización. Existe para cuando
+ * el primero no salió: sin esto, esa cotización se quedaría fuera del correo
+ * con el que se arma el plan de la semana.
+ */
+export async function reenviarAvisoCotizacionAction(id: string): Promise<AvisoState> {
+  await requireAdmin();
+  const t = await getTranslations("cotizacionDetail");
+
+  const cotizacion = await obtenerCotizacion(id);
+  if (!cotizacion) return { error: t("avisoSigueSinSalir") };
+
+  const aviso = await avisarCotizacionCreada(id);
+  revalidatePath(`/admin/cotizaciones/${id}`);
+
+  return aviso?.ok ? { ok: t("avisoReenviado") } : { error: t("avisoSigueSinSalir") };
 }
 
 /**

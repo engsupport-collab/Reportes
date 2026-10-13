@@ -29,6 +29,13 @@
       "when": 1791474160779,
       "tag": "0003_idioma_del_reporte",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1791911967357,
+      "tag": "0004_aviso_de_cotizacion",
+      "breakpoints": true
     }
   ]
 }
