@@ -317,6 +317,8 @@ async function main() {
     amount: 1200000,
     creationNotice: null,
     finalizedAt: null,
+    finalizacionRegistradaPor: null,
+    finalizacionRegistradaEl: null,
     createdByName: "José Pérez",
     updatedAt: new Date("2026-10-13T14:12:00Z"),
   };

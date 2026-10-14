@@ -57,13 +57,13 @@ function mesDeBogota(fecha: Date): string {
 async function main() {
   const { db } = await import("../src/db");
   const { clients, companies, quotes, users } = await import("../src/db/schema");
-  const { inArray, like } = await import("drizzle-orm");
+  const { eq, inArray, like, ne } = await import("drizzle-orm");
   const q = await import("../src/lib/queries/quotes");
   const { serieCotizacionesFinalizadas } = await import("../src/lib/queries/analytics");
   const { aFiltrosDeConsulta, leerFiltrosCotizaciones } = await import(
     "../src/lib/filtros-cotizaciones"
   );
-  const { inicioDelDia, sumarDias, ultimosMeses } = await import("../src/lib/fechas");
+  const { aValorInput, inicioDelDia, sumarDias, ultimosMeses } = await import("../src/lib/fechas");
   const { aCsv } = await import("../src/lib/csv");
   const { csvDeCotizaciones, filasDeExportacion } = await import("../src/lib/exportar-cotizaciones");
 
@@ -404,7 +404,7 @@ async function main() {
       await q.listarCotizacionesParaExportar(aFiltrosDeConsulta(leer({ empresa: "saas" })))
     ).items.filter((c) => c.id === ids.historica || c.id === ids.facturarConFecha);
     const textos = {
-      encabezados: Array.from({ length: 12 }, (_, i) => `col${i}`),
+      encabezados: Array.from({ length: 14 }, (_, i) => `col${i}`),
       estado: (e: string) => `estado:${e}`,
       sinFechaRegistrada: "Sin fecha registrada",
       si: "Sí",
@@ -478,8 +478,8 @@ async function main() {
     const normal = { ...hoyEnLista!, quoteNumber: "Q-9", projectName: "Línea 2 (bis)", clientName: "ACME", purchaseOrderNo: "4500" };
     const leidas = leerCsv(csvDeCotizaciones([...conTrampas, normal], textos).slice(1));
     comprobar(
-      "el archivo se lee de vuelta con 12 columnas en cada fila",
-      leidas.length === 1 + PELIGROSOS.length + 1 && leidas.every((f) => f.length === 12),
+      "el archivo se lee de vuelta con 14 columnas en cada fila",
+      leidas.length === 1 + PELIGROSOS.length + 1 && leidas.every((f) => f.length === 14),
       leidas.map((f) => f.length).join(","),
     );
     comprobar(
@@ -574,6 +574,181 @@ async function main() {
     comprobar(
       "la numeración automática también guarda la fecha si nace finalizada",
       cerca(await fecha(nacidaFinalizada), antes, Date.now()) && (await fecha(nacidaEnCurso)) === null,
+    );
+
+    console.log("\nFecha de finalización registrada a mano\n");
+
+    const registro = async (id: string) => {
+      const c = await q.obtenerCotizacion(id);
+      return {
+        fin: c?.finalizedAt ?? null,
+        por: c?.finalizacionRegistradaPor ?? null,
+        el: c?.finalizacionRegistradaEl ?? null,
+      };
+    };
+    const [{ nombre: nombreAutor }] = await db
+      .select({ nombre: users.fullName })
+      .from(users)
+      .where(eq(users.id, autor.id));
+    const iso = (d: Date | null) => d?.toISOString() ?? null;
+
+    const declarada = await crear({ nombre: "histórica a la que se le registra la fecha", finalizadaEl: null });
+    const sinFechaAntes = await q.contarFinalizadasSinFecha("saas");
+    antes = Date.now();
+    const r1 = await q.registrarFechaDeFinalizacion({ id: declarada, fecha: "2025-08-20", userId: autor.id });
+    const reg1 = await registro(declarada);
+    comprobar(
+      "registrarla guarda el día declarado, quién lo escribió y cuándo",
+      "ok" in r1 &&
+        iso(reg1.fin) === "2025-08-20T12:00:00.000Z" &&
+        reg1.por === nombreAutor &&
+        cerca(reg1.el, antes, Date.now()),
+      `${iso(reg1.fin)} por ${reg1.por}`,
+    );
+    comprobar(
+      "la fecha declarada y el momento del registro se guardan por separado",
+      reg1.fin !== null && reg1.el !== null && reg1.fin.getTime() !== reg1.el.getTime(),
+    );
+    comprobar(
+      "deja de contarse entre las finalizadas sin fecha",
+      (await q.contarFinalizadasSinFecha("saas")) === sinFechaAntes - 1,
+    );
+    comprobar(
+      "entra en un rango que incluye ese día, y no en uno que no",
+      (await saas({ finalizadas: "rango", desde: "2025-08-20", hasta: "2025-08-20" })).includes(declarada) &&
+        !(await saas({ finalizadas: "rango", desde: "2025-08-21", hasta: "2025-08-31" })).includes(declarada),
+    );
+
+    await new Promise((r) => setTimeout(r, 1100));
+    const r2 = await q.registrarFechaDeFinalizacion({ id: declarada, fecha: "2025-08-25", userId: autor.id });
+    const reg2 = await registro(declarada);
+    comprobar(
+      "corregirla cambia el día y renueva el momento del registro",
+      "ok" in r2 && iso(reg2.fin) === "2025-08-25T12:00:00.000Z" && reg2.el!.getTime() > reg1.el!.getTime(),
+    );
+
+    // Registrar o corregir no toca el estado ni nada más de la cotización:
+    // solo la fecha, quién y cuándo, y la marca de última edición.
+    const filaCruda = async (id: string) => {
+      const [f] = await db.select().from(quotes).where(eq(quotes.id, id));
+      const resto: Record<string, unknown> = { ...f! };
+      for (const k of ["finalizedAt", "finalizedAtSetBy", "finalizedAtSetAt", "updatedAt", "updatedBy"]) delete resto[k];
+      return JSON.stringify(resto);
+    };
+    const intacta = await crear({ nombre: "histórica: lo demás no se toca", finalizadaEl: null, monto: 777 });
+    const antesDeRegistrar = await filaCruda(intacta);
+    await q.registrarFechaDeFinalizacion({ id: intacta, fecha: "2025-07-10", userId: autor.id });
+    const despuesDeRegistrar = await filaCruda(intacta);
+    await q.registrarFechaDeFinalizacion({ id: intacta, fecha: "2025-07-11", userId: autor.id });
+    const despuesDeCorregir = await filaCruda(intacta);
+    comprobar(
+      "registrar y corregir no cambian el estado ni ninguna otra columna de la cotización",
+      antesDeRegistrar === despuesDeRegistrar && despuesDeRegistrar === despuesDeCorregir &&
+        JSON.parse(despuesDeCorregir).status === "finalizada",
+    );
+
+    // Corregida por otra persona: el registro pasa a ser de ella, y la fecha
+    // declarada sigue separada del momento en que se escribió.
+    const [otraPersona] = await db
+      .select({ id: users.id, nombre: users.fullName })
+      .from(users)
+      .where(ne(users.id, autor.id))
+      .limit(1);
+    if (otraPersona) {
+      const regAntes = await registro(intacta);
+      await new Promise((r) => setTimeout(r, 1100));
+      await q.registrarFechaDeFinalizacion({ id: intacta, fecha: "2025-07-12", userId: otraPersona.id });
+      const regOtra = await registro(intacta);
+      comprobar(
+        "si otra persona la corrige, el registro pasa a su nombre y a ese momento",
+        regAntes.por === nombreAutor &&
+          regOtra.por === otraPersona.nombre &&
+          regOtra.el!.getTime() > regAntes.el!.getTime() &&
+          iso(regOtra.fin) === "2025-07-12T12:00:00.000Z",
+        `${regAntes.por} -> ${regOtra.por}`,
+      );
+      comprobar(
+        "tras la corrección, la fecha declarada y el momento del registro siguen siendo distintos",
+        regOtra.fin!.getTime() !== regOtra.el!.getTime() && regOtra.fin!.getTime() < regOtra.el!.getTime(),
+      );
+    } else {
+      comprobar("hace falta un segundo usuario en la base para probar la corrección por otra persona", false);
+    }
+
+    const r3 = await q.registrarFechaDeFinalizacion({ id: t1, fecha: "2025-09-01", userId: autor.id });
+    const reg3 = await registro(t1);
+    comprobar(
+      "también se corrige una fecha que puso el sistema, y queda marcada como escrita a mano",
+      "ok" in r3 && iso(reg3.fin) === "2025-09-01T12:00:00.000Z" && reg3.el !== null && reg3.por === nombreAutor,
+    );
+
+    const ahoraMismo = new Date();
+    const mananaTexto = aValorInput(sumarDias(ahoraMismo, 1));
+    const hoyTexto = aValorInput(ahoraMismo);
+    const futura = await q.registrarFechaDeFinalizacion({ id: declarada, fecha: mananaTexto, userId: autor.id });
+    const malas = await Promise.all(
+      ["2025-02-30", "abc", "1999-12-31", "", "2025-8-1"].map((f) =>
+        q.registrarFechaDeFinalizacion({ id: declarada, fecha: f, userId: autor.id }),
+      ),
+    );
+    const enCursoSinFecha = await crear({ nombre: "en curso: no admite fecha de finalización", estado: "en_curso" });
+    const noFinalizada = await q.registrarFechaDeFinalizacion({ id: enCursoSinFecha, fecha: "2025-08-20", userId: autor.id });
+    const reg4 = await registro(declarada);
+    comprobar("una fecha futura se rechaza", "error" in futura && futura.error === "fechaFutura", mananaTexto);
+    comprobar(
+      "fechas imposibles, mal escritas, vacías o anteriores al 2000 se rechazan",
+      malas.every((r) => "error" in r && r.error === "fechaInvalida"),
+    );
+    comprobar(
+      "una cotización que no está finalizada no recibe fecha",
+      "error" in noFinalizada && noFinalizada.error === "noFinalizada" && (await registro(enCursoSinFecha)).fin === null,
+    );
+    comprobar(
+      "los intentos rechazados no tocaron la fecha guardada ni su registro",
+      iso(reg4.fin) === iso(reg2.fin) && iso(reg4.el) === iso(reg2.el),
+    );
+    const deHoy = await crear({ nombre: "histórica a la que se le registra hoy", finalizadaEl: null });
+    comprobar(
+      "contraste: el día de hoy sí se acepta",
+      "ok" in (await q.registrarFechaDeFinalizacion({ id: deHoy, fecha: hoyTexto, userId: autor.id })),
+      hoyTexto,
+    );
+
+    await q.cambiarEstadoDeCotizacion({ id: declarada, estado: "finalizada", userId: autor.id });
+    const reg5 = await registro(declarada);
+    comprobar(
+      "volver a elegir finalizada conserva la fecha escrita a mano y su registro",
+      iso(reg5.fin) === iso(reg4.fin) && iso(reg5.el) === iso(reg4.el) && reg5.por === reg4.por,
+    );
+    await q.cambiarEstadoDeCotizacion({ id: declarada, estado: "facturar", userId: autor.id });
+    const reg6 = await registro(declarada);
+    comprobar(
+      "al salir de finalizada se borran la fecha y su registro",
+      reg6.fin === null && reg6.el === null && reg6.por === null,
+    );
+    antes = Date.now();
+    await q.cambiarEstadoDeCotizacion({ id: declarada, estado: "finalizada", userId: autor.id });
+    const reg7 = await registro(declarada);
+    comprobar(
+      "al finalizarla otra vez, la fecha es la del sistema y ya no figura como escrita a mano",
+      cerca(reg7.fin, antes, Date.now()) && reg7.el === null && reg7.por === null,
+    );
+
+    const [t1EnLista] = (
+      await q.listarCotizacionesParaExportar(aFiltrosDeConsulta(leer({ empresa: "saas" })))
+    ).items.filter((c) => c.id === t1);
+    const filaManual = filasDeExportacion([t1EnLista!], textos)[0]!;
+    comprobar(
+      "en el archivo, una fecha escrita a mano va solo con el día, y al final quién y cuándo",
+      filaManual.length === 14 &&
+        filaManual[10] === "2025-09-01" &&
+        filaManual[12] === nombreAutor &&
+        /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(String(filaManual[13])),
+      `${filaManual[10]} | ${filaManual[12]} | ${filaManual[13]}`,
+    );
+    comprobar(
+      "contraste: una fecha del sistema lleva la hora, y las dos columnas del registro van vacías",
+      /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(String(filas[0]![10])) && filas[0]![12] === null && filas[0]![13] === null,
     );
 
     console.log("\nGráfica de finalizadas por mes\n");

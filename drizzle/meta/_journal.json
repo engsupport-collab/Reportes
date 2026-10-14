@@ -43,6 +43,13 @@
       "when": 1791988172878,
       "tag": "0005_fecha_de_finalizacion",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1792008668133,
+      "tag": "0006_fecha_de_finalizacion_registrada",
+      "breakpoints": true
     }
   ]
 }

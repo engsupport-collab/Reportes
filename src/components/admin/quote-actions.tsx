@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useActionState, useState, useTransition } from "react";
 import { useTranslations } from "next-intl";
 
-import type { AvisoState } from "@/actions/quotes";
+import type { AvisoState, FechaFinalizacionState } from "@/actions/quotes";
 import { ESTADOS_COTIZACION, type EstadoCotizacion } from "@/lib/cotizaciones";
 
 /** Cambia el estado de una cotización. Se envía apenas se elige, sin botón aparte. */
@@ -83,6 +83,101 @@ export function ReenviarAvisoBoton({
       ) : null}
       {resultado.ok ? <p className="text-sm text-success">{resultado.ok}</p> : null}
     </div>
+  );
+}
+
+/**
+ * Registrar o corregir a mano la fecha de finalización. Cerrado es solo el
+ * botón, para no estorbar en el detalle; abierto, el campo de fecha. Al
+ * guardar se cierra, y la página se vuelve a pintar con la fecha nueva: la
+ * acción invalida el detalle y la lista.
+ *
+ * `max` no deja elegir un día futuro en el calendario, pero la regla de
+ * verdad la aplica el servidor: esto solo ahorra un viaje.
+ */
+export function FechaFinalizacionForm({
+  action,
+  tieneFecha,
+  valorInicial,
+  hoy,
+  minimo,
+}: {
+  action: (estado: FechaFinalizacionState, formData: FormData) => Promise<FechaFinalizacionState>;
+  tieneFecha: boolean;
+  /** "AAAA-MM-DD" de la fecha actual, o vacío si no tiene. */
+  valorInicial: string;
+  /** Hoy en hora de Colombia, "AAAA-MM-DD". */
+  hoy: string;
+  minimo: string;
+}) {
+  const t = useTranslations("cotizacionDetail");
+  const [abierto, setAbierto] = useState(false);
+  const [estado, formAction, pendiente] = useActionState<FechaFinalizacionState, FormData>(
+    async (anterior, datos) => {
+      // Una petición que no llega lanza en vez de devolver un error; sin
+      // atraparla tumbaría la pantalla.
+      try {
+        const resultado = await action(anterior, datos);
+        if (resultado.guardada) setAbierto(false);
+        return resultado;
+      } catch {
+        return { error: t("sinConexion") };
+      }
+    },
+    {},
+  );
+
+  if (!abierto) {
+    return (
+      <button
+        type="button"
+        onClick={() => setAbierto(true)}
+        className="rounded-lg border border-border bg-surface px-3 py-1.5 text-xs font-medium text-text transition hover:border-brand hover:text-brand"
+      >
+        {tieneFecha ? t("corregirFechaFinalizacion") : t("registrarFechaFinalizacion")}
+      </button>
+    );
+  }
+
+  return (
+    <form action={formAction} className="space-y-2 rounded-xl border border-border bg-surface-muted p-3">
+      <label htmlFor="fechaFinalizacion" className="block text-xs font-medium text-muted">
+        {t("fechaFinalizacionLabel")}
+      </label>
+      <div className="flex flex-wrap items-center gap-2">
+        <input
+          id="fechaFinalizacion"
+          name="fechaFinalizacion"
+          type="date"
+          required
+          min={minimo}
+          max={hoy}
+          defaultValue={valorInicial}
+          className="rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text focus:border-brand focus:outline-none"
+        />
+        <button
+          type="submit"
+          disabled={pendiente}
+          className="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-strong disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {pendiente ? t("guardandoFecha") : t("guardarFecha")}
+        </button>
+        <button
+          type="button"
+          onClick={() => setAbierto(false)}
+          disabled={pendiente}
+          className="rounded-lg px-3 py-2 text-sm font-medium text-muted transition hover:text-text"
+        >
+          {t("cancelar")}
+        </button>
+      </div>
+      <p className="text-xs text-muted">{t("fechaFinalizacionAyuda")}</p>
+      {estado.error ? (
+        <p role="alert" className="text-sm text-danger">
+          {estado.error}
+        </p>
+      ) : null}
+    </form>
   );
 }
 

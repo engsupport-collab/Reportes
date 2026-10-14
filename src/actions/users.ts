@@ -167,9 +167,11 @@ export type EliminarUsuarioState = { error?: string };
  * siempre — que es exactamente lo que preserva el historial y la auditoría.
  *
  * Los rastros que sí se sueltan (`quotes.updatedBy`, `reports.updatedBy`,
- * `report_events.userId`) tienen `onDelete: "set null"` y ya se muestran con
- * un texto de reemplazo cuando faltan (ver `usuarioEliminado` en
- * `HistorialEstado`): perder ESE dato puntual no es perder el historial.
+ * `report_events.userId`, `quotes.finalizedAtSetBy`) tienen `onDelete: "set
+ * null"` y ya se muestran con un texto de reemplazo cuando faltan (ver
+ * `usuarioEliminado` en `HistorialEstado`, y "Registrada a mano el …" sin
+ * nombre en el detalle de una cotización): perder ESE dato puntual no es
+ * perder el historial — la fecha y el momento en que se registró se quedan.
  */
 export async function eliminarUsuarioAction(
   userId: string,

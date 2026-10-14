@@ -63,7 +63,7 @@ export async function QuoteList({ items }: { items: CotizacionEnLista[] }) {
                   </span>
                 </span>
               ) : c.status === "finalizada" ? (
-                <span title={t("sinFechaAyuda")}>
+                <span className="font-medium text-warning" title={t("sinFechaPendiente")}>
                   {t("colFinalizada")}: {t("sinFechaRegistrada")}
                 </span>
               ) : null}

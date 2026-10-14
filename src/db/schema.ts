@@ -303,6 +303,22 @@ export const quotes = pgTable(
      * filtros por fecha de finalización ni en la gráfica mensual.
      */
     finalizedAt: marcaDeTiempo("finalized_at"),
+    /**
+     * Quién escribió a mano la fecha de finalización (al registrarla o al
+     * corregirla) y cuándo lo hizo. Son datos distintos de `finalizedAt`: esa
+     * es la fecha que se declara —cuándo se finalizó de verdad—, y estos dicen
+     * quién la puso en el sistema y en qué momento. Así una fecha cargada
+     * después nunca se confunde con una que el sistema guardó al cambiar el
+     * estado.
+     *
+     * Null en los dos cuando la fecha la puso el sistema, o cuando no hay
+     * fecha. Se borran junto con la fecha si la cotización sale de
+     * "finalizada" (ver `cambiarEstadoDeCotizacion`).
+     */
+    finalizedAtSetBy: text("finalized_at_set_by").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    finalizedAtSetAt: marcaDeTiempo("finalized_at_set_at"),
 
     createdBy: text("created_by")
       .notNull()

@@ -6,9 +6,11 @@ import {
   cambiarEstadoCotizacionAction,
   marcarCotizacionRevisadaAction,
   reenviarAvisoCotizacionAction,
+  registrarFechaFinalizacionAction,
 } from "@/actions/quotes";
 import {
   CambiarEstadoCotizacion,
+  FechaFinalizacionForm,
   MarcarRevisadaBoton,
   ReenviarAvisoBoton,
 } from "@/components/admin/quote-actions";
@@ -17,9 +19,13 @@ import { Saludo } from "@/components/saludo";
 import { requireAdmin } from "@/lib/auth-guard";
 import { leerAviso } from "@/lib/aviso-cotizacion";
 import { esEstadoActivo } from "@/lib/cotizaciones";
-import { formatFechaLarga, formatInstante } from "@/lib/fechas";
+import { aValorInput, formatFechaLarga, formatInstante } from "@/lib/fechas";
 import { formatearMonto } from "@/lib/moneda";
-import { listarReportesDeCotizacion, obtenerCotizacion } from "@/lib/queries/quotes";
+import {
+  PRIMERA_FECHA_DE_FINALIZACION,
+  listarReportesDeCotizacion,
+  obtenerCotizacion,
+} from "@/lib/queries/quotes";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -97,16 +103,45 @@ export default async function DetalleCotizacionPage({ params }: Params) {
             <Dato etiqueta={t("creadaPor")} valor={cotizacion.createdByName} />
             <Dato etiqueta={t("creadaEl")} valor={formatInstante(cotizacion.createdAt)} />
             {/* Solo si está finalizada. Una que ya lo estaba antes de que se
-                guardara esta fecha lo dice, en vez de mostrar otra fecha. */}
+                guardara esta fecha lo dice, en vez de mostrar otra fecha, y
+                ofrece registrarla. Una fecha escrita a mano se muestra sin
+                hora —solo se conoce el día— y dice quién la puso y cuándo. */}
             {cotizacion.status === "finalizada" ? (
-              <Dato
-                etiqueta={t("finalizadaEl")}
-                valor={
-                  cotizacion.finalizedAt
-                    ? formatInstante(cotizacion.finalizedAt)
-                    : t("sinFechaFinalizacion")
-                }
-              />
+              <div className="sm:col-span-2">
+                <dt className="text-xs font-medium uppercase tracking-wide text-muted">
+                  {t("finalizadaEl")}
+                </dt>
+                <dd className="mt-1 space-y-2 text-sm text-text">
+                  {cotizacion.finalizedAt ? (
+                    <p>
+                      {cotizacion.finalizacionRegistradaEl
+                        ? formatFechaLarga(cotizacion.finalizedAt)
+                        : formatInstante(cotizacion.finalizedAt)}
+                    </p>
+                  ) : (
+                    <p className="font-medium text-warning">{t("sinFechaFinalizacion")}</p>
+                  )}
+                  {cotizacion.finalizedAt && cotizacion.finalizacionRegistradaEl ? (
+                    <p className="text-xs text-muted">
+                      {cotizacion.finalizacionRegistradaPor
+                        ? t("fechaRegistradaPor", {
+                            nombre: cotizacion.finalizacionRegistradaPor,
+                            fecha: formatInstante(cotizacion.finalizacionRegistradaEl),
+                          })
+                        : t("fechaRegistradaSinNombre", {
+                            fecha: formatInstante(cotizacion.finalizacionRegistradaEl),
+                          })}
+                    </p>
+                  ) : null}
+                  <FechaFinalizacionForm
+                    action={registrarFechaFinalizacionAction.bind(null, id)}
+                    tieneFecha={Boolean(cotizacion.finalizedAt)}
+                    valorInicial={cotizacion.finalizedAt ? aValorInput(cotizacion.finalizedAt) : ""}
+                    hoy={aValorInput(new Date())}
+                    minimo={PRIMERA_FECHA_DE_FINALIZACION}
+                  />
+                </dd>
+              </div>
             ) : null}
           </dl>
 

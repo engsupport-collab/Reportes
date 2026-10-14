@@ -1,6 +1,7 @@
 import "server-only";
 
 import { type SQL, and, desc, eq, gte, ilike, isNull, lt, or, sql } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 
 import { db } from "@/db";
 import {
@@ -23,7 +24,15 @@ import {
   type PeriodoFinalizacion,
   leerPagina,
 } from "@/lib/filtros-cotizaciones";
+import { aValorInput, parseFechaISO } from "@/lib/fechas";
 import type { Moneda } from "@/lib/moneda";
+
+/**
+ * `users` otra vez, con otro nombre: quien registró a mano la fecha de
+ * finalización. Hace falta un alias porque el detalle ya une `users` para
+ * quien creó la cotización.
+ */
+const registrador = alias(users, "registrador_finalizacion");
 
 /**
  * Consultas de cotizaciones.
@@ -92,6 +101,13 @@ export type CotizacionEnLista = {
    * desde antes de que existiera el dato ("sin fecha registrada").
    */
   finalizedAt: Date | null;
+  /**
+   * Si esa fecha se escribió a mano (al registrarla o corregirla): quién y
+   * cuándo. Null en los dos si la puso el sistema al cambiar el estado, o si
+   * no hay fecha. El nombre también queda null si ese usuario ya no existe.
+   */
+  finalizacionRegistradaPor: string | null;
+  finalizacionRegistradaEl: Date | null;
 };
 
 export type FiltrosCotizaciones = {
@@ -191,6 +207,8 @@ const COLUMNAS_LISTA = {
   revisada: quotes.revisada,
   createdAt: quotes.createdAt,
   finalizedAt: quotes.finalizedAt,
+  finalizacionRegistradaPor: registrador.fullName,
+  finalizacionRegistradaEl: quotes.finalizedAtSetAt,
 };
 
 /** Página de cotizaciones para el panel del admin, con sus filtros. */
@@ -211,6 +229,7 @@ export async function listarCotizaciones(filtros: FiltrosCotizaciones): Promise<
       .from(quotes)
       .innerJoin(companies, eq(companies.id, quotes.companyId))
       .innerJoin(clients, eq(clients.id, quotes.clientId))
+      .leftJoin(registrador, eq(registrador.id, quotes.finalizedAtSetBy))
       .where(where)
       .orderBy(...ordenSql(filtros.orden))
       .limit(POR_PAGINA)
@@ -257,6 +276,7 @@ export async function listarCotizacionesParaExportar(
     .from(quotes)
     .innerJoin(companies, eq(companies.id, quotes.companyId))
     .innerJoin(clients, eq(clients.id, quotes.clientId))
+    .leftJoin(registrador, eq(registrador.id, quotes.finalizedAtSetBy))
     .where(construirWhere(filtros))
     .orderBy(...ordenSql(filtros.orden))
     .limit(TOPE_EXPORTACION + 1);
@@ -304,6 +324,8 @@ export async function obtenerCotizacion(
       revisada: quotes.revisada,
       creationNotice: quotes.creationNotice,
       finalizedAt: quotes.finalizedAt,
+      finalizacionRegistradaPor: registrador.fullName,
+      finalizacionRegistradaEl: quotes.finalizedAtSetAt,
       createdByName: users.fullName,
       createdAt: quotes.createdAt,
       updatedAt: quotes.updatedAt,
@@ -312,6 +334,7 @@ export async function obtenerCotizacion(
     .innerJoin(companies, eq(companies.id, quotes.companyId))
     .innerJoin(clients, eq(clients.id, quotes.clientId))
     .innerJoin(users, eq(users.id, quotes.createdBy))
+    .leftJoin(registrador, eq(registrador.id, quotes.finalizedAtSetBy))
     .where(eq(quotes.id, id))
     .limit(1);
 
@@ -470,6 +493,10 @@ export function fechaDeFinalizacionAlCrear(status: EstadoCotizacion): Date | nul
  *    no tenía fecha registrada sigue sin tenerla — no se inventa.
  *  - Sale de "finalizada": la fecha se borra; ya no está finalizada.
  *
+ * Quién y cuándo registró la fecha a mano (`finalizedAtSetBy`/`SetAt`) sigue
+ * a la fecha: se conserva si ya estaba finalizada, y se borra al entrar de
+ * nuevo (la fecha vuelve a ser la del sistema) o al salir.
+ *
  * La comparación con el estado anterior la hace la base dentro del mismo
  * UPDATE, no la aplicación leyendo antes: con dos cambios casi simultáneos,
  * leer y luego escribir podría tomar por transición lo que no lo es.
@@ -479,18 +506,73 @@ export async function cambiarEstadoDeCotizacion(datos: {
   estado: EstadoCotizacion;
   userId: string;
 }): Promise<void> {
+  const finaliza = datos.estado === "finalizada";
   await db
     .update(quotes)
     .set({
       status: datos.estado,
-      finalizedAt:
-        datos.estado === "finalizada"
-          ? sql`CASE WHEN ${quotes.status} = 'finalizada' THEN ${quotes.finalizedAt} ELSE now() END`
-          : null,
+      finalizedAt: finaliza
+        ? sql`CASE WHEN ${quotes.status} = 'finalizada' THEN ${quotes.finalizedAt} ELSE now() END`
+        : null,
+      finalizedAtSetBy: finaliza
+        ? sql`CASE WHEN ${quotes.status} = 'finalizada' THEN ${quotes.finalizedAtSetBy} END`
+        : null,
+      finalizedAtSetAt: finaliza
+        ? sql`CASE WHEN ${quotes.status} = 'finalizada' THEN ${quotes.finalizedAtSetAt} END`
+        : null,
       updatedAt: new Date(),
       updatedBy: datos.userId,
     })
     .where(eq(quotes.id, datos.id));
+}
+
+/** Desde cuándo se acepta una fecha de finalización escrita a mano: frena un año mal tecleado. */
+export const PRIMERA_FECHA_DE_FINALIZACION = "2000-01-01";
+
+export type ErrorFechaFinalizacion = "fechaInvalida" | "fechaFutura" | "noFinalizada";
+
+/**
+ * Registra o corrige a mano la fecha de finalización de una cotización
+ * finalizada: la que declara quien sabe cuándo se finalizó de verdad. Es para
+ * las que se finalizaron antes de que el sistema guardara el dato, y para
+ * corregir una que quedó mal.
+ *
+ * Guarda tres cosas distintas: la fecha declarada (`finalizedAt`, el día que
+ * se escribió, a la hora ancla de `parseFechaISO`), quién la escribió y en
+ * qué momento. La fecha declarada nunca se confunde así con el momento en que
+ * se cargó.
+ *
+ * Reglas: solo una cotización que está finalizada —el estado lo comprueba la
+ * base en el mismo UPDATE—; un día válido, no futuro en hora de Colombia, y
+ * desde `PRIMERA_FECHA_DE_FINALIZACION`. No se limita por la fecha de
+ * creación: muchas se cargaron al sistema después de haberse finalizado.
+ *
+ * NO comprueba permisos: quien llama exige que sea un administrador.
+ */
+export async function registrarFechaDeFinalizacion(datos: {
+  id: string;
+  fecha: string;
+  userId: string;
+  ahora?: Date;
+}): Promise<{ ok: true } | { error: ErrorFechaFinalizacion }> {
+  const valor = datos.fecha.trim();
+  const fecha = parseFechaISO(valor);
+  if (!fecha || valor < PRIMERA_FECHA_DE_FINALIZACION) return { error: "fechaInvalida" };
+  if (valor > aValorInput(datos.ahora ?? new Date())) return { error: "fechaFutura" };
+
+  const actualizadas = await db
+    .update(quotes)
+    .set({
+      finalizedAt: fecha,
+      finalizedAtSetBy: datos.userId,
+      finalizedAtSetAt: sql`now()`,
+      updatedAt: new Date(),
+      updatedBy: datos.userId,
+    })
+    .where(and(eq(quotes.id, datos.id), eq(quotes.status, "finalizada")))
+    .returning({ id: quotes.id });
+
+  return actualizadas.length === 1 ? { ok: true } : { error: "noFinalizada" };
 }
 
 /**

@@ -63,6 +63,8 @@ export async function GET(request: Request) {
       t("exportCreada"),
       t("exportFinalizada"),
       t("colRevisada"),
+      t("exportRegistradaPor"),
+      t("exportRegistradaEl"),
     ],
     estado: (estado) => tEstados(estado),
     sinFechaRegistrada: t("sinFechaRegistrada"),

@@ -367,7 +367,7 @@ async function main() {
     contenido[0] === 0xef &&
       contenido[1] === 0xbb &&
       contenido[2] === 0xbf &&
-      textoExportado.split("\r\n")[0]!.split(";").length === 12,
+      textoExportado.split("\r\n")[0]!.split(";").length === 14,
     textoExportado.split("\r\n")[0]!,
   );
 

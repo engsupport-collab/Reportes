@@ -19,6 +19,7 @@ import {
   fechaDeFinalizacionAlCrear,
   insertarCotizacionConNumeroAutomatico,
   obtenerCotizacion,
+  registrarFechaDeFinalizacion,
   sincronizarSecuenciaConNumero,
 } from "@/lib/queries/quotes";
 import {
@@ -360,6 +361,45 @@ export async function crearCotizacionCampoAction(
   return {
     creada: { id, projectName: parsed.data.projectName, clientName: cliente.name },
   };
+}
+
+export type FechaFinalizacionState = { error?: string; guardada?: boolean };
+
+/**
+ * Registra o corrige a mano la fecha de finalización de una cotización
+ * finalizada. Solo un administrador (`requireAdmin`), igual que el resto del
+ * detalle de cotizaciones. Las reglas de la fecha y de quién/cuándo se
+ * guardan viven en `registrarFechaDeFinalizacion`.
+ *
+ * Al guardar se invalidan la lista y el detalle: los filtros por fecha y la
+ * gráfica leen la misma columna, así que la cuentan desde la siguiente vista.
+ */
+export async function registrarFechaFinalizacionAction(
+  id: string,
+  _estado: FechaFinalizacionState,
+  formData: FormData,
+): Promise<FechaFinalizacionState> {
+  const user = await requireAdmin();
+  const t = await getTranslations("cotizacionDetail");
+
+  const resultado = await registrarFechaDeFinalizacion({
+    id,
+    fecha: String(formData.get("fechaFinalizacion") ?? ""),
+    userId: user.id,
+  });
+  if ("error" in resultado) {
+    return {
+      error:
+        resultado.error === "fechaFutura"
+          ? t("fechaFinalizacionFutura")
+          : resultado.error === "noFinalizada"
+            ? t("fechaFinalizacionNoFinalizada")
+            : t("fechaFinalizacionInvalida"),
+    };
+  }
+
+  revalidarListas(id);
+  return { guardada: true };
 }
 
 export type AvisoState = { error?: string; ok?: string };
