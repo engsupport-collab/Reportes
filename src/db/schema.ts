@@ -288,6 +288,22 @@ export const quotes = pgTable(
      */
     creationNotice: text("creation_notice"),
 
+    /**
+     * Cuándo pasó a "finalizada": el instante real de esa transición, nunca
+     * una fecha deducida. Lo escribe `cambiarEstadoDeCotizacion` en la misma
+     * actualización que cambia el estado (y el alta, si la cotización nace
+     * finalizada); vuelve a null si sale de "finalizada", y se escribe de
+     * nuevo si vuelve a entrar.
+     *
+     * Null en una cotización finalizada quiere decir "sin fecha registrada":
+     * las que ya estaban finalizadas cuando se agregó esta columna. No había de
+     * dónde sacar esa fecha —ni historial de estados, ni otra columna que la
+     * guardara— y `updated_at` no sirve: cambia con cualquier edición. Esas
+     * cotizaciones se muestran como "sin fecha registrada" y no entran en los
+     * filtros por fecha de finalización ni en la gráfica mensual.
+     */
+    finalizedAt: marcaDeTiempo("finalized_at"),
+
     createdBy: text("created_by")
       .notNull()
       .references(() => users.id, { onDelete: "restrict" }),
@@ -305,6 +321,9 @@ export const quotes = pgTable(
     index("quotes_company_revisada_idx").on(table.companyId, table.revisada),
     index("quotes_project_idx").on(table.projectName),
     index("quotes_client_idx").on(table.clientId),
+    // Los filtros de "finalizadas en los últimos días" y la gráfica mensual
+    // van siempre por empresa y por esta fecha.
+    index("quotes_company_finalized_idx").on(table.companyId, table.finalizedAt),
   ],
 );
 

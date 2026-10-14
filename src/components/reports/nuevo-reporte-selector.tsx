@@ -31,6 +31,8 @@ export function NuevoReporteSelector({
   valoresServicio,
   cotizacionesPorEmpresa,
   clientesPorEmpresa,
+  tipoInicial = "servicio",
+  cotizacionOrigen,
 }: {
   accionServicio: (estado: ReporteState, formData: FormData) => Promise<ReporteState>;
   accionViatico: (estado: ReporteState, formData: FormData) => Promise<ReporteState>;
@@ -55,8 +57,15 @@ export function NuevoReporteSelector({
   cotizacionesPorEmpresa: { companyId: string; opciones: OpcionCotizacionSelector[] }[];
   /** Solo para el tipo servicio: la creación mínima desde campo los necesita. */
   clientesPorEmpresa: { companyId: string; opciones: OpcionCliente[] }[];
+  /** Con qué tipo se abre: "Crear viáticos" en una cotización lo abre en viáticos. */
+  tipoInicial?: Tipo;
+  /**
+   * La cotización desde la que se abrió, ya comprobada en el servidor. Los
+   * viáticos quedan colgados de ella sin selector.
+   */
+  cotizacionOrigen?: OpcionCotizacionSelector;
 }) {
-  const [tipo, setTipo] = useState<Tipo>("servicio");
+  const [tipo, setTipo] = useState<Tipo>(tipoInicial);
   const t = useTranslations("nuevoReportePage");
 
   return (
@@ -109,6 +118,7 @@ export function NuevoReporteSelector({
             companyIdFijo={companyIdFijo}
             empresaFija={empresaFija}
             cotizacionesPorEmpresa={cotizacionesPorEmpresa}
+            cotizacionFija={cotizacionOrigen}
           />
         )}
       </div>

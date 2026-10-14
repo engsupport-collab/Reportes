@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, desc, eq, ilike, or, sql } from "drizzle-orm";
+import { type SQL, and, desc, eq, gte, ilike, isNull, lt, or, sql } from "drizzle-orm";
 
 import { db } from "@/db";
 import {
@@ -11,7 +11,18 @@ import {
   reports,
   users,
 } from "@/db/schema";
-import { ESTADOS_ACTIVOS, type EstadoCotizacion } from "@/lib/cotizaciones";
+import {
+  ESTADOS_ACTIVOS,
+  ESTADOS_COTIZACION,
+  type EstadoCotizacion,
+  esEstadoActivo,
+} from "@/lib/cotizaciones";
+import {
+  ORDEN_POR_DEFECTO,
+  type Orden,
+  type PeriodoFinalizacion,
+  leerPagina,
+} from "@/lib/filtros-cotizaciones";
 import type { Moneda } from "@/lib/moneda";
 
 /**
@@ -73,8 +84,14 @@ export type CotizacionEnLista = {
   status: EstadoCotizacion;
   purchaseOrderNo: string | null;
   dueDate: Date | null;
+  amount: number | null;
   revisada: boolean;
   createdAt: Date;
+  /**
+   * Cuándo pasó a "finalizada". Null si no está finalizada, o si lo estaba
+   * desde antes de que existiera el dato ("sin fecha registrada").
+   */
+  finalizedAt: Date | null;
 };
 
 export type FiltrosCotizaciones = {
@@ -82,6 +99,12 @@ export type FiltrosCotizaciones = {
   status?: EstadoCotizacion;
   soloSinRevisar?: boolean;
   buscar?: string;
+  /**
+   * Solo las finalizadas en este periodo, por su fecha de finalización. Deja
+   * fuera las que no están finalizadas y las finalizadas sin fecha registrada.
+   */
+  finalizadas?: Pick<PeriodoFinalizacion, "desde" | "hasta">;
+  orden?: Orden;
   pagina?: number;
 };
 
@@ -90,6 +113,15 @@ function construirWhere(filtros: FiltrosCotizaciones) {
     filtros.companyId ? eq(quotes.companyId, filtros.companyId) : undefined,
     filtros.status ? eq(quotes.status, filtros.status) : undefined,
     filtros.soloSinRevisar ? eq(quotes.revisada, false) : undefined,
+    // El estado se exige además de la fecha: una cotización que salió de
+    // "finalizada" ya no cuenta como finalizada, tenga la fecha que tenga.
+    ...(filtros.finalizadas
+      ? [
+          eq(quotes.status, "finalizada"),
+          gte(quotes.finalizedAt, filtros.finalizadas.desde),
+          lt(quotes.finalizedAt, filtros.finalizadas.hasta),
+        ]
+      : []),
   ];
 
   const buscar = filtros.buscar?.trim();
@@ -110,6 +142,57 @@ function construirWhere(filtros: FiltrosCotizaciones) {
   return and(...condiciones);
 }
 
+/**
+ * Cómo se ordena la lista. Los vacíos van siempre al final, se ordene hacia
+ * arriba o hacia abajo: una cotización sin valor no es "la más barata". El
+ * estado se ordena por el recorrido de una cotización, no alfabéticamente.
+ * Después de la columna elegida desempata la fecha de creación, y al final el
+ * id, para que el orden no cambie entre una página y la siguiente.
+ */
+function ordenSql(orden: Orden = ORDEN_POR_DEFECTO): SQL[] {
+  const dir = sql.raw(orden.dir === "asc" ? "ASC" : "DESC");
+  const columna = {
+    numero: sql`${quotes.quoteNumber}`,
+    proyecto: sql`lower(${quotes.projectName})`,
+    cliente: sql`lower(${clients.name})`,
+    empresa: sql`${companies.name}`,
+    estado: sql`array_position(ARRAY[${sql.raw(
+      ESTADOS_COTIZACION.map((e) => `'${e}'`).join(","),
+    )}]::text[], ${quotes.status})`,
+    oc: sql`${quotes.purchaseOrderNo}`,
+    entrega: sql`${quotes.dueDate}`,
+    valor: sql`${quotes.amount}`,
+    creada: sql`${quotes.createdAt}`,
+    // Solo cuenta la fecha de una que está finalizada (ver `finalizacionVigente`).
+    finalizada: sql`CASE WHEN ${quotes.status} = 'finalizada' THEN ${quotes.finalizedAt} END`,
+  }[orden.campo];
+
+  return [
+    sql`${columna} ${dir} NULLS LAST`,
+    sql`${quotes.createdAt} DESC`,
+    sql`${quotes.id}`,
+  ];
+}
+
+/** Las columnas de una fila de la lista; las comparten la pantalla y la exportación. */
+const COLUMNAS_LISTA = {
+  id: quotes.id,
+  companyId: quotes.companyId,
+  companyName: companies.name,
+  currency: companies.currency,
+  quoteNumber: quotes.quoteNumber,
+  projectName: quotes.projectName,
+  clientId: quotes.clientId,
+  clientName: clients.name,
+  status: quotes.status,
+  purchaseOrderNo: quotes.purchaseOrderNo,
+  dueDate: quotes.dueDate,
+  amount: quotes.amount,
+  revisada: quotes.revisada,
+  createdAt: quotes.createdAt,
+  finalizedAt: quotes.finalizedAt,
+};
+
 /** Página de cotizaciones para el panel del admin, con sus filtros. */
 export async function listarCotizaciones(filtros: FiltrosCotizaciones): Promise<{
   items: CotizacionEnLista[];
@@ -117,31 +200,19 @@ export async function listarCotizaciones(filtros: FiltrosCotizaciones): Promise<
   pagina: number;
   totalPaginas: number;
 }> {
-  const pagina = Math.max(1, filtros.pagina ?? 1);
+  // Validada otra vez aquí, no solo al leer la dirección: el desplazamiento
+  // tiene que ser entero (ver `leerPagina`).
+  const pagina = leerPagina(filtros.pagina);
   const where = construirWhere(filtros);
 
   const [items, [conteo]] = await Promise.all([
     db
-      .select({
-        id: quotes.id,
-        companyId: quotes.companyId,
-        companyName: companies.name,
-        currency: companies.currency,
-        quoteNumber: quotes.quoteNumber,
-        projectName: quotes.projectName,
-        clientId: quotes.clientId,
-        clientName: clients.name,
-        status: quotes.status,
-        purchaseOrderNo: quotes.purchaseOrderNo,
-        dueDate: quotes.dueDate,
-        revisada: quotes.revisada,
-        createdAt: quotes.createdAt,
-      })
+      .select(COLUMNAS_LISTA)
       .from(quotes)
       .innerJoin(companies, eq(companies.id, quotes.companyId))
       .innerJoin(clients, eq(clients.id, quotes.clientId))
       .where(where)
-      .orderBy(desc(quotes.createdAt))
+      .orderBy(...ordenSql(filtros.orden))
       .limit(POR_PAGINA)
       .offset((pagina - 1) * POR_PAGINA),
 
@@ -165,9 +236,39 @@ export async function listarCotizaciones(filtros: FiltrosCotizaciones): Promise<
   };
 }
 
+/**
+ * Tope de filas de una exportación. Hoy son cien cotizaciones; esto solo
+ * evita que una exportación sin filtros de dentro de unos años arme en memoria
+ * un archivo de cientos de miles de filas. Si se alcanza, se dice.
+ */
+export const TOPE_EXPORTACION = 10_000;
+
+/**
+ * Todas las cotizaciones que cumplen los filtros, en el mismo orden que la
+ * lista y sin paginar: lo que lleva el archivo exportado. Usa exactamente el
+ * mismo filtro y el mismo orden que `listarCotizaciones` — es lo que garantiza
+ * que el archivo traiga lo mismo que la pantalla desde la que se pidió.
+ */
+export async function listarCotizacionesParaExportar(
+  filtros: Omit<FiltrosCotizaciones, "pagina">,
+): Promise<{ items: CotizacionEnLista[]; recortado: boolean }> {
+  const filas = await db
+    .select(COLUMNAS_LISTA)
+    .from(quotes)
+    .innerJoin(companies, eq(companies.id, quotes.companyId))
+    .innerJoin(clients, eq(clients.id, quotes.clientId))
+    .where(construirWhere(filtros))
+    .orderBy(...ordenSql(filtros.orden))
+    .limit(TOPE_EXPORTACION + 1);
+
+  return {
+    items: filas.slice(0, TOPE_EXPORTACION),
+    recortado: filas.length > TOPE_EXPORTACION,
+  };
+}
+
 export type CotizacionCompleta = CotizacionEnLista & {
   description: string | null;
-  amount: number | null;
   /** Cómo terminó el aviso de creación, tal como se guardó (ver `leerAviso`). */
   creationNotice: string | null;
   createdByName: string;
@@ -202,6 +303,7 @@ export async function obtenerCotizacion(
       amount: quotes.amount,
       revisada: quotes.revisada,
       creationNotice: quotes.creationNotice,
+      finalizedAt: quotes.finalizedAt,
       createdByName: users.fullName,
       createdAt: quotes.createdAt,
       updatedAt: quotes.updatedAt,
@@ -342,11 +444,104 @@ export async function insertarCotizacionConNumeroAutomatico(valores: {
       description: valores.description,
       amount: valores.amount,
       revisada: valores.revisada,
+      finalizedAt: fechaDeFinalizacionAlCrear(valores.status),
       createdBy: valores.createdBy,
     });
 
     return quoteNumber;
   });
+}
+
+/**
+ * La fecha de finalización de una cotización que se está creando: ahora, si
+ * nace ya finalizada —la transición ocurrió en el alta—, y ninguna si no.
+ */
+export function fechaDeFinalizacionAlCrear(status: EstadoCotizacion): Date | null {
+  return status === "finalizada" ? new Date() : null;
+}
+
+/**
+ * Cambia el estado de una cotización y, en la misma escritura, su fecha de
+ * finalización. Es el único camino por el que cambia el estado de una que ya
+ * existe: así la fecha no puede quedar desalineada del estado.
+ *
+ *  - Entra en "finalizada": la fecha es este momento.
+ *  - Ya estaba en "finalizada" y se vuelve a elegir: no cambia nada. Una que
+ *    no tenía fecha registrada sigue sin tenerla — no se inventa.
+ *  - Sale de "finalizada": la fecha se borra; ya no está finalizada.
+ *
+ * La comparación con el estado anterior la hace la base dentro del mismo
+ * UPDATE, no la aplicación leyendo antes: con dos cambios casi simultáneos,
+ * leer y luego escribir podría tomar por transición lo que no lo es.
+ */
+export async function cambiarEstadoDeCotizacion(datos: {
+  id: string;
+  estado: EstadoCotizacion;
+  userId: string;
+}): Promise<void> {
+  await db
+    .update(quotes)
+    .set({
+      status: datos.estado,
+      finalizedAt:
+        datos.estado === "finalizada"
+          ? sql`CASE WHEN ${quotes.status} = 'finalizada' THEN ${quotes.finalizedAt} ELSE now() END`
+          : null,
+      updatedAt: new Date(),
+      updatedBy: datos.userId,
+    })
+    .where(eq(quotes.id, datos.id));
+}
+
+/**
+ * Cuántas cotizaciones de una empresa están finalizadas sin fecha registrada:
+ * las que ya lo estaban antes de que existiera el dato. Se dice junto a la
+ * gráfica mensual, para que nadie lea que no se finalizó nada.
+ */
+export async function contarFinalizadasSinFecha(companyId: string): Promise<number> {
+  const [fila] = await db
+    .select({ n: sql<number>`COUNT(*)` })
+    .from(quotes)
+    .where(
+      and(
+        eq(quotes.companyId, companyId),
+        eq(quotes.status, "finalizada"),
+        isNull(quotes.finalizedAt),
+      ),
+    );
+  return Number(fila?.n ?? 0);
+}
+
+/** Lo mínimo de un usuario que decide a qué cotizaciones puede colgarles un reporte. */
+export type UsuarioDeReportes = {
+  role: string;
+  empresas: { id: string }[];
+  empresaActiva: { id: string } | null;
+};
+
+/**
+ * La cotización a la que este usuario puede colgarle un reporte nuevo
+ * (de servicio o de viáticos), o null si no existe, no está activa o es de
+ * una empresa que no le toca.
+ *
+ * El id llega del navegador —de la dirección o del formulario— y aquí no se
+ * da por bueno: se busca la cotización y se decide con lo que dice la base.
+ * Un empleado solo trabaja en su empresa activa; el admin, en cualquiera de
+ * las suyas.
+ */
+export async function cotizacionParaReporte(
+  user: UsuarioDeReportes,
+  quoteId: string,
+): Promise<CotizacionCompleta | null> {
+  const cotizacion = await obtenerCotizacion(quoteId).catch(() => null);
+  if (!cotizacion || !esEstadoActivo(cotizacion.status)) return null;
+
+  const permitida =
+    user.role === "admin"
+      ? user.empresas.some((e) => e.id === cotizacion.companyId)
+      : user.empresaActiva?.id === cotizacion.companyId;
+
+  return permitida ? cotizacion : null;
 }
 
 /**

@@ -93,6 +93,9 @@ jobs:
       - name: Filtros de reportes
         run: npm run test:filtros
 
+      - name: Cotizaciones (finalización, filtros, exportación, gráfica y permisos)
+        run: npm run test:cotizaciones
+
       - name: Bloqueo por fuerza bruta
         run: npm run test:rate-limit
 

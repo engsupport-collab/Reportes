@@ -36,6 +36,13 @@
       "when": 1791911967357,
       "tag": "0004_aviso_de_cotizacion",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1791988172878,
+      "tag": "0005_fecha_de_finalizacion",
+      "breakpoints": true
     }
   ]
 }

@@ -1,19 +1,22 @@
 import Link from "next/link";
 import { getLocale, getTranslations } from "next-intl/server";
 
+import { finalizacionVigente } from "@/lib/cotizaciones";
 import { formatFechaCorta } from "@/lib/fechas";
 import { type Idioma, REGION } from "@/lib/idiomas";
 import type { CotizacionEnLista } from "@/lib/queries/quotes";
-import { QuoteStatusBadge } from "./quote-status-badge";
+import { InsigniaEstadoCotizacion } from "./quote-status-badge";
 
 /**
- * Lista de cotizaciones. Mismo patrón de tarjetas apiladas que `ReportList`,
- * por la misma razón: una tabla ancha obliga a scroll horizontal en el
- * celular, y el admin también revisa esto desde ahí.
+ * Lista de cotizaciones en tarjetas, para el teléfono. Mismo patrón que
+ * `ReportList`, por la misma razón: una tabla ancha obliga a scroll horizontal
+ * en el celular, y el admin también revisa esto desde ahí. En pantallas
+ * anchas la misma lista va como tabla (`QuoteTable`).
  */
 export async function QuoteList({ items }: { items: CotizacionEnLista[] }) {
-  const [t, locale] = await Promise.all([
+  const [t, tEstados, locale] = await Promise.all([
     getTranslations("cotizacionesPage"),
+    getTranslations("estadosCotizacion"),
     getLocale(),
   ]);
   const region = REGION[locale as Idioma];
@@ -41,7 +44,7 @@ export async function QuoteList({ items }: { items: CotizacionEnLista[] }) {
                 </p>
                 <p className="truncate text-sm text-muted">{c.clientName}</p>
               </div>
-              <QuoteStatusBadge status={c.status} />
+              <InsigniaEstadoCotizacion status={c.status} texto={tEstados(c.status)} />
             </div>
 
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted">
@@ -50,6 +53,20 @@ export async function QuoteList({ items }: { items: CotizacionEnLista[] }) {
               </span>
               {c.dueDate ? <span>{formatFechaCorta(c.dueDate, region)}</span> : null}
               <span>{c.companyName}</span>
+              {/* La fecha de finalización también a la vista en el teléfono,
+                  sin abrir la cotización — igual que en la tabla. */}
+              {finalizacionVigente(c) ? (
+                <span>
+                  {t("colFinalizada")}{" "}
+                  <span className="font-medium text-text">
+                    {formatFechaCorta(finalizacionVigente(c)!, region)}
+                  </span>
+                </span>
+              ) : c.status === "finalizada" ? (
+                <span title={t("sinFechaAyuda")}>
+                  {t("colFinalizada")}: {t("sinFechaRegistrada")}
+                </span>
+              ) : null}
             </div>
 
             {!c.revisada ? (

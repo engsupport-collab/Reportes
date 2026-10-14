@@ -3,7 +3,8 @@ import "server-only";
 import { and, desc, eq, gte, isNull, sql } from "drizzle-orm";
 
 import { db } from "@/db";
-import { attachments, reportTags, reports } from "@/db/schema";
+import { attachments, quotes, reportTags, reports } from "@/db/schema";
+import { ZONA_HORARIA, ultimosMeses } from "@/lib/fechas";
 
 /**
  * Analíticas de una empresa.
@@ -21,6 +22,8 @@ export type PuntoMes = {
   /** "2026-08" — sirve de clave y de orden. */
   mes: string;
   etiqueta: string;
+  /** El nombre completo, con el año ("octubre de 2026"), para el globo de la gráfica. */
+  etiquetaLarga?: string;
   total: number;
 };
 
@@ -40,7 +43,6 @@ export type Analiticas = {
   sinDocumento: number;
   sinFirma: number;
   sinOrden: number;
-  porMes: PuntoMes[];
   porServicio: SegmentoPorId[];
   porEtiqueta: SegmentoPorId[];
   topClientes: Segmento[];
@@ -108,6 +110,44 @@ export async function serieMensual(
     if (i !== undefined) puntos[i]!.total = Number(fila.n);
   }
   return puntos;
+}
+
+/**
+ * Cotizaciones finalizadas por mes, los últimos doce, de una empresa.
+ *
+ * Cuenta por la fecha real de finalización (`quotes.finalized_at`), no por la
+ * de creación ni la de la última edición: una cotización creada en agosto y
+ * finalizada en septiembre cuenta en septiembre. Cada una cuenta una sola vez
+ * —una fila por cotización— y solo si sigue finalizada: la que salió de ese
+ * estado ya no es trabajo terminado.
+ *
+ * El mes es el de Bogotá: lo finalizado el 30 a las 10 de la noche es de ese
+ * mes, aunque en UTC ya sea el siguiente. Las finalizadas sin fecha
+ * registrada no tienen mes y no entran (ver `contarFinalizadasSinFecha`).
+ */
+export async function serieCotizacionesFinalizadas(
+  companyId: string,
+  ahora = new Date(),
+): Promise<{ mes: string; total: number }[]> {
+  const { claves, desde } = ultimosMeses(ahora, 12);
+
+  const filas = await db
+    .select({
+      mes: sql<string>`to_char(${quotes.finalizedAt} AT TIME ZONE ${ZONA_HORARIA}, 'YYYY-MM')`,
+      n: sql<number>`COUNT(*)`,
+    })
+    .from(quotes)
+    .where(
+      and(
+        eq(quotes.companyId, companyId),
+        eq(quotes.status, "finalizada"),
+        gte(quotes.finalizedAt, desde),
+      ),
+    )
+    .groupBy(sql`1`);
+
+  const porMes = new Map(filas.map((f) => [f.mes, Number(f.n)]));
+  return claves.map((mes) => ({ mes, total: porMes.get(mes) ?? 0 }));
 }
 
 export type EstadoDocumental = {
@@ -187,16 +227,11 @@ export async function obtenerAnaliticas(
     return Number(fila?.n ?? 0);
   };
 
-  // Doce meses atrás desde el primer día del mes actual.
-  const hoy = new Date();
-  const desde = new Date(hoy.getFullYear(), hoy.getMonth() - 11, 1).getTime();
-
   const [
     total,
     terminados,
     sinFirma,
     sinOrden,
-    filasMes,
     filasServicio,
     filasEtiqueta,
     filasClientes,
@@ -212,15 +247,6 @@ export async function obtenerAnaliticas(
       ),
     ),
     contar(and(deLaEmpresa, isNull(reports.purchaseOrderNo))),
-
-    db
-      .select({
-        mes: sql<string>`to_char(${reports.createdAt}, 'YYYY-MM')`,
-        n: sql<number>`COUNT(*)`,
-      })
-      .from(reports)
-      .where(and(deLaEmpresa, gte(reports.createdAt, new Date(desde))))
-      .groupBy(sql`1`),
 
     db
       .select({ nombre: reports.serviceType, n: sql<number>`COUNT(*)` })
@@ -258,14 +284,6 @@ export async function obtenerAnaliticas(
       ),
   ]);
 
-  // Los meses vacíos ya están en la plantilla; esto solo rellena los que tienen.
-  const porMes = ultimosDoceMeses();
-  const indice = new Map(porMes.map((p, i) => [p.mes, i]));
-  for (const fila of filasMes) {
-    const i = indice.get(fila.mes);
-    if (i !== undefined) porMes[i]!.total = Number(fila.n);
-  }
-
   const ordenar = (a: { total: number }, b: { total: number }) =>
     b.total - a.total;
 
@@ -276,7 +294,6 @@ export async function obtenerAnaliticas(
     sinDocumento: Number(filasSinDocumento[0]?.n ?? 0),
     sinFirma,
     sinOrden,
-    porMes,
     // Estas dos series salen por id, no por nombre: el nombre depende del
     // idioma de quien mira, y eso solo se sabe al pintar la pantalla. Un
     // reporte sin tipo de servicio queda con id vacío, que la pantalla

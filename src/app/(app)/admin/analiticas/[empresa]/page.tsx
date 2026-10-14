@@ -1,12 +1,14 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getTranslations } from "next-intl/server";
+import { getLocale, getTranslations } from "next-intl/server";
 
 import { Barras } from "@/components/admin/barras";
 import { GraficaMeses } from "@/components/admin/grafica-meses";
 import { requireAdmin } from "@/lib/auth-guard";
 import { esEtiquetaValida, esTipoServicioValido } from "@/lib/etiquetas";
-import { obtenerAnaliticas } from "@/lib/queries/analytics";
+import { type Idioma, REGION } from "@/lib/idiomas";
+import { obtenerAnaliticas, serieCotizacionesFinalizadas } from "@/lib/queries/analytics";
+import { contarFinalizadasSinFecha } from "@/lib/queries/quotes";
 
 type Params = { params: Promise<{ empresa: string }> };
 
@@ -86,12 +88,33 @@ export default async function AnaliticasPage({ params }: Params) {
   const empresa = user.empresas.find((e) => e.id === idEmpresa);
   if (!empresa) notFound();
 
-  const a = await obtenerAnaliticas(empresa.id);
-  const hrefReportes = `/admin/reportes?empresa=${empresa.id}`;
-  const [t, tEtiquetas] = await Promise.all([
+  const [a, finalizadas, sinFecha, t, tEtiquetas, locale] = await Promise.all([
+    obtenerAnaliticas(empresa.id),
+    serieCotizacionesFinalizadas(empresa.id),
+    contarFinalizadasSinFecha(empresa.id),
     getTranslations("analiticasPage"),
     getTranslations("etiquetas"),
+    getLocale(),
   ]);
+  const hrefReportes = `/admin/reportes?empresa=${empresa.id}`;
+
+  // El nombre de cada mes en el idioma de quien mira: corto en el eje, y con
+  // el año en el globo — doce meses atrás cruzan siempre un cambio de año.
+  const region = REGION[locale as Idioma];
+  const finalizadasPorMes = finalizadas.map(({ mes, total }) => {
+    const [anio, numero] = mes.split("-").map(Number);
+    const fecha = new Date(Date.UTC(anio!, numero! - 1, 15));
+    return {
+      mes,
+      total,
+      etiqueta: fecha.toLocaleDateString(region, { month: "short", timeZone: "UTC" }),
+      etiquetaLarga: fecha.toLocaleDateString(region, {
+        month: "long",
+        year: "numeric",
+        timeZone: "UTC",
+      }),
+    };
+  });
 
   /**
    * Pone nombre a un reparto que vino por id. Un id que no esté en el
@@ -138,10 +161,22 @@ export default async function AnaliticasPage({ params }: Params) {
         </div>
 
         <Tarjeta
-          titulo={t("reportesPorMes")}
-          nota={t("notaReportesPorMes")}
+          titulo={t("cotizacionesFinalizadasPorMes")}
+          nota={t("notaCotizacionesFinalizadas")}
         >
-          <GraficaMeses puntos={a.porMes} />
+          <GraficaMeses
+            puntos={finalizadasPorMes}
+            unidad={{ una: t("unidadCotizacion"), varias: t("unidadCotizaciones") }}
+            descripcion={t("graficaCotizacionesAria", { meses: finalizadasPorMes.length })}
+            textoEnCurso={t("enCurso")}
+          />
+          {/* Las finalizadas antes de que se guardara la fecha no tienen mes:
+              se dice cuántas son, para que nadie lea que no se finalizó nada. */}
+          {sinFecha > 0 ? (
+            <p className="mt-3 text-xs text-muted">
+              {t("finalizadasSinFecha", { count: sinFecha })}
+            </p>
+          ) : null}
         </Tarjeta>
 
         <div className="grid gap-4 lg:grid-cols-2">

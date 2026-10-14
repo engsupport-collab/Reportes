@@ -141,6 +141,64 @@ export function inicioDeMes(mesesAtras = 0): Date {
   );
 }
 
+const MS_POR_DIA = 86_400_000;
+
+/**
+ * Medianoche de Bogotá del día en que cae `fecha`, como instante. Es el borde
+ * de un día "de calendario" para la empresa: lo finalizado a las 11 de la
+ * noche cuenta en ese día, no en el siguiente, aunque en UTC ya sea mañana.
+ */
+export function inicioDelDia(fecha: Date): Date {
+  const local = new Date(fecha.getTime() - OFFSET_HORAS * 3_600_000);
+  return new Date(
+    Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate(), OFFSET_HORAS),
+  );
+}
+
+/** El mismo instante `dias` días más tarde (o antes, si es negativo). */
+export function sumarDias(fecha: Date, dias: number): Date {
+  // Sin horario de verano en Colombia, un día son siempre 24 horas.
+  return new Date(fecha.getTime() + dias * MS_POR_DIA);
+}
+
+/** "2026-10-01" -> medianoche de Bogotá de ese día. Null si no es una fecha válida. */
+export function inicioDeFechaISO(valor: string): Date | null {
+  const fecha = parseFechaISO(valor);
+  return fecha ? inicioDelDia(fecha) : null;
+}
+
+/** "2026-10" — el mes de calendario de Bogotá en que cae `fecha`. */
+export function claveDeMes(fecha: Date): string {
+  const local = new Date(fecha.getTime() - OFFSET_HORAS * 3_600_000);
+  return `${local.getUTCFullYear()}-${String(local.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
+/**
+ * Las claves de los últimos `cuantos` meses de Bogotá, del más antiguo al
+ * actual, y el instante en que empieza el primero.
+ */
+export function ultimosMeses(
+  ahora: Date,
+  cuantos: number,
+): { claves: string[]; desde: Date } {
+  const local = new Date(ahora.getTime() - OFFSET_HORAS * 3_600_000);
+  const claves: string[] = [];
+  for (let i = cuantos - 1; i >= 0; i--) {
+    const mes = new Date(Date.UTC(local.getUTCFullYear(), local.getUTCMonth() - i, 1));
+    claves.push(`${mes.getUTCFullYear()}-${String(mes.getUTCMonth() + 1).padStart(2, "0")}`);
+  }
+  const desde = new Date(
+    Date.UTC(local.getUTCFullYear(), local.getUTCMonth() - (cuantos - 1), 1, OFFSET_HORAS),
+  );
+  return { claves, desde };
+}
+
+/** "2026-10-01 14:30" en hora de Bogotá: para un archivo exportado, que no tiene idioma. */
+export function aTextoLocal(fecha: Date): string {
+  const local = new Date(fecha.getTime() - OFFSET_HORAS * 3_600_000);
+  return local.toISOString().slice(0, 16).replace("T", " ");
+}
+
 /** "agosto de 2026" — para nombrar el periodo de una comparación. */
 export function nombreDeMes(fecha: Date, locale = "es-CO"): string {
   return fecha.toLocaleDateString(locale, {

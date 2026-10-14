@@ -204,7 +204,8 @@
     "crear": "Create report",
     "tipoDeReporte": "Report type",
     "tipoServicio": "Service",
-    "tipoViaticos": "Expenses"
+    "tipoViaticos": "Expenses",
+    "cotizacionNoDisponible": "The quote you came from is not available: it does not exist, is not active, or is not from your company. Choose one from the list."
   },
   "viaticoReportForm": {
     "creando": "Creating…",
@@ -215,7 +216,8 @@
     "elige": "Choose a quote…",
     "sinCotizacionesActivas": "This company has no active quotes.",
     "ayuda": "Expenses you add later fall under this quote, independent of the service report.",
-    "empresaDeCotizacion": "Comes from the quote and can't be changed: report and quote are the same job."
+    "empresaDeCotizacion": "Comes from the quote and can't be changed: report and quote are the same job.",
+    "cotizacionFija": "It comes from the quote you opened and cannot be changed: the expenses go under it."
   },
   "editarReportePage": {
     "volver": "← Back to report",
@@ -390,7 +392,7 @@
   },
   "analiticasPage": {
     "titulo": "Analytics · {empresa}",
-    "subtitulo": "Only {empresa}'s reports.",
+    "subtitulo": "Only the reports and quotes of {empresa}.",
     "total": "Total",
     "desdeInicio": "Since the start",
     "terminados": "Completed",
@@ -409,7 +411,14 @@
     "sinDocumento": "Missing document",
     "sinFirmar": "Unsigned",
     "sinDatos": "No data yet.",
-    "sinDefinir": "Not set"
+    "sinDefinir": "Not set",
+    "cotizacionesFinalizadasPorMes": "Completed quotes per month",
+    "notaCotizacionesFinalizadas": "Last 12 months, by completion date in Colombia time. The current month has just started, so its segment is dashed.",
+    "finalizadasSinFecha": "{count, plural, one {# completed quote has no date recorded and is not in the chart: it was completed before the system recorded that date.} other {# completed quotes have no date recorded and are not in the chart: they were completed before the system recorded that date.}}",
+    "unidadCotizacion": "quote",
+    "unidadCotizaciones": "quotes",
+    "enCurso": "in progress",
+    "graficaCotizacionesAria": "Completed quotes per month over the last {meses} months"
   },
   "validacion": {
     "ingresaUsuario": "Enter your username",
@@ -490,7 +499,43 @@
     "paraQuery": " for “{q}”",
     "quitarFiltros": "Clear filters",
     "sinCotizaciones": "No quotes yet.",
-    "sinRevisarInsignia": "Unreviewed"
+    "sinRevisarInsignia": "Unreviewed",
+    "colNumero": "Number",
+    "colProyecto": "Project",
+    "colCliente": "Client",
+    "colEmpresa": "Company",
+    "colEstado": "Status",
+    "colOc": "Purchase order",
+    "colEntrega": "Due",
+    "colValor": "Amount",
+    "colMoneda": "Currency",
+    "colCreada": "Created",
+    "colFinalizada": "Completed",
+    "colRevisada": "Reviewed",
+    "exportCreada": "Created (Colombia time)",
+    "exportFinalizada": "Completed (Colombia time)",
+    "si": "Yes",
+    "no": "No",
+    "sinFechaRegistrada": "No date recorded",
+    "sinFechaAyuda": "It was completed before the system recorded that date.",
+    "finalizadasLabel": "Completed",
+    "finalizadasTodas": "All",
+    "ultimos15": "Last 15 days",
+    "ultimos30": "Last 30 days",
+    "rango": "Date range",
+    "desde": "From",
+    "hasta": "To",
+    "aplicar": "Apply",
+    "rangoInvalido": "The start date is after the end date: the range was not applied.",
+    "rangoVacio": "Choose a start date, an end date, or both.",
+    "notaFinalizadas": "Only completed quotes, by their completion date in Colombia time. Completed quotes with no date recorded are left out.",
+    "exportar": "Export to Excel",
+    "exportarAyuda": "Downloads every quote in this filter, not just this page.",
+    "ordenarPor": "Sort by",
+    "ordenAscendente": "{columna}, ascending",
+    "ordenDescendente": "{columna}, descending",
+    "colOcCorta": "PO",
+    "sinFechaCorta": "No date"
   },
   "cotizacionForm": {
     "tituloNueva": "New quote",
@@ -544,7 +589,10 @@
     "avisoReenviado": "Notice sent.",
     "avisoSigueSinSalir": "The notice did not go out. Try again in a moment.",
     "detalleTecnico": "Technical detail: {detalle}",
-    "sinConexion": "No connection. Check your signal and try again."
+    "sinConexion": "No connection. Check your signal and try again.",
+    "finalizadaEl": "Completed on",
+    "sinFechaFinalizacion": "No date recorded",
+    "crearViaticos": "Create travel expenses for this quote"
   },
   "quoteSelector": {
     "label": "Quote",

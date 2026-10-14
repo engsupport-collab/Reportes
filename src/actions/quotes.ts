@@ -14,7 +14,9 @@ import { esEstadoActivo } from "@/lib/cotizaciones";
 import { obtenerClienteActivoDeEmpresa } from "@/lib/queries/clients";
 import { listarEmpresas } from "@/lib/queries/companies";
 import {
+  cambiarEstadoDeCotizacion,
   esNumeroCotizacionDuplicado,
+  fechaDeFinalizacionAlCrear,
   insertarCotizacionConNumeroAutomatico,
   obtenerCotizacion,
   sincronizarSecuenciaConNumero,
@@ -142,6 +144,7 @@ export async function crearCotizacionAction(
         companyId: empresa.id,
         createdBy: user.id,
         status,
+        finalizedAt: fechaDeFinalizacionAlCrear(status),
         ...parsed.data,
       });
       // El admin escribió el número a mano. Si va por delante del contador, se
@@ -233,10 +236,9 @@ export async function cambiarEstadoCotizacionAction(
   const parsed = estadoCotizacionSchema.safeParse(formData.get("status"));
   if (!parsed.success) return;
 
-  await db
-    .update(quotes)
-    .set({ status: parsed.data, updatedAt: new Date(), updatedBy: user.id })
-    .where(eq(quotes.id, id));
+  // Junto con el estado se escribe la fecha de finalización (ver
+  // `cambiarEstadoDeCotizacion`): por eso no se actualiza aquí a mano.
+  await cambiarEstadoDeCotizacion({ id, estado: parsed.data, userId: user.id });
 
   revalidarListas(id);
 }

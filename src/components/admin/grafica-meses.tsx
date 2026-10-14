@@ -5,7 +5,9 @@ import { useRef, useState } from "react";
 import type { PuntoMes } from "@/lib/queries/analytics";
 
 /**
- * Reportes creados por mes, últimos doce.
+ * Una serie por mes, los últimos doce: reportes creados en el panel,
+ * cotizaciones finalizadas en las analíticas. Qué se cuenta lo dicen
+ * `unidad` y `descripcion`; sin ellas, reportes, como siempre.
  *
  * Es una sola serie, así que no lleva leyenda: el título ya dice qué se está
  * mirando, y un recuadro de leyenda con una sola entrada solo ocupa sitio.
@@ -30,7 +32,20 @@ function techo(maximo: number): number {
   return Math.ceil(maximo / (magnitud / 2)) * (magnitud / 2);
 }
 
-export function GraficaMeses({ puntos }: { puntos: PuntoMes[] }) {
+export function GraficaMeses({
+  puntos,
+  unidad = { una: "reporte", varias: "reportes" },
+  descripcion = `Reportes por mes durante los últimos ${puntos.length} meses`,
+  textoEnCurso = "en curso",
+}: {
+  puntos: PuntoMes[];
+  /** Cómo se llama lo contado, para el globo ("3 reportes · oct"). */
+  unidad?: { una: string; varias: string };
+  /** Para quien no ve la gráfica: qué muestra. */
+  descripcion?: string;
+  /** Cómo se marca en el globo el mes que todavía no termina. */
+  textoEnCurso?: string;
+}) {
   const svgRef = useRef<SVGSVGElement>(null);
   const [activo, setActivo] = useState<number | null>(null);
 
@@ -81,7 +96,7 @@ export function GraficaMeses({ puntos }: { puntos: PuntoMes[] }) {
         viewBox={`0 0 ${ANCHO} ${ALTO}`}
         className="w-full"
         role="img"
-        aria-label={`Reportes por mes durante los últimos ${puntos.length} meses`}
+        aria-label={descripcion}
         onPointerMove={alMover}
         onPointerLeave={() => setActivo(null)}
       >
@@ -172,8 +187,9 @@ export function GraficaMeses({ puntos }: { puntos: PuntoMes[] }) {
         >
           <span className="font-semibold text-text">{punto.total}</span>{" "}
           <span className="text-muted">
-            {punto.total === 1 ? "reporte" : "reportes"} · {punto.etiqueta}
-            {activo === puntos.length - 1 ? " (en curso)" : ""}
+            {punto.total === 1 ? unidad.una : unidad.varias} ·{" "}
+            {punto.etiquetaLarga ?? punto.etiqueta}
+            {activo === puntos.length - 1 ? ` (${textoEnCurso})` : ""}
           </span>
         </div>
       ) : null}

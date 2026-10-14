@@ -41,6 +41,7 @@ export function ViaticoReportForm({
   companyIdFijo,
   empresaFija,
   cotizacionesPorEmpresa,
+  cotizacionFija,
 }: {
   action: (estado: ReporteState, formData: FormData) => Promise<ReporteState>;
   cancelarHref: string;
@@ -52,6 +53,12 @@ export function ViaticoReportForm({
   empresaFija?: Empresa;
   /** Cotizaciones activas disponibles, por empresa — la misma lista que usa el formulario de servicio. */
   cotizacionesPorEmpresa: { companyId: string; opciones: OpcionCotizacionSelector[] }[];
+  /**
+   * Abierto desde una cotización: los viáticos van con ella y no se ofrece
+   * elegir otra. Llega ya comprobada por la página, y la acción la vuelve a
+   * comprobar al guardar — lo que viaja en el formulario es solo su id.
+   */
+  cotizacionFija?: OpcionCotizacionSelector;
 }) {
   const [state, formAction] = useActionState<ReporteState, FormData>(
     action,
@@ -105,38 +112,49 @@ export function ViaticoReportForm({
         </div>
       ) : null}
 
-      <div className="space-y-1.5">
-        <label htmlFor="quoteId" className="block text-sm font-medium text-text">
-          {t("cotizacion")}
-        </label>
-        {opciones.length === 0 ? (
-          <p className="rounded-lg bg-surface-muted px-3 py-2.5 text-sm text-muted">
-            {t("sinCotizacionesActivas")}
+      {cotizacionFija ? (
+        <div className="space-y-1.5">
+          <span className="block text-sm font-medium text-text">{t("cotizacion")}</span>
+          <p className="rounded-lg bg-surface-muted px-3 py-2.5 text-sm text-text">
+            {cotizacionFija.label}
           </p>
-        ) : (
-          // key={companyId}: al cambiar de empresa la lista de opciones
-          // cambia, y sin esto un <select> no controlado se queda mostrando
-          // la selección de la empresa anterior.
-          <select
-            key={companyId}
-            id="quoteId"
-            name="quoteId"
-            required
-            defaultValue=""
-            className="w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-sm text-text focus:border-brand focus:outline-none"
-          >
-            <option value="" disabled>
-              {t("elige")}
-            </option>
-            {opciones.map((o) => (
-              <option key={o.id} value={o.id}>
-                {o.label}
+          <input type="hidden" name="quoteId" value={cotizacionFija.id} readOnly />
+          <p className="text-xs text-muted">{t("cotizacionFija")}</p>
+        </div>
+      ) : (
+        <div className="space-y-1.5">
+          <label htmlFor="quoteId" className="block text-sm font-medium text-text">
+            {t("cotizacion")}
+          </label>
+          {opciones.length === 0 ? (
+            <p className="rounded-lg bg-surface-muted px-3 py-2.5 text-sm text-muted">
+              {t("sinCotizacionesActivas")}
+            </p>
+          ) : (
+            // key={companyId}: al cambiar de empresa la lista de opciones
+            // cambia, y sin esto un <select> no controlado se queda mostrando
+            // la selección de la empresa anterior.
+            <select
+              key={companyId}
+              id="quoteId"
+              name="quoteId"
+              required
+              defaultValue=""
+              className="w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-sm text-text focus:border-brand focus:outline-none"
+            >
+              <option value="" disabled>
+                {t("elige")}
               </option>
-            ))}
-          </select>
-        )}
-        <p className="text-xs text-muted">{t("ayuda")}</p>
-      </div>
+              {opciones.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          )}
+          <p className="text-xs text-muted">{t("ayuda")}</p>
+        </div>
+      )}
 
       {state.error ? (
         <p

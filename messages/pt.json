@@ -204,7 +204,8 @@
     "crear": "Criar relatório",
     "tipoDeReporte": "Tipo de relatório",
     "tipoServicio": "Serviço",
-    "tipoViaticos": "Despesas"
+    "tipoViaticos": "Despesas",
+    "cotizacionNoDisponible": "A cotação pela qual você entrou não está disponível: não existe, não está ativa ou não é da sua empresa. Escolha uma da lista."
   },
   "viaticoReportForm": {
     "creando": "Criando…",
@@ -215,7 +216,8 @@
     "elige": "Escolha uma cotação…",
     "sinCotizacionesActivas": "Esta empresa não tem cotações ativas.",
     "ayuda": "As despesas que você adicionar depois ficam sob esta cotação, independentes do relatório de serviço.",
-    "empresaDeCotizacion": "Vem da cotação e não pode ser alterada: o relatório e a cotação são o mesmo trabalho."
+    "empresaDeCotizacion": "Vem da cotação e não pode ser alterada: o relatório e a cotação são o mesmo trabalho.",
+    "cotizacionFija": "Vem da cotação pela qual você entrou e não pode ser alterada: as despesas ficam sob ela."
   },
   "editarReportePage": {
     "volver": "← Voltar ao relatório",
@@ -390,7 +392,7 @@
   },
   "analiticasPage": {
     "titulo": "Análises · {empresa}",
-    "subtitulo": "Somente os relatórios de {empresa}.",
+    "subtitulo": "Só os relatórios e cotações de {empresa}.",
     "total": "Total",
     "desdeInicio": "Desde o início",
     "terminados": "Concluídos",
@@ -409,7 +411,14 @@
     "sinDocumento": "Sem documento",
     "sinFirmar": "Sem assinatura",
     "sinDatos": "Ainda não há dados.",
-    "sinDefinir": "Não definido"
+    "sinDefinir": "Não definido",
+    "cotizacionesFinalizadasPorMes": "Cotações finalizadas por mês",
+    "notaCotizacionesFinalizadas": "Últimos 12 meses, pela data de finalização no horário da Colômbia. O mês atual acabou de começar, por isso seu trecho aparece tracejado.",
+    "finalizadasSinFecha": "{count, plural, one {# cotação finalizada não tem data registrada e não aparece no gráfico: foi finalizada antes de o sistema registrar essa data.} other {# cotações finalizadas não têm data registrada e não aparecem no gráfico: foram finalizadas antes de o sistema registrar essa data.}}",
+    "unidadCotizacion": "cotação",
+    "unidadCotizaciones": "cotações",
+    "enCurso": "em andamento",
+    "graficaCotizacionesAria": "Cotações finalizadas por mês nos últimos {meses} meses"
   },
   "validacion": {
     "ingresaUsuario": "Digite seu usuário",
@@ -490,7 +499,43 @@
     "paraQuery": " para “{q}”",
     "quitarFiltros": "Remover filtros",
     "sinCotizaciones": "Ainda não há cotações.",
-    "sinRevisarInsignia": "Não revisada"
+    "sinRevisarInsignia": "Não revisada",
+    "colNumero": "Número",
+    "colProyecto": "Projeto",
+    "colCliente": "Cliente",
+    "colEmpresa": "Empresa",
+    "colEstado": "Status",
+    "colOc": "Ordem de compra",
+    "colEntrega": "Entrega",
+    "colValor": "Valor",
+    "colMoneda": "Moeda",
+    "colCreada": "Criada",
+    "colFinalizada": "Finalizada",
+    "colRevisada": "Revisada",
+    "exportCreada": "Criada (horário da Colômbia)",
+    "exportFinalizada": "Finalizada (horário da Colômbia)",
+    "si": "Sim",
+    "no": "Não",
+    "sinFechaRegistrada": "Sem data registrada",
+    "sinFechaAyuda": "Foi finalizada antes de o sistema registrar essa data.",
+    "finalizadasLabel": "Finalizadas",
+    "finalizadasTodas": "Todas",
+    "ultimos15": "Últimos 15 dias",
+    "ultimos30": "Últimos 30 dias",
+    "rango": "Intervalo de datas",
+    "desde": "De",
+    "hasta": "Até",
+    "aplicar": "Aplicar",
+    "rangoInvalido": "A data inicial é posterior à final: o intervalo não foi aplicado.",
+    "rangoVacio": "Escolha uma data inicial, uma final ou as duas.",
+    "notaFinalizadas": "Só cotações finalizadas, pela data de finalização no horário da Colômbia. As finalizadas sem data registrada ficam de fora.",
+    "exportar": "Exportar para Excel",
+    "exportarAyuda": "Baixa todas as cotações deste filtro, não só as desta página.",
+    "ordenarPor": "Ordenar por",
+    "ordenAscendente": "{columna}, crescente",
+    "ordenDescendente": "{columna}, decrescente",
+    "colOcCorta": "OC",
+    "sinFechaCorta": "Sem data"
   },
   "cotizacionForm": {
     "tituloNueva": "Nova cotação",
@@ -544,7 +589,10 @@
     "avisoReenviado": "Aviso enviado.",
     "avisoSigueSinSalir": "O aviso não saiu. Tente de novo em instantes.",
     "detalleTecnico": "Detalhe técnico: {detalle}",
-    "sinConexion": "Sem conexão. Verifique o sinal e tente de novo."
+    "sinConexion": "Sem conexão. Verifique o sinal e tente de novo.",
+    "finalizadaEl": "Finalizada em",
+    "sinFechaFinalizacion": "Sem data registrada",
+    "crearViaticos": "Criar despesas de viagem com esta cotação"
   },
   "quoteSelector": {
     "label": "Cotação",

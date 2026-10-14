@@ -316,6 +316,7 @@ async function main() {
     description: "Tablero nuevo para la línea 2.\nIncluye puesta en marcha.",
     amount: 1200000,
     creationNotice: null,
+    finalizedAt: null,
     createdByName: "José Pérez",
     updatedAt: new Date("2026-10-13T14:12:00Z"),
   };

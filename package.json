@@ -25,6 +25,7 @@
     "test:adjuntos": "tsx scripts/test-adjuntos.ts",
     "test:archivos": "tsx scripts/test-archivos.ts",
     "test:correo": "tsx --conditions=react-server scripts/test-correo.ts",
+    "test:cotizaciones": "tsx --conditions=react-server scripts/test-cotizaciones.ts",
     "test:filtros": "tsx --conditions=react-server scripts/test-filtros.ts",
     "test:firma": "tsx scripts/test-firma.ts",
     "test:numeracion": "tsx --conditions=react-server scripts/test-numeracion.ts",

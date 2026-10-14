@@ -7,10 +7,15 @@ import { Saludo } from "@/components/saludo";
 import { requireAccesoReportes } from "@/lib/auth-guard";
 import { formatFechaLarga, aValorInput } from "@/lib/fechas";
 import { listarClientesActivos } from "@/lib/queries/clients";
-import { listarCotizacionesActivas } from "@/lib/queries/quotes";
+import {
+  type CotizacionEnLista,
+  type OpcionCotizacion,
+  cotizacionParaReporte,
+  listarCotizacionesActivas,
+} from "@/lib/queries/quotes";
 
 type Params = {
-  searchParams: Promise<{ companyId?: string; quoteId?: string }>;
+  searchParams: Promise<{ companyId?: string; quoteId?: string; tipo?: string }>;
 };
 
 /**
@@ -20,19 +25,40 @@ type Params = {
  * admin no tiene empresa activa —ve las dos siempre— así que aquí es donde
  * elige explícitamente, una vez por reporte, para cuál de las dos es.
  *
- * `companyId`/`quoteId` en la URL vienen del botón "Crear reporte con esta
- * cotización" en el detalle de una cotización: sin ellos, el admin cae en la
- * primera empresa de la lista por defecto, que puede no ser la de la
- * cotización que acaba de abrir, y el selector la muestra vacía.
+ * `companyId`/`quoteId` en la URL vienen de los botones "Crear reporte" y
+ * "Crear viáticos" en el detalle de una cotización (el segundo agrega
+ * `tipo=viaticos`). La cotización de origen no se da por buena por venir en
+ * la dirección: `cotizacionParaReporte` comprueba que exista, esté activa y
+ * sea de una empresa de este usuario. Si lo es, el reporte de viáticos queda
+ * colgado de ella sin selector, y la empresa sale de ella. Si no, se avisa y
+ * se sigue con el formulario de siempre.
  */
 export default async function NuevoReportePage({ searchParams }: Params) {
   const user = await requireAccesoReportes();
-  const [{ companyId: companyIdParam, quoteId: quoteIdParam }, t, tSelector] =
+  const [{ companyId: companyIdParam, quoteId: quoteIdParam, tipo }, t, tSelector] =
     await Promise.all([
       searchParams,
       getTranslations("nuevoReportePage"),
       getTranslations("quoteSelector"),
     ]);
+
+  const cotizacionOrigen = quoteIdParam
+    ? await cotizacionParaReporte(user, quoteIdParam)
+    : null;
+
+  /** Cómo se muestra una cotización en los selectores y en el recuadro fijo. */
+  const opcion = (
+    c: Pick<CotizacionEnLista, "id" | "quoteNumber" | "projectName" | "clientName"> &
+      Pick<OpcionCotizacion, "purchaseOrderNo" | "dueDate">,
+  ): OpcionCotizacionSelector => ({
+    id: c.id,
+    label: c.quoteNumber
+      ? `${c.quoteNumber} — ${c.projectName} — ${c.clientName}`
+      : `${c.projectName} — ${c.clientName}`,
+    clientName: c.clientName,
+    purchaseOrderLabel: c.purchaseOrderNo ?? tSelector("sinAsignar"),
+    dueDateLabel: c.dueDate ? formatFechaLarga(c.dueDate) : tSelector("sinFecha"),
+  });
 
   // Las cotizaciones y los clientes activos se traen para todas las empresas
   // del usuario de una vez: son pocos (una empresa entera, no todo el
@@ -48,28 +74,23 @@ export default async function NuevoReportePage({ searchParams }: Params) {
   // la empresa deja de ser una decisión: la hereda de ella y no se puede
   // cambiar. Cotización y reporte documentan el mismo trabajo, así que uno en
   // LLC y el otro en SAS sería una contradicción, no una opción.
+  //
+  // Con una cotización de origen válida, la empresa es la de la cotización —
+  // leída de la base—, no la que diga la dirección.
   const empresaHeredada =
-    user.role === "admin" && companyIdParam
-      ? empresas.find((e) => e.id === companyIdParam)
-      : undefined;
+    user.role !== "admin"
+      ? undefined
+      : cotizacionOrigen
+        ? empresas.find((e) => e.id === cotizacionOrigen.companyId)
+        : companyIdParam
+          ? empresas.find((e) => e.id === companyIdParam)
+          : undefined;
 
   const [cotizacionesPorEmpresa, clientesPorEmpresa] = await Promise.all([
     Promise.all(
       empresas.map(async (e) => ({
         companyId: e.id,
-        opciones: (await listarCotizacionesActivas(e.id)).map(
-          (c): OpcionCotizacionSelector => ({
-            id: c.id,
-            label: c.quoteNumber
-              ? `${c.quoteNumber} — ${c.projectName} — ${c.clientName}`
-              : `${c.projectName} — ${c.clientName}`,
-            clientName: c.clientName,
-            purchaseOrderLabel: c.purchaseOrderNo ?? tSelector("sinAsignar"),
-            dueDateLabel: c.dueDate
-              ? formatFechaLarga(c.dueDate)
-              : tSelector("sinFecha"),
-          }),
-        ),
+        opciones: (await listarCotizacionesActivas(e.id)).map(opcion),
       })),
     ),
     Promise.all(
@@ -90,6 +111,15 @@ export default async function NuevoReportePage({ searchParams }: Params) {
           <p className="mt-1 text-sm text-muted">{t("subtitulo")}</p>
         </div>
 
+        {quoteIdParam && !cotizacionOrigen ? (
+          <p
+            role="alert"
+            className="mb-5 rounded-lg border border-warning/30 bg-warning-soft px-3 py-2.5 text-sm text-warning"
+          >
+            {t("cotizacionNoDisponible")}
+          </p>
+        ) : null}
+
         <NuevoReporteSelector
           accionServicio={crearReporteAction}
           accionViatico={crearReporteViaticoAction}
@@ -106,16 +136,14 @@ export default async function NuevoReportePage({ searchParams }: Params) {
           }
           cotizacionesPorEmpresa={cotizacionesPorEmpresa}
           clientesPorEmpresa={clientesPorEmpresa}
+          tipoInicial={tipo === "viaticos" ? "viaticos" : "servicio"}
+          cotizacionOrigen={cotizacionOrigen ? opcion(cotizacionOrigen) : undefined}
           // Se propone la fecha de hoy: el reporte se escribe casi siempre el
           // mismo día del trabajo, y así es un campo menos que llenar.
           valoresServicio={{
-            // Solo se preselecciona si la empresa también quedó fijada: un
-            // quoteId de otra empresa que la elegida por defecto no
-            // aparecería en su lista y quedaría un id colgado sin efecto.
-            // Para un empleado la empresa siempre está fijada, así que su
-            // quoteId de la URL sí vale.
-            quoteId:
-              user.role !== "admin" || empresaHeredada ? (quoteIdParam ?? "") : "",
+            // Solo la cotización de origen ya comprobada: un id de la
+            // dirección que no pasó `cotizacionParaReporte` no se preselecciona.
+            quoteId: cotizacionOrigen?.id ?? "",
             workDate: aValorInput(new Date()),
             serviceType: "",
             etiquetas: [],

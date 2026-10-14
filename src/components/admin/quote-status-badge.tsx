@@ -43,19 +43,41 @@ const PUNTO: Record<EstadoCotizacion, string> = {
   cancelada: "bg-muted",
 };
 
+/**
+ * La insignia con el texto ya traducido. Es la que van en las listas: quien la
+ * usa trae la traducción una vez para todas las filas.
+ *
+ * No es asíncrona a propósito. Cada componente asíncrono dentro de una fila
+ * llega aparte en la respuesta y React tiene que esperarlo antes de mostrar la
+ * página: con veinte filas en la tabla y otras veinte en las tarjetas eran
+ * cuarenta esperas por navegación. Con Next 16.2.12 cada espera es una
+ * oportunidad más de un fallo de React que deja la navegación suspendida para
+ * siempre —el clic no hace nada—; con la insignia síncrona pasó de cerca del
+ * 9 % al 5 % de los clics en la lista. No lo corrige: Next 16.4.0 sí (0 de 200).
+ */
+export function InsigniaEstadoCotizacion({
+  status,
+  texto,
+}: {
+  status: EstadoCotizacion;
+  texto: string;
+}) {
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${ESTILO[status]}`}
+    >
+      <span aria-hidden className={`h-1.5 w-1.5 rounded-full ${PUNTO[status]}`} />
+      {texto}
+    </span>
+  );
+}
+
+/** La misma insignia, para una sola cotización (el detalle). */
 export async function QuoteStatusBadge({
   status,
 }: {
   status: EstadoCotizacion;
 }) {
   const t = await getTranslations("estadosCotizacion");
-
-  return (
-    <span
-      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${ESTILO[status]}`}
-    >
-      <span aria-hidden className={`h-1.5 w-1.5 rounded-full ${PUNTO[status]}`} />
-      {t(status)}
-    </span>
-  );
+  return <InsigniaEstadoCotizacion status={status} texto={t(status)} />;
 }

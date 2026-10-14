@@ -204,7 +204,8 @@
     "crear": "Crear reporte",
     "tipoDeReporte": "Tipo de reporte",
     "tipoServicio": "Servicio",
-    "tipoViaticos": "Viáticos"
+    "tipoViaticos": "Viáticos",
+    "cotizacionNoDisponible": "La cotización desde la que entraste no está disponible: no existe, no está activa o no es de tu empresa. Elige una de la lista."
   },
   "viaticoReportForm": {
     "creando": "Creando…",
@@ -215,7 +216,8 @@
     "elige": "Elige una cotización…",
     "sinCotizacionesActivas": "No hay cotizaciones activas en esta empresa.",
     "ayuda": "Los gastos que agregues después quedan bajo esta cotización, independientes del reporte de servicio.",
-    "empresaDeCotizacion": "Viene de la cotización y no se puede cambiar: el reporte y la cotización son el mismo trabajo."
+    "empresaDeCotizacion": "Viene de la cotización y no se puede cambiar: el reporte y la cotización son el mismo trabajo.",
+    "cotizacionFija": "Viene de la cotización desde la que entraste y no se puede cambiar: los gastos quedan bajo ella."
   },
   "editarReportePage": {
     "volver": "← Volver al reporte",
@@ -390,7 +392,7 @@
   },
   "analiticasPage": {
     "titulo": "Analíticas · {empresa}",
-    "subtitulo": "Solo los reportes de {empresa}.",
+    "subtitulo": "Solo los reportes y cotizaciones de {empresa}.",
     "total": "Total",
     "desdeInicio": "Desde el inicio",
     "terminados": "Terminados",
@@ -409,7 +411,14 @@
     "sinDocumento": "Sin documento",
     "sinFirmar": "Sin firmar",
     "sinDatos": "Todavía no hay datos.",
-    "sinDefinir": "Sin definir"
+    "sinDefinir": "Sin definir",
+    "cotizacionesFinalizadasPorMes": "Cotizaciones finalizadas por mes",
+    "notaCotizacionesFinalizadas": "Últimos 12 meses, por fecha de finalización en hora de Colombia. El mes actual va empezado, por eso su tramo aparece punteado.",
+    "finalizadasSinFecha": "{count, plural, one {# cotización finalizada no tiene fecha registrada y no aparece en la gráfica: se finalizó antes de que el sistema guardara esa fecha.} other {# cotizaciones finalizadas no tienen fecha registrada y no aparecen en la gráfica: se finalizaron antes de que el sistema guardara esa fecha.}}",
+    "unidadCotizacion": "cotización",
+    "unidadCotizaciones": "cotizaciones",
+    "enCurso": "en curso",
+    "graficaCotizacionesAria": "Cotizaciones finalizadas por mes durante los últimos {meses} meses"
   },
   "validacion": {
     "ingresaUsuario": "Ingresa tu usuario",
@@ -490,7 +499,43 @@
     "paraQuery": " para “{q}”",
     "quitarFiltros": "Quitar filtros",
     "sinCotizaciones": "No hay cotizaciones todavía.",
-    "sinRevisarInsignia": "Sin revisar"
+    "sinRevisarInsignia": "Sin revisar",
+    "colNumero": "Número",
+    "colProyecto": "Proyecto",
+    "colCliente": "Cliente",
+    "colEmpresa": "Empresa",
+    "colEstado": "Estado",
+    "colOc": "Orden de compra",
+    "colEntrega": "Entrega",
+    "colValor": "Valor",
+    "colMoneda": "Moneda",
+    "colCreada": "Creada",
+    "colFinalizada": "Finalizada",
+    "colRevisada": "Revisada",
+    "exportCreada": "Creada (hora de Colombia)",
+    "exportFinalizada": "Finalizada (hora de Colombia)",
+    "si": "Sí",
+    "no": "No",
+    "sinFechaRegistrada": "Sin fecha registrada",
+    "sinFechaAyuda": "Se finalizó antes de que el sistema guardara esa fecha.",
+    "finalizadasLabel": "Finalizadas",
+    "finalizadasTodas": "Todas",
+    "ultimos15": "Últimos 15 días",
+    "ultimos30": "Últimos 30 días",
+    "rango": "Rango de fechas",
+    "desde": "Desde",
+    "hasta": "Hasta",
+    "aplicar": "Aplicar",
+    "rangoInvalido": "La fecha inicial es posterior a la final: el rango no se aplicó.",
+    "rangoVacio": "Elige una fecha inicial, una final o las dos.",
+    "notaFinalizadas": "Solo cotizaciones finalizadas, por su fecha de finalización en hora de Colombia. Las finalizadas sin fecha registrada no entran.",
+    "exportar": "Exportar a Excel",
+    "exportarAyuda": "Descarga todas las cotizaciones de este filtro, no solo las de esta página.",
+    "ordenarPor": "Ordenar por",
+    "ordenAscendente": "{columna}, ascendente",
+    "ordenDescendente": "{columna}, descendente",
+    "colOcCorta": "OC",
+    "sinFechaCorta": "Sin fecha"
   },
   "cotizacionForm": {
     "tituloNueva": "Nueva cotización",
@@ -544,7 +589,10 @@
     "avisoReenviado": "Aviso enviado.",
     "avisoSigueSinSalir": "El aviso no salió. Vuelve a intentarlo en un momento.",
     "detalleTecnico": "Detalle técnico: {detalle}",
-    "sinConexion": "No hay conexión. Revisa la señal y vuelve a intentarlo."
+    "sinConexion": "No hay conexión. Revisa la señal y vuelve a intentarlo.",
+    "finalizadaEl": "Finalizada el",
+    "sinFechaFinalizacion": "Sin fecha registrada",
+    "crearViaticos": "Crear viáticos con esta cotización"
   },
   "quoteSelector": {
     "label": "Cotización",

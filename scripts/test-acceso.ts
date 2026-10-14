@@ -336,6 +336,41 @@ async function main() {
     `${r.status}, ¿redirige? ${r.texto.includes(MARCA_REDIRECCION)}`,
   );
 
+  console.log("\nExportación de cotizaciones\n");
+
+  // Esta sí es una ruta que responde de una vez, sin transmitir: aquí el
+  // código HTTP vale como señal.
+  r = await pedir("/api/cotizaciones/exportar?finalizadas=30");
+  comprobar("sin sesión no se descarga", r.status === 401, `${r.status}`);
+
+  r = await pedir("/api/cotizaciones/exportar?finalizadas=30", cookieEmpleado);
+  comprobar(
+    "un empleado no puede descargarla: se le contesta que no existe",
+    r.status === 404 && !r.texto.includes(";"),
+    `${r.status}`,
+  );
+
+  const exportada = await fetch(`${BASE}/api/cotizaciones/exportar?finalizadas=30`, {
+    headers: { cookie: `${SESSION_COOKIE}=${cookieAdmin}` },
+  });
+  const contenido = new Uint8Array(await exportada.arrayBuffer());
+  const textoExportado = new TextDecoder().decode(contenido);
+  comprobar(
+    "el administrador la descarga como archivo CSV",
+    exportada.status === 200 &&
+      (exportada.headers.get("content-type") ?? "").startsWith("text/csv") &&
+      (exportada.headers.get("content-disposition") ?? "").startsWith("attachment;"),
+    `${exportada.status} ${exportada.headers.get("content-type")}`,
+  );
+  comprobar(
+    "con la marca de UTF-8 al principio y una columna de fecha de finalización",
+    contenido[0] === 0xef &&
+      contenido[1] === 0xbb &&
+      contenido[2] === 0xbf &&
+      textoExportado.split("\r\n")[0]!.split(";").length === 12,
+    textoExportado.split("\r\n")[0]!,
+  );
+
   console.log(
     fallos === 0
       ? "\nTodas las comprobaciones pasaron.\n"

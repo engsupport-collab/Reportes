@@ -59,3 +59,17 @@ export function esEstadoCotizacion(valor: string): valor is EstadoCotizacion {
 export function esEstadoActivo(valor: string): boolean {
   return (ESTADOS_ACTIVOS as readonly string[]).includes(valor);
 }
+
+/**
+ * La fecha de finalización que vale: la de una cotización que está
+ * finalizada. Cambiar de estado ya borra la fecha al salir de "finalizada"
+ * (ver `cambiarEstadoDeCotizacion`); esto es para que ninguna pantalla ni
+ * archivo muestre una fecha de finalización junto a otro estado aunque algún
+ * día quedara una por otro camino.
+ */
+export function finalizacionVigente(c: {
+  status: string;
+  finalizedAt: Date | null;
+}): Date | null {
+  return c.status === "finalizada" ? c.finalizedAt : null;
+}

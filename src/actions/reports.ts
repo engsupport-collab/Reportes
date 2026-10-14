@@ -17,7 +17,7 @@ import {
 import { enviarReporteAlCliente } from "@/lib/correo-reporte";
 import { registrarEvento } from "@/lib/eventos-reporte";
 import { listarEmpresas } from "@/lib/queries/companies";
-import { obtenerCotizacion } from "@/lib/queries/quotes";
+import { cotizacionParaReporte, obtenerCotizacion } from "@/lib/queries/quotes";
 import { obtenerReporte } from "@/lib/queries/reports";
 import {
   correoClienteSchema,
@@ -179,26 +179,23 @@ export async function crearReporteViaticoAction(
     return { error: parsed.error.issues[0]?.message ?? t("revisaLosDatos") };
   }
 
-  let companyId: string;
-  if (user.role === "admin") {
-    const enviado = formData.get("companyId");
-    const empresas = await listarEmpresas();
-    const valida = empresas.find((e) => e.id === enviado);
-    if (!valida) {
-      return { error: t("eligeEmpresaReporte") };
-    }
-    companyId = valida.id;
-  } else {
-    companyId = user.empresaActiva.id;
-  }
-
-  const cotizacion = await obtenerCotizacionActivaDeEmpresa(
-    parsed.data.quoteId,
-    companyId,
-  );
+  // El id de la cotización llega del navegador —del selector, o fijo cuando
+  // el formulario se abrió desde una cotización— y no se da por bueno: la
+  // cotización tiene que existir, estar activa y ser de una empresa en la que
+  // este usuario trabaja. La empresa del reporte sale de la cotización, no
+  // del formulario.
+  const cotizacion = await cotizacionParaReporte(user, parsed.data.quoteId);
   if (!cotizacion) {
     return { error: t("eligeCotizacion") };
   }
+  // El admin además eligió una empresa arriba: si no es la de la cotización,
+  // el formulario fue manipulado o quedó desalineado, y no se adivina cuál de
+  // las dos quería.
+  const empresaEnviada = formData.get("companyId");
+  if (user.role === "admin" && empresaEnviada && empresaEnviada !== cotizacion.companyId) {
+    return { error: t("eligeCotizacion") };
+  }
+  const companyId = cotizacion.companyId;
 
   const id = crypto.randomUUID();
 

@@ -96,6 +96,18 @@ export default async function DetalleCotizacionPage({ params }: Params) {
             ) : null}
             <Dato etiqueta={t("creadaPor")} valor={cotizacion.createdByName} />
             <Dato etiqueta={t("creadaEl")} valor={formatInstante(cotizacion.createdAt)} />
+            {/* Solo si está finalizada. Una que ya lo estaba antes de que se
+                guardara esta fecha lo dice, en vez de mostrar otra fecha. */}
+            {cotizacion.status === "finalizada" ? (
+              <Dato
+                etiqueta={t("finalizadaEl")}
+                valor={
+                  cotizacion.finalizedAt
+                    ? formatInstante(cotizacion.finalizedAt)
+                    : t("sinFechaFinalizacion")
+                }
+              />
+            ) : null}
           </dl>
 
           {cotizacion.description ? (
@@ -151,12 +163,22 @@ export default async function DetalleCotizacionPage({ params }: Params) {
               {t("editar")}
             </Link>
             {esEstadoActivo(cotizacion.status) ? (
-              <Link
-                href={`/reportes/nuevo?companyId=${cotizacion.companyId}&quoteId=${id}`}
-                className="rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-strong"
-              >
-                {t("crearReporte")}
-              </Link>
+              <>
+                <Link
+                  href={`/reportes/nuevo?companyId=${cotizacion.companyId}&quoteId=${id}`}
+                  className="rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-strong"
+                >
+                  {t("crearReporte")}
+                </Link>
+                {/* Abre el mismo formulario ya en viáticos y con esta
+                    cotización fija: no hay que elegirla otra vez. */}
+                <Link
+                  href={`/reportes/nuevo?companyId=${cotizacion.companyId}&quoteId=${id}&tipo=viaticos`}
+                  className="rounded-lg border border-border px-4 py-2.5 text-sm font-medium text-text transition hover:border-brand hover:text-brand"
+                >
+                  {t("crearViaticos")}
+                </Link>
+              </>
             ) : null}
           </div>
           {!esEstadoActivo(cotizacion.status) ? (

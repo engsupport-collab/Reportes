@@ -49,8 +49,9 @@ function construirUrl(
   basePath: string,
   q: string | undefined,
   valores: { name: string; value: string }[],
+  conservar: [string, string][] = [],
 ): string {
-  const sp = new URLSearchParams();
+  const sp = new URLSearchParams(conservar);
   if (q) sp.set("q", q);
   for (const { name, value } of valores) {
     if (value) sp.set(name, value);
@@ -75,10 +76,16 @@ export function FilterPanel({
   basePath,
   q,
   campos,
+  conservar,
 }: {
   basePath: string;
   q?: string;
   campos: CampoFiltro[];
+  /**
+   * Parámetros de la dirección que este panel no maneja pero no debe perder
+   * al aplicar (el orden de una tabla, un filtro que vive fuera del panel).
+   */
+  conservar?: [string, string][];
 }) {
   const [abierto, setAbierto] = useState(false);
   const router = useRouter();
@@ -101,7 +108,7 @@ export function FilterPanel({
       value: String(datos.get(campo.name) ?? ""),
     }));
     setAbierto(false);
-    router.push(construirUrl(basePath, q, valores));
+    router.push(construirUrl(basePath, q, valores, conservar));
   }
 
   /** URL igual a la actual pero sin un filtro concreto. */
@@ -120,6 +127,7 @@ export function FilterPanel({
                 ? "1"
                 : "",
       })),
+      conservar,
     );
   }
 
@@ -224,6 +232,7 @@ export function FilterPanel({
                       basePath,
                       q,
                       campos.map((c) => ({ name: c.name, value: "" })),
+                      conservar,
                     )}
                     onClick={() => setAbierto(false)}
                     className="rounded-lg px-3 py-2 text-sm font-medium text-muted transition hover:text-text"
